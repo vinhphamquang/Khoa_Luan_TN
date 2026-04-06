@@ -69,10 +69,18 @@ def analyze_image(image_bytes: bytes):
     Ưu tiên dùng Spoonacular vì chuyên trang ẩm thực. 
     Nếu không được sẽ fallback sang Google Cloud Vision.
     """
+    # 1. Thử Spoonacular trước (chuyên về đồ ăn)
     food_name, confidence = recognize_food_spoonacular(image_bytes)
+    print(f"[DEBUG] Spoonacular => name='{food_name}', confidence={confidence}")
     
-    if food_name and confidence > 0.4:
+    if food_name and confidence > 0:
         return food_name, confidence
         
-    # Fallback to Vision
-    return recognize_food_vision(image_bytes)
+    # 2. Fallback sang Google Vision
+    food_name_v, confidence_v = recognize_food_vision(image_bytes)
+    print(f"[DEBUG] Vision => name='{food_name_v}', confidence={confidence_v}")
+    
+    if food_name_v:
+        return food_name_v, confidence_v
+    
+    return None, 0.0

@@ -27,13 +27,23 @@ def get_mapped_food_name(food_name: str) -> str:
         'banh mi': 'Banh mi',
         'bread': 'Banh mi',
         'burger': 'Banh mi',
+        'burrito': 'Banh mi',
+        'wrap': 'Banh mi',
         
         # Tập Alias cho Bún Chả
         'bun cha': 'Bun cha',
         'pork meatball': 'Bun cha',
         'grilled pork': 'Bun cha',
         'meatball': 'Bun cha',
-        'noodles with pork': 'Bun cha'
+        'noodles with pork': 'Bun cha',
+        
+        # Tập Alias cho Bún bò Huế
+        'bun bo hue': 'Bún bò Huế',
+        'bun bo': 'Bún bò Huế',
+        'beef stew': 'Bún bò Huế',
+        'beef_stew': 'Bún bò Huế',
+        'spicy beef noodle': 'Bún bò Huế',
+        'beef noodle': 'Bún bò Huế'
     }
     return alias_map.get(food_lower, food_name)
 
@@ -49,10 +59,11 @@ def search_food_by_name(food_name: str):
     cursor = conn.cursor()
     
     # 1. Look for MonAn (Tìm theo tên đã map HOẶC tên gốc)
+    # Thêm MoTa LIKE ? để quét các món do AI sinh ra (AI sẽ nhúng tên tiếng Anh vào MoTa)
     cursor.execute("""
         SELECT * FROM MonAn 
-        WHERE TenMonAn LIKE ? OR PhanLoai LIKE ? OR TenMonAn LIKE ?
-    """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{food_name}%'))
+        WHERE TenMonAn LIKE ? OR PhanLoai LIKE ? OR TenMonAn LIKE ? OR MoTa LIKE ?
+    """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{food_name}%', f'%{food_name}%'))
     
     mon_an = cursor.fetchone()
     
@@ -105,3 +116,77 @@ def insert_lich_su(ma_nguoi_dung, hinh_anh, ket_qua, do_chinh_xac):
     """, (ma_nguoi_dung, hinh_anh, ket_qua, do_chinh_xac))
     conn.commit()
     conn.close()
+
+import datetime
+
+def insert_generated_food_data(food_name_english: str, data: dict):
+    """
+    Nhận dữ liệu dạng JSON dict từ Gemini và lưu vào SQLite.
+    Bao gồm ghi chú gốc tiếng Anh vào `MoTa` để lần sau `search_food_by_name` có thể match được qua `MoTa LIKE ?`
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Thêm ghi chú Tên Tiếng Anh vào Mô tả để công cụ tìm kiếm qua LIKE tìm được trong tương lai
+        mo_ta = data.get('MoTa', '') + f" [AI_Alias: {food_name_english}]"
+        
+        # 1. Insert MonAn
+        cursor.execute("""
+            INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao)
+            VALUES (?, ?, ?, ?)
+        """, (data.get('TenMonAn', food_name_english), mo_ta, data.get('PhanLoai', ''), datetime.date.today().strftime('%Y-%m-%d')))
+        ma_mon_an = cursor.lastrowid
+        
+        dinh_duong = data.get('DinhDuong', {})
+        # 2. Insert DinhDuong
+        cursor.execute("""
+            INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            ma_mon_an, 
+            dinh_duong.get('Calo', 0), 
+            dinh_duong.get('Protein', 0.0), 
+            dinh_duong.get('ChatBeo', 0.0), 
+            dinh_duong.get('Carbohydrate', 0.0), 
+            dinh_duong.get('Vitamin', '')
+        ))
+        
+        cong_thuc = data.get('CongThuc', {})
+        # 3. Insert CongThuc
+        cursor.execute("""
+            INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
+            VALUES (?, ?, ?, ?)
+        """, (
+            ma_mon_an,
+            cong_thuc.get('HuongDan', ''),
+            cong_thuc.get('ThoiGianNau', 0),
+            cong_thuc.get('KhauPhan', 1)
+        ))
+        ma_cong_thuc = cursor.lastrowid
+        
+        # 4. Insert NguyenLieu and ChiTietNguyenLieu
+        nguyen_lieu_list = cong_thuc.get('NguyenLieu', [])
+        for nl in nguyen_lieu_list:
+            ten_nl = nl.get('TenNguyenLieu', '')
+            so_luong = str(nl.get('SoLuong', ''))
+            
+            if not ten_nl:
+                continue
+                
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            row = cursor.fetchone()
+            if row:
+                ma_nl = row['MaNguyenLieu']
+            else:
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
+                ma_nl = cursor.lastrowid
+                
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ma_cong_thuc, ma_nl, so_luong))
+            
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[Database Insert Error] {e}")
+        return False

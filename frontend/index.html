@@ -3,129 +3,390 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Smart Food Detector</title>
+    <title>Smart Food Analysis - Nhận Diện Món Ăn Bằng AI</title>
+    <meta name="description" content="Hệ thống nhận diện món ăn Việt Nam thông minh sử dụng trí tuệ nhân tạo, phân tích giá trị dinh dưỡng và gợi ý công thức nấu ăn.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-    <!-- Nền động Animated Background -->
-    <div class="bg-shape shape-1"></div>
-    <div class="bg-shape shape-2"></div>
-    <div class="bg-shape shape-3"></div>
-
-    <div class="container glass-panel">
-        <header>
-            <div class="logo-area">
-                <i class="fa-solid fa-bowl-food"></i>
-            </div>
-            <h1>Smart Food Analysis</h1>
-            <p>Phân tích giá trị dinh dưỡng qua ống kính AI</p>
-        </header>
-
-        <main>
-            <section class="upload-section" id="drop-zone">
-                <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" hidden>
-                
-                <div class="upload-content" id="upload-content">
-                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                    <h2>Kéo thả ảnh món ăn vào đây</h2>
-                    <span>hoặc <button class="browse-btn" onclick="document.getElementById('file-input').click()">Chọn từ thiết bị</button></span>
-                </div>
-                
-                <!-- Vùng ảnh preview sẽ ẩn cho đến khi có ảnh -->
-                <div id="image-preview-container" class="hidden">
-                     <img id="preview-img" src="" alt="Biểu tượng món ăn tải lên">
-                     <div class="preview-actions">
-                         <button class="action-btn analyze-btn" id="analyze-btn">
-                             <i class="fa-solid fa-wand-magic-sparkles"></i> Phân tích AI
-                         </button>
-                         <button class="action-btn remove-btn" id="remove-btn">
-                             <i class="fa-solid fa-trash"></i> Xóa
-                         </button>
-                     </div>
-                </div>
-            </section>
-
-            <!-- Loading Spinner mượt mà -->
-            <div id="loading" class="hidden">
-                <div class="loader">
-                  <div class="circle"></div>
-                  <div class="circle"></div>
-                  <div class="circle"></div>
-                  <div class="circle"></div>
-                </div>
-                <p>Mô hình Neural Network đang quét...</p>
-            </div>
-
-            <!-- Kết quả dạng Widget Dinh Dưỡng -->
-            <section id="result-section" class="hidden result-panel">
-                <div class="result-header">
-                    <h2 id="food-name">Tên Món Ăn</h2>
-                    <div class="confidence-badge">
-                         Độ tin cậy Model: <span id="confidence-score">98</span>%
-                    </div>
-                </div>
-                
-                <p id="food-desc" class="food-desc">Mô tả về món ăn.</p>
-                <div class="system-msg" id="sys-msg"></div>
-                
-                <div class="nutrition-grid">
-                    <div class="nutri-card cal">
-                        <div class="icon-wrap"><i class="fa-solid fa-fire"></i></div>
-                        <div class="info-wrap">
-                            <span class="value" id="val-cal">--</span>
-                            <span class="label">Calo (kcal)</span>
-                        </div>
-                    </div>
-                    <div class="nutri-card prot">
-                        <div class="icon-wrap"><i class="fa-solid fa-dumbbell"></i></div>
-                        <div class="info-wrap">
-                            <span class="value" id="val-prot">--</span>
-                            <span class="label">Protein (g)</span>
-                        </div>
-                    </div>
-                    <div class="nutri-card carb">
-                        <div class="icon-wrap"><i class="fa-solid fa-wheat-awn"></i></div>
-                        <div class="info-wrap">
-                            <span class="value" id="val-carb">--</span>
-                            <span class="label">Tinh bột (g)</span>
-                        </div>
-                    </div>
-                    <div class="nutri-card fat">
-                        <div class="icon-wrap"><i class="fa-solid fa-droplet"></i></div>
-                        <div class="info-wrap">
-                            <span class="value" id="val-fat">--</span>
-                            <span class="label">Chất béo (g)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Thêm Nguyên Liệu & Công Thức -->
-                <div class="recipe-container hidden" id="recipe-container">
-                    <div class="recipe-section">
-                        <h3><i class="fa-solid fa-basket-shopping"></i> Nguyên Liệu</h3>
-                        <ul id="ingredients-list" class="ingredients-list">
-                            <!-- JS will populate this -->
-                        </ul>
-                    </div>
-                    <div class="recipe-section">
-                        <h3><i class="fa-solid fa-fire-burner"></i> Công Thức Cách Làm <span id="recipe-time"></span></h3>
-                        <p id="recipe-instructions" class="recipe-instructions">
-                            <!-- JS will populate this -->
-                        </p>
-                    </div>
-                </div>
-            </section>
-        </main>
-        
-        <footer>
-            <p>Hệ Thống API Viết bằng <i class="fa-brands fa-python"></i> Python Flask & <i class="fa-solid fa-database"></i> SQLite</p>
-        </footer>
+    <!-- Animated Background Blobs -->
+    <div class="bg-blobs" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
     </div>
-    
+
+    <!-- ========== HEADER / NAVBAR ========== -->
+    <header class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#intro" class="nav-logo" id="nav-logo">
+                <i class="fa-solid fa-bowl-food"></i>
+                <span>SmartFood<strong>AI</strong></span>
+            </a>
+            <nav class="nav-links" id="nav-links">
+                <a href="#intro" class="nav-link active" data-page="intro">
+                    <i class="fa-solid fa-house"></i> Giới Thiệu
+                </a>
+                <a href="#analyze" class="nav-link" data-page="analyze">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Phân Tích
+                </a>
+            </nav>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ========== PAGE: GIỚI THIỆU ========== -->
+    <section class="page active" id="page-intro">
+
+        <!-- Hero Section -->
+        <div class="hero">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <i class="fa-solid fa-sparkles"></i> Ứng Dụng Trí Tuệ Nhân Tạo
+                </div>
+                <h1 class="hero-title">
+                    Nhận Diện <span class="gradient-text">Món Ăn</span><br>
+                    Thông Minh Bằng AI
+                </h1>
+                <p class="hero-desc">
+                    Hệ thống phân tích hình ảnh món ăn Việt Nam sử dụng công nghệ AI tiên tiến. 
+                    Chỉ cần chụp ảnh, hệ thống sẽ tự động nhận diện tên món, 
+                    thành phần dinh dưỡng và gợi ý công thức nấu ăn chi tiết.
+                </p>
+                <div class="hero-actions">
+                    <a href="#analyze" class="btn btn-primary" id="hero-cta">
+                        <i class="fa-solid fa-camera"></i> Bắt Đầu Phân Tích
+                    </a>
+                    <a href="#section-guide" class="btn btn-outline">
+                        <i class="fa-solid fa-circle-info"></i> Tìm Hiểu Thêm
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number" id="stat-dishes">3</span>
+                        <span class="stat-label">Món ăn hỗ trợ</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number">2</span>
+                        <span class="stat-label">API nhận diện</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number">&lt;5s</span>
+                        <span class="stat-label">Thời gian xử lý</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-glow"></div>
+                <div class="hero-card glass-card">
+                    <i class="fa-solid fa-brain hero-card-icon"></i>
+                    <div class="scan-line"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hướng Dẫn Sử Dụng -->
+        <div class="section" id="section-guide">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-book-open"></i> Hướng Dẫn</span>
+                <h2 class="section-title">Sử Dụng <span class="gradient-text">Dễ Dàng</span></h2>
+                <p class="section-desc">Chỉ cần 3 bước đơn giản để phân tích món ăn của bạn</p>
+            </div>
+            <div class="steps-grid">
+                <div class="step-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="step-number">01</div>
+                    <div class="step-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <h3>Tải Lên Hình Ảnh</h3>
+                    <p>Chụp ảnh hoặc chọn ảnh món ăn từ thiết bị. Hỗ trợ định dạng JPG, PNG, WebP.</p>
+                </div>
+                <div class="step-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="step-number">02</div>
+                    <div class="step-icon accent"><i class="fa-solid fa-microchip"></i></div>
+                    <h3>AI Phân Tích</h3>
+                    <p>Hệ thống AI sẽ tự động nhận diện món ăn qua hình ảnh bằng công nghệ Cloud Vision & Spoonacular.</p>
+                </div>
+                <div class="step-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="step-number">03</div>
+                    <div class="step-icon success"><i class="fa-solid fa-chart-pie"></i></div>
+                    <h3>Xem Kết Quả</h3>
+                    <p>Nhận thông tin chi tiết: tên món, dinh dưỡng (calo, protein, chất béo, tinh bột), công thức nấu.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Công Nghệ Sử Dụng -->
+        <div class="section">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-microchip"></i> Công Nghệ</span>
+                <h2 class="section-title">Nền Tảng <span class="gradient-text">Công Nghệ</span></h2>
+                <p class="section-desc">Được xây dựng bằng các công nghệ hiện đại và đáng tin cậy</p>
+            </div>
+            <div class="tech-grid">
+                <div class="tech-card glass-card reveal" style="--delay: 0.05s">
+                    <div class="tech-icon python"><i class="fa-brands fa-python"></i></div>
+                    <h4>Python</h4>
+                    <p>Ngôn ngữ lập trình chính cho Backend & xử lý dữ liệu</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="tech-icon flask"><i class="fa-solid fa-flask"></i></div>
+                    <h4>Flask</h4>
+                    <p>Web framework nhẹ gọn để xây dựng REST API server</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.15s">
+                    <div class="tech-icon sqlite"><i class="fa-solid fa-database"></i></div>
+                    <h4>SQLite</h4>
+                    <p>Cơ sở dữ liệu nhúng lưu trữ thông tin món ăn & dinh dưỡng</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="tech-icon vision"><i class="fa-solid fa-eye"></i></div>
+                    <h4>Google Vision</h4>
+                    <p>API nhận diện hình ảnh bằng Machine Learning của Google Cloud</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.25s">
+                    <div class="tech-icon spoon"><i class="fa-solid fa-utensils"></i></div>
+                    <h4>Spoonacular</h4>
+                    <p>API chuyên biệt cho nhận diện và phân loại thực phẩm</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="tech-icon frontend"><i class="fa-brands fa-html5"></i></div>
+                    <h4>HTML / CSS / JS</h4>
+                    <p>Giao diện web hiện đại với thiết kế Glassmorphism & SPA</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tính Năng Nổi Bật -->
+        <div class="section">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-star"></i> Tính Năng</span>
+                <h2 class="section-title">Tính Năng <span class="gradient-text">Nổi Bật</span></h2>
+                <p class="section-desc">Khám phá những gì hệ thống có thể làm cho bạn</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="feature-icon-wrap cal-bg">
+                        <i class="fa-solid fa-camera-retro"></i>
+                    </div>
+                    <h3>Nhận Diện Hình Ảnh</h3>
+                    <p>AI tự động phân tích hình ảnh và nhận diện tên món ăn với độ chính xác cao thông qua nhiều tầng API.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="feature-icon-wrap prot-bg">
+                        <i class="fa-solid fa-apple-whole"></i>
+                    </div>
+                    <h3>Phân Tích Dinh Dưỡng</h3>
+                    <p>Hiển thị chi tiết thành phần dinh dưỡng: Calo, Protein, Tinh bột, Chất béo cho mỗi món ăn.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="feature-icon-wrap carb-bg">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                    </div>
+                    <h3>Công Thức Nấu Ăn</h3>
+                    <p>Cung cấp hướng dẫn nấu ăn chi tiết từng bước và danh sách nguyên liệu cần thiết.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.4s">
+                    <div class="feature-icon-wrap fat-bg">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h3>Xử Lý Nhanh Chóng</h3>
+                    <p>Kết quả nhận diện được trả về trong vòng vài giây nhờ kiến trúc API tối ưu.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh Sách Món Ăn Hỗ Trợ -->
+        <div class="section">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-bowl-rice"></i> Thực Đơn</span>
+                <h2 class="section-title">Món Ăn <span class="gradient-text">Được Hỗ Trợ</span></h2>
+                <p class="section-desc">Danh sách các món ăn Việt Nam mà hệ thống có thể nhận diện</p>
+            </div>
+            <div class="dishes-grid" id="dishes-grid">
+                <!-- Sẽ được JS populate từ API, fallback static -->
+                <div class="dish-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="dish-emoji">🍜</div>
+                    <h3>Phở Bò</h3>
+                    <p class="dish-cat">Món nước</p>
+                    <p class="dish-desc">Phở bò truyền thống Việt Nam với nước cốt hầm xương đậm đà, thịt bò mềm và bánh phở dai.</p>
+                    <div class="dish-nutrients">
+                        <span><i class="fa-solid fa-fire"></i> 450 kcal</span>
+                        <span><i class="fa-solid fa-dumbbell"></i> 25.5g protein</span>
+                    </div>
+                </div>
+                <div class="dish-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="dish-emoji">🥖</div>
+                    <h3>Bánh Mì</h3>
+                    <p class="dish-cat">Bánh</p>
+                    <p class="dish-desc">Bánh mì Việt Nam giòn rụm với nhân pate, thịt nướng, chả lụa và rau củ muối chua.</p>
+                    <div class="dish-nutrients">
+                        <span><i class="fa-solid fa-fire"></i> 350 kcal</span>
+                        <span><i class="fa-solid fa-dumbbell"></i> 15g protein</span>
+                    </div>
+                </div>
+                <div class="dish-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="dish-emoji">🍖</div>
+                    <h3>Bún Chả</h3>
+                    <p class="dish-cat">Món nước trộn</p>
+                    <p class="dish-desc">Bún chả Hà Nội - sự hòa quyện tuyệt vời giữa thịt lợn nướng xém cạnh, chả băm nhuyễn và nước mắm chua ngọt.</p>
+                    <div class="dish-nutrients">
+                        <span><i class="fa-solid fa-fire"></i> 520 kcal</span>
+                        <span><i class="fa-solid fa-dumbbell"></i> 28g protein</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- ========== PAGE: PHÂN TÍCH ========== -->
+    <section class="page" id="page-analyze">
+        <div class="analyze-container">
+            <div class="analyze-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Engine</span>
+                <h2 class="section-title">Phân Tích <span class="gradient-text">Món Ăn</span></h2>
+                <p class="section-desc">Tải lên hình ảnh món ăn và để AI phân tích cho bạn</p>
+            </div>
+
+            <div class="analyze-main glass-card">
+                <!-- Upload Zone -->
+                <div class="upload-zone" id="drop-zone">
+                    <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" hidden>
+                    
+                    <div class="upload-content" id="upload-content">
+                        <div class="upload-icon-wrap">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <div class="upload-pulse"></div>
+                        </div>
+                        <h3>Kéo thả ảnh món ăn vào đây</h3>
+                        <p>hoặc</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                            <i class="fa-solid fa-folder-open"></i> Chọn Từ Thiết Bị
+                        </button>
+                        <span class="upload-hint">Hỗ trợ: JPG, PNG, WebP • Tối đa 10MB</span>
+                    </div>
+                    
+                    <!-- Image Preview -->
+                    <div id="image-preview-container" class="hidden">
+                        <img id="preview-img" src="" alt="Ảnh món ăn tải lên">
+                        <div class="preview-actions">
+                            <button class="btn btn-primary" id="analyze-btn">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích AI
+                            </button>
+                            <button class="btn btn-ghost" id="remove-btn">
+                                <i class="fa-solid fa-trash"></i> Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="hidden">
+                    <div class="loader-modern">
+                        <div class="loader-ring"></div>
+                        <i class="fa-solid fa-brain loader-brain"></i>
+                    </div>
+                    <p class="loader-text">AI đang phân tích hình ảnh<span class="dots"></span></p>
+                </div>
+
+                <!-- Kết Quả -->
+                <div id="result-section" class="hidden result-panel">
+                    <div class="result-header">
+                        <div>
+                            <h2 id="food-name">Tên Món Ăn</h2>
+                            <p id="food-desc" class="food-desc">Mô tả về món ăn.</p>
+                        </div>
+                        <div class="confidence-badge" id="confidence-badge">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span><span id="confidence-score">0</span>%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="system-msg" id="sys-msg"></div>
+                    
+                    <div class="nutrition-grid">
+                        <div class="nutri-card cal">
+                            <div class="nutri-icon"><i class="fa-solid fa-fire"></i></div>
+                            <div class="nutri-info">
+                                <span class="nutri-value" id="val-cal">--</span>
+                                <span class="nutri-label">Calo (kcal)</span>
+                            </div>
+                        </div>
+                        <div class="nutri-card prot">
+                            <div class="nutri-icon"><i class="fa-solid fa-dumbbell"></i></div>
+                            <div class="nutri-info">
+                                <span class="nutri-value" id="val-prot">--</span>
+                                <span class="nutri-label">Protein (g)</span>
+                            </div>
+                        </div>
+                        <div class="nutri-card carb">
+                            <div class="nutri-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                            <div class="nutri-info">
+                                <span class="nutri-value" id="val-carb">--</span>
+                                <span class="nutri-label">Tinh bột (g)</span>
+                            </div>
+                        </div>
+                        <div class="nutri-card fat">
+                            <div class="nutri-icon"><i class="fa-solid fa-droplet"></i></div>
+                            <div class="nutri-info">
+                                <span class="nutri-value" id="val-fat">--</span>
+                                <span class="nutri-label">Chất béo (g)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Công thức & Nguyên liệu -->
+                    <div class="recipe-panel hidden" id="recipe-container">
+                        <div class="recipe-block">
+                            <h3><i class="fa-solid fa-basket-shopping"></i> Nguyên Liệu</h3>
+                            <ul id="ingredients-list" class="ingredients-list"></ul>
+                        </div>
+                        <div class="recipe-block">
+                            <h3><i class="fa-solid fa-fire-burner"></i> Công Thức Nấu <span id="recipe-time" class="recipe-time-badge"></span></h3>
+                            <p id="recipe-instructions" class="recipe-text"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="footer-logo">
+                    <i class="fa-solid fa-bowl-food"></i>
+                    <span>SmartFood<strong>AI</strong></span>
+                </div>
+                <p>Hệ thống nhận diện món ăn Việt Nam thông minh sử dụng trí tuệ nhân tạo.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Điều Hướng</h4>
+                <a href="#intro"><i class="fa-solid fa-chevron-right"></i> Giới Thiệu</a>
+                <a href="#analyze"><i class="fa-solid fa-chevron-right"></i> Phân Tích Món Ăn</a>
+            </div>
+            <div class="footer-tech">
+                <h4>Công Nghệ</h4>
+                <div class="footer-tech-tags">
+                    <span><i class="fa-brands fa-python"></i> Python</span>
+                    <span><i class="fa-solid fa-flask"></i> Flask</span>
+                    <span><i class="fa-solid fa-database"></i> SQLite</span>
+                    <span><i class="fa-solid fa-eye"></i> Vision API</span>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Smart Food Analysis — Đề Tài Khóa Luận Tốt Nghiệp</p>
+        </div>
+    </footer>
+
     <script src="/static/script.js"></script>
 </body>
 </html>
