@@ -1,0 +1,55 @@
+CREATE TABLE NguoiDung (
+    MaNguoiDung INTEGER PRIMARY KEY AUTOINCREMENT,
+    TenNguoiDung TEXT NOT NULL,
+    Email TEXT UNIQUE,
+    MatKhau TEXT NOT NULL,
+    NgayDangKy DATE,
+    VaiTro TEXT
+)
+CREATE TABLE sqlite_sequence(name,seq)
+CREATE TABLE MonAn (
+    MaMonAn INTEGER PRIMARY KEY AUTOINCREMENT,
+    TenMonAn TEXT NOT NULL,
+    MoTa TEXT,
+    PhanLoai TEXT,
+    NgayTao DATE
+)
+CREATE TABLE DinhDuong (
+    MaDinhDuong INTEGER PRIMARY KEY AUTOINCREMENT,
+    MaMonAn INTEGER,
+    Calo REAL,
+    Protein REAL,
+    ChatBeo REAL,
+    Carbohydrate REAL,
+    Vitamin TEXT,
+    FOREIGN KEY (MaMonAn) REFERENCES MonAn(MaMonAn)
+)
+CREATE TABLE CongThuc (
+    MaCongThuc INTEGER PRIMARY KEY AUTOINCREMENT,
+    MaMonAn INTEGER,
+    HuongDan TEXT,
+    ThoiGianNau INTEGER,
+    KhauPhan INTEGER,
+    FOREIGN KEY (MaMonAn) REFERENCES MonAn(MaMonAn)
+)
+CREATE TABLE NguyenLieu (
+    MaNguyenLieu INTEGER PRIMARY KEY AUTOINCREMENT,
+    TenNguyenLieu TEXT NOT NULL
+)
+CREATE TABLE ChiTietNguyenLieu (
+    MaCongThuc INTEGER,
+    MaNguyenLieu INTEGER,
+    SoLuong TEXT,
+    PRIMARY KEY (MaCongThuc, MaNguyenLieu),
+    FOREIGN KEY (MaCongThuc) REFERENCES CongThuc(MaCongThuc),
+    FOREIGN KEY (MaNguyenLieu) REFERENCES NguyenLieu(MaNguyenLieu)
+)
+CREATE TABLE LichSuNhanDien (
+    MaLichSu INTEGER PRIMARY KEY AUTOINCREMENT,
+    MaNguoiDung INTEGER,
+    HinhAnh TEXT,
+    KetQuaNhanDien TEXT,
+    ThoiGianNhanDien DATETIME,
+    DoChinhXac REAL,
+    FOREIGN KEY (MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung)
+)

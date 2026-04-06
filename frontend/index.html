@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Smart Food Detector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Nền động Animated Background -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
+    <div class="container glass-panel">
+        <header>
+            <div class="logo-area">
+                <i class="fa-solid fa-bowl-food"></i>
+            </div>
+            <h1>Smart Food Analysis</h1>
+            <p>Phân tích giá trị dinh dưỡng qua ống kính AI</p>
+        </header>
+
+        <main>
+            <section class="upload-section" id="drop-zone">
+                <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" hidden>
+                
+                <div class="upload-content" id="upload-content">
+                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                    <h2>Kéo thả ảnh món ăn vào đây</h2>
+                    <span>hoặc <button class="browse-btn" onclick="document.getElementById('file-input').click()">Chọn từ thiết bị</button></span>
+                </div>
+                
+                <!-- Vùng ảnh preview sẽ ẩn cho đến khi có ảnh -->
+                <div id="image-preview-container" class="hidden">
+                     <img id="preview-img" src="" alt="Biểu tượng món ăn tải lên">
+                     <div class="preview-actions">
+                         <button class="action-btn analyze-btn" id="analyze-btn">
+                             <i class="fa-solid fa-wand-magic-sparkles"></i> Phân tích AI
+                         </button>
+                         <button class="action-btn remove-btn" id="remove-btn">
+                             <i class="fa-solid fa-trash"></i> Xóa
+                         </button>
+                     </div>
+                </div>
+            </section>
+
+            <!-- Loading Spinner mượt mà -->
+            <div id="loading" class="hidden">
+                <div class="loader">
+                  <div class="circle"></div>
+                  <div class="circle"></div>
+                  <div class="circle"></div>
+                  <div class="circle"></div>
+                </div>
+                <p>Mô hình Neural Network đang quét...</p>
+            </div>
+
+            <!-- Kết quả dạng Widget Dinh Dưỡng -->
+            <section id="result-section" class="hidden result-panel">
+                <div class="result-header">
+                    <h2 id="food-name">Tên Món Ăn</h2>
+                    <div class="confidence-badge">
+                         Độ tin cậy Model: <span id="confidence-score">98</span>%
+                    </div>
+                </div>
+                
+                <p id="food-desc" class="food-desc">Mô tả về món ăn.</p>
+                <div class="system-msg" id="sys-msg"></div>
+                
+                <div class="nutrition-grid">
+                    <div class="nutri-card cal">
+                        <div class="icon-wrap"><i class="fa-solid fa-fire"></i></div>
+                        <div class="info-wrap">
+                            <span class="value" id="val-cal">--</span>
+                            <span class="label">Calo (kcal)</span>
+                        </div>
+                    </div>
+                    <div class="nutri-card prot">
+                        <div class="icon-wrap"><i class="fa-solid fa-dumbbell"></i></div>
+                        <div class="info-wrap">
+                            <span class="value" id="val-prot">--</span>
+                            <span class="label">Protein (g)</span>
+                        </div>
+                    </div>
+                    <div class="nutri-card carb">
+                        <div class="icon-wrap"><i class="fa-solid fa-wheat-awn"></i></div>
+                        <div class="info-wrap">
+                            <span class="value" id="val-carb">--</span>
+                            <span class="label">Tinh bột (g)</span>
+                        </div>
+                    </div>
+                    <div class="nutri-card fat">
+                        <div class="icon-wrap"><i class="fa-solid fa-droplet"></i></div>
+                        <div class="info-wrap">
+                            <span class="value" id="val-fat">--</span>
+                            <span class="label">Chất béo (g)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thêm Nguyên Liệu & Công Thức -->
+                <div class="recipe-container hidden" id="recipe-container">
+                    <div class="recipe-section">
+                        <h3><i class="fa-solid fa-basket-shopping"></i> Nguyên Liệu</h3>
+                        <ul id="ingredients-list" class="ingredients-list">
+                            <!-- JS will populate this -->
+                        </ul>
+                    </div>
+                    <div class="recipe-section">
+                        <h3><i class="fa-solid fa-fire-burner"></i> Công Thức Cách Làm <span id="recipe-time"></span></h3>
+                        <p id="recipe-instructions" class="recipe-instructions">
+                            <!-- JS will populate this -->
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Hệ Thống API Viết bằng <i class="fa-brands fa-python"></i> Python Flask & <i class="fa-solid fa-database"></i> SQLite</p>
+        </footer>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>
