@@ -117,6 +117,71 @@ def insert_lich_su(ma_nguoi_dung, hinh_anh, ket_qua, do_chinh_xac):
     conn.commit()
     conn.close()
 
+def create_user(name: str, email: str, hashed_password: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO NguoiDung (TenNguoiDung, Email, MatKhau, NgayDangKy, VaiTro)
+            VALUES (?, ?, ?, date('now', 'localtime'), 'user')
+        """, (name, email, hashed_password))
+        conn.commit()
+        return True, "Đăng ký thành công"
+    except sqlite3.IntegrityError:
+        return False, "Email đã được sử dụng"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def get_user_by_email(email: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM NguoiDung WHERE Email = ?", (email,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        return dict(user)
+    return None
+
+def get_user_by_id(ma_nguoi_dung: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM NguoiDung WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        return dict(user)
+    return None
+
+def update_password(ma_nguoi_dung: int, new_hashed_password: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE NguoiDung SET MatKhau = ? WHERE MaNguoiDung = ?", (new_hashed_password, ma_nguoi_dung))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating password: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_user_history(ma_nguoi_dung: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT MaLichSu, HinhAnh, KetQuaNhanDien, DoChinhXac, ThoiGianNhanDien 
+        FROM LichSuNhanDien 
+        WHERE MaNguoiDung = ? 
+        ORDER BY ThoiGianNhanDien DESC
+    """, (ma_nguoi_dung,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+
 import datetime
 
 def insert_generated_food_data(food_name_english: str, data: dict):

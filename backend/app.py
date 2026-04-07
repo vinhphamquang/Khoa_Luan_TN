@@ -2,8 +2,9 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import os
 from external_api import analyze_image
-from db_queries import search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data
+from db_queries import search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, create_user, get_user_by_email, get_user_history, get_user_by_id, update_password
 from ai_generator import generate_food_data_vietnamese
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, static_folder="../frontend")
 CORS(app)
@@ -56,7 +57,67 @@ def get_dishes():
         })
     
     conn.close()
+    conn.close()
     return jsonify({"dishes": dishes, "total": len(dishes)})
+
+@app.route("/api/register", methods=["POST"])
+def register():
+    data = request.json
+    if not data or not data.get("name") or not data.get("email") or not data.get("password"):
+        return jsonify({"success": False, "message": "Vui lòng điền đầy đủ thông tin"}), 400
+    
+    hashed_password = generate_password_hash(data["password"])
+    success, message = create_user(data["name"], data["email"], hashed_password)
+    
+    if success:
+        return jsonify({"success": True, "message": message})
+    else:
+        return jsonify({"success": False, "message": message}), 400
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    if not data or not data.get("email") or not data.get("password"):
+        return jsonify({"success": False, "message": "Vui lòng nhập Email và Mật khẩu"}), 400
+        
+    user = get_user_by_email(data["email"])
+    if not user or not check_password_hash(user["MatKhau"], data["password"]):
+        return jsonify({"success": False, "message": "Email hoặc mật khẩu không đúng"}), 401
+        
+    return jsonify({
+        "success": True,
+        "message": "Đăng nhập thành công",
+        "user": {
+            "id": user["MaNguoiDung"],
+            "name": user["TenNguoiDung"],
+            "email": user["Email"],
+            "role": user["VaiTro"]
+        }
+    })
+
+@app.route("/api/history/<int:user_id>")
+def get_user_history_api(user_id):
+    history = get_user_history(user_id)
+    return jsonify({"success": True, "history": history})
+
+@app.route("/api/change-password", methods=["POST"])
+def change_password():
+    data = request.json
+    user_id = data.get("user_id")
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+    
+    if not user_id or not old_password or not new_password:
+        return jsonify({"success": False, "message": "Vui lòng nhập đủ thông tin"}), 400
+        
+    user = get_user_by_id(user_id)
+    if not user or not check_password_hash(user["MatKhau"], old_password):
+        return jsonify({"success": False, "message": "Mật khẩu cũ không chính xác"}), 400
+        
+    if update_password(user_id, generate_password_hash(new_password)):
+        return jsonify({"success": True, "message": "Đổi mật khẩu thành công"})
+    else:
+        return jsonify({"success": False, "message": "Có lỗi xảy ra, vui lòng thử lại"}), 500
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -123,6 +184,13 @@ def predict():
             response_data["message"] = f"Món ăn mới '{food_name}' vừa được AI phân tích và lưu vào cơ sở dữ liệu thành công!"
     else:
         response_data["message"] = f"[Cảnh Báo] API nhận diện ra '{food_name}' nhưng trên SQLite chưa có dữ liệu và AI Generator không hoạt động."
+
+    user_id = request.form.get("user_id")
+    if user_id and str(user_id).isdigit():
+        try:
+            insert_lich_su(int(user_id), "", food_name, confidence_pct)
+        except Exception as e:
+            print(f"Error saving history: {e}")
 
     return jsonify(response_data)
 

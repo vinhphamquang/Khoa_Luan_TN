@@ -35,7 +35,20 @@ function navigateTo(pageId) {
 
 function handleHashChange() {
     const hash = window.location.hash.replace('#', '') || 'intro';
+
+    if(hash === 'profile') {
+        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+        if(!loggedUser) {
+            window.location.hash = 'intro';
+            return;
+        }
+    }
+
     navigateTo(hash);
+    
+    if(hash === 'profile') {
+        initProfilePage();
+    }
 }
 
 window.addEventListener('hashchange', handleHashChange);
@@ -179,6 +192,11 @@ function initAnalyzePage() {
 
         const formData = new FormData();
         formData.append('file', currentFile);
+        
+        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+        if (loggedUser) {
+            formData.append('user_id', loggedUser.id);
+        }
 
         try {
             const response = await fetch('/predict', {
@@ -296,8 +314,240 @@ function showError(message) {
     document.getElementById('recipe-container').classList.add('hidden');
 }
 
+// ---- AUTH LOGIC ----
+function checkLoginState() {
+    const authSection = document.getElementById('auth-section');
+    const userSection = document.getElementById('user-section');
+    const userNameDisplay = document.getElementById('user-name-display');
+    
+    const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    
+    if (loggedUser) {
+        if(authSection) authSection.classList.add('hidden');
+        if(userSection) userSection.classList.remove('hidden');
+        if(userNameDisplay) {
+            userNameDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${loggedUser.name}`;
+            userNameDisplay.style.cursor = 'pointer';
+        }
+    } else {
+        if(authSection) authSection.classList.remove('hidden');
+        if(userSection) userSection.classList.add('hidden');
+    }
+}
+
+function initAuth() {
+    const modalOverlay = document.getElementById('auth-modal');
+    const loginBox = document.getElementById('login-box');
+    const registerBox = document.getElementById('register-box');
+    
+    // Shows
+    document.getElementById('btn-show-login')?.addEventListener('click', () => {
+        modalOverlay.classList.remove('hidden');
+        loginBox.classList.remove('hidden');
+        registerBox.classList.add('hidden');
+    });
+    
+    document.getElementById('btn-show-register')?.addEventListener('click', () => {
+        modalOverlay.classList.remove('hidden');
+        registerBox.classList.remove('hidden');
+        loginBox.classList.add('hidden');
+    });
+    
+    // Switch
+    document.getElementById('switch-to-register')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginBox.classList.add('hidden');
+        registerBox.classList.remove('hidden');
+    });
+    
+    document.getElementById('switch-to-login')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        registerBox.classList.add('hidden');
+        loginBox.classList.remove('hidden');
+    });
+    
+    // Close
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            modalOverlay.classList.add('hidden');
+        });
+    });
+    
+    // Forms
+    const loginForm = document.getElementById('login-form');
+    loginForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errDiv = document.getElementById('login-error');
+        errDiv.classList.add('hidden');
+        
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                localStorage.setItem('smartfood_user', JSON.stringify(data.user));
+                modalOverlay.classList.add('hidden');
+                checkLoginState();
+                loginForm.reset();
+            } else {
+                errDiv.textContent = data.message;
+                errDiv.classList.remove('hidden', 'success');
+            }
+        } catch (error) {
+            errDiv.textContent = "Lỗi kết nối máy chủ";
+            errDiv.classList.remove('hidden', 'success');
+        }
+    });
+
+    const regForm = document.getElementById('register-form');
+    regForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errDiv = document.getElementById('reg-error');
+        errDiv.classList.add('hidden');
+        
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                errDiv.textContent = data.message + " - Vui lòng đăng nhập.";
+                errDiv.classList.remove('hidden');
+                errDiv.classList.add('success');
+                regForm.reset();
+                setTimeout(() => {
+                    document.getElementById('switch-to-login').click();
+                    errDiv.classList.add('hidden');
+                }, 1500);
+            } else {
+                errDiv.textContent = data.message;
+                errDiv.classList.remove('hidden', 'success');
+            }
+        } catch (error) {
+            errDiv.textContent = "Lỗi kết nối máy chủ";
+            errDiv.classList.remove('hidden', 'success');
+        }
+    });
+    
+    // Logout
+    document.getElementById('btn-logout')?.addEventListener('click', () => {
+        localStorage.removeItem('smartfood_user');
+        checkLoginState();
+    });}
+
+// ---- PROFILE LOGIC ----
+async function initProfilePage() {
+    const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (!loggedUser) return;
+
+    // Set UI Info
+    const nameEl = document.getElementById('profile-page-name');
+    const emailEl = document.getElementById('profile-page-email');
+    if (nameEl) nameEl.textContent = loggedUser.name;
+    if (emailEl) emailEl.textContent = loggedUser.email;
+
+    // Load History
+    const historyContainer = document.getElementById('history-container');
+    if(historyContainer) {
+        try {
+            historyContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px 0;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top: 10px;">Đang tải lịch sử...</p></div>';
+            
+            const res = await fetch('/api/history/' + loggedUser.id);
+            const data = await res.json();
+            
+            if (data.success && data.history && data.history.length > 0) {
+                historyContainer.innerHTML = '';
+                data.history.forEach(item => {
+                    const el = document.createElement('div');
+                    el.style.cssText = "background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;";
+                    
+                    const date = item.ThoiGianNhanDien ? new Date(item.ThoiGianNhanDien).toLocaleString() : '';
+                    
+                    el.innerHTML = `
+                        <div>
+                            <h4 style="font-size: 16px; margin-bottom: 4px; font-weight: 600; color: var(--primary-light);">${item.KetQuaNhanDien}</h4>
+                            <p style="font-size: 12px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> ${date}</p>
+                        </div>
+                        <div style="background: rgba(163, 230, 53, 0.15); color: var(--c-carb); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;">
+                            ${item.DoChinhXac}%
+                        </div>
+                    `;
+                    historyContainer.appendChild(el);
+                });
+            } else {
+                historyContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 20px;">Chưa có lịch sử tra cứu nào.</p>';
+            }
+        } catch (e) {
+            historyContainer.innerHTML = '<p style="text-align: center; color: var(--c-fat); margin-top: 20px;">Lỗi tải dữ liệu.</p>';
+        }
+    }
+
+    // Handlers (only attach once)
+    const pwForm = document.getElementById('change-pw-form');
+    if (pwForm && !pwForm.dataset.initialized) {
+        pwForm.dataset.initialized = 'true';
+        pwForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errDiv = document.getElementById('pw-error');
+            errDiv.classList.add('hidden');
+            
+            const oldPw = document.getElementById('pw-old').value;
+            const newPw = document.getElementById('pw-new').value;
+            
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: loggedUser.id, old_password: oldPw, new_password: newPw })
+                });
+                const responseData = await res.json();
+                
+                if (responseData.success) {
+                    errDiv.textContent = responseData.message;
+                    errDiv.classList.remove('hidden');
+                    errDiv.classList.add('success');
+                    pwForm.reset();
+                    setTimeout(() => errDiv.classList.add('hidden'), 3000);
+                } else {
+                    errDiv.textContent = responseData.message;
+                    errDiv.classList.remove('hidden', 'success');
+                }
+            } catch (err) {
+                errDiv.textContent = 'Lỗi kết nối';
+                errDiv.classList.remove('hidden', 'success');
+            }
+        });
+    }
+
+    const btnPageLogout = document.getElementById('btn-page-logout');
+    if (btnPageLogout && !btnPageLogout.dataset.initialized) {
+        btnPageLogout.dataset.initialized = 'true';
+        btnPageLogout.addEventListener('click', () => {
+            localStorage.removeItem('smartfood_user');
+            checkLoginState();
+            window.location.hash = 'intro';
+        });
+    }
+}
+
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', () => {
+    initAuth();
+    checkLoginState();
     initAnalyzePage();
     initRevealAnimations();
 });
