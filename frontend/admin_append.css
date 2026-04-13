@@ -1,0 +1,141 @@
+/* ============================================
+   ADMIN DASHBOARD
+   ============================================ */
+.admin-dashboard {
+    margin-top: 30px;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.admin-tab {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-base);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.admin-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.admin-tab.active {
+    background: var(--gradient-btn);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.admin-tab-content {
+    animation: fadeIn 0.4s ease-out;
+}
+
+.admin-tab-content.hidden {
+    display: none;
+}
+
+/* Admin Table */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    font-size: 14px;
+}
+
+.admin-table th {
+    text-align: left;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 13px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.admin-table td {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    vertical-align: middle;
+}
+
+.admin-table tr {
+    transition: var(--transition-fast);
+}
+
+.admin-table tr:hover td {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-table td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    font-weight: 600;
+    color: var(--primary-light);
+}
+
+.admin-table td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* Badges */
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge-success { background: rgba(163, 230, 53, 0.15); color: var(--c-carb); }
+.badge-danger { background: rgba(251, 113, 133, 0.15); color: var(--c-fat); }
+.badge-warning { background: rgba(251, 146, 60, 0.15); color: var(--c-cal); }
+.badge-info { background: rgba(56, 189, 248, 0.15); color: var(--c-prot); }
+
+.action-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+}
+
+.btn-icon:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-icon.delete:hover {
+    background: var(--c-fat);
+}

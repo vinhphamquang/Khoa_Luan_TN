@@ -2,7 +2,12 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import os
 from external_api import analyze_image
-from db_queries import search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, create_user, get_user_by_email, get_user_history, get_user_by_id, update_password
+from db_queries import (
+    search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, 
+    create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
+    get_all_users, delete_user, get_system_stats, get_all_history_admin, 
+    get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, delete_food_soft, restore_food_soft
+)
 from ai_generator import generate_food_data_vietnamese
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -38,6 +43,7 @@ def get_dishes():
                d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
         FROM MonAn m
         LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+        WHERE m.IsDeleted = 0
         ORDER BY m.MaMonAn
     """)
     
@@ -119,6 +125,63 @@ def change_password():
     else:
         return jsonify({"success": False, "message": "Có lỗi xảy ra, vui lòng thử lại"}), 500
 
+@app.route("/api/admin/users", methods=["GET"])
+def api_admin_get_users():
+    return jsonify({"success": True, "users": get_all_users()})
+
+@app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+def api_admin_delete_user(user_id):
+    if delete_user(user_id): return jsonify({"success": True, "message": "Xóa người dùng thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa người dùng"}), 500
+
+@app.route("/api/admin/stats", methods=["GET"])
+def api_admin_get_stats():
+    return jsonify({"success": True, "stats": get_system_stats()})
+
+@app.route("/api/admin/history", methods=["GET"])
+def api_admin_get_history():
+    return jsonify({"success": True, "history": get_all_history_admin()})
+
+@app.route("/api/admin/foods", methods=["GET"])
+def api_admin_get_foods():
+    return jsonify({"success": True, "foods": get_all_foods_admin()})
+
+@app.route("/api/admin/foods/<int:food_id>", methods=["GET"])
+def api_admin_get_food(food_id):
+    data = get_food_detail_admin(food_id)
+    if data: return jsonify({"success": True, "food": data})
+    return jsonify({"success": False, "message": "Không tìm thấy món ăn"}), 404
+
+@app.route("/api/admin/foods", methods=["POST"])
+def api_admin_add_food():
+    data = request.json
+    if not data or not data.get("TenMonAn"):
+        return jsonify({"success": False, "message": "Thiếu thông tin tên món ăn"}), 400
+    if insert_food_full(data):
+        return jsonify({"success": True, "message": "Thêm món ăn thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi thêm món ăn"}), 500
+
+@app.route("/api/admin/foods/<int:food_id>", methods=["PUT"])
+def api_admin_update_food(food_id):
+    data = request.json
+    if not data or not data.get("TenMonAn"):
+        return jsonify({"success": False, "message": "Thiếu thông tin tên món ăn"}), 400
+    if update_food_full(food_id, data):
+        return jsonify({"success": True, "message": "Cập nhật món ăn thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi cập nhật món ăn"}), 500
+
+@app.route("/api/admin/foods/<int:food_id>", methods=["DELETE"])
+def api_admin_delete_food(food_id):
+    if delete_food_soft(food_id):
+        return jsonify({"success": True, "message": "Đã chuyển món ăn vào thùng rác (Soft Delete) thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa món ăn"}), 500
+
+@app.route("/api/admin/foods/<int:food_id>/restore", methods=["PUT"])
+def api_admin_restore_food(food_id):
+    if restore_food_soft(food_id):
+        return jsonify({"success": True, "message": "Đã khôi phục món ăn từ thùng rác thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi khôi phục món ăn"}), 500
+
 @app.route("/predict", methods=["POST"])
 def predict():
     if 'file' not in request.files:
@@ -131,12 +194,12 @@ def predict():
     image_bytes = file.read()
     
     # 1. Gọi API nhận diện ngoại
-    food_name, confidence = analyze_image(image_bytes)
+    food_name, confidence, error_msg = analyze_image(image_bytes)
     
     if not food_name:
         return jsonify({
             "success": False,
-            "message": "Không thể nhận diện hình ảnh qua API."
+            "message": f"Không thể nhận diện hình ảnh qua API. Chi tiết lỗi: {error_msg}"
         })
         
     # 2. Truy vấn Database dựa trên tên món ăn

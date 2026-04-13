@@ -62,7 +62,7 @@ def search_food_by_name(food_name: str):
     # Thêm MoTa LIKE ? để quét các món do AI sinh ra (AI sẽ nhúng tên tiếng Anh vào MoTa)
     cursor.execute("""
         SELECT * FROM MonAn 
-        WHERE TenMonAn LIKE ? OR PhanLoai LIKE ? OR TenMonAn LIKE ? OR MoTa LIKE ?
+        WHERE (TenMonAn LIKE ? OR PhanLoai LIKE ? OR TenMonAn LIKE ? OR MoTa LIKE ?) AND IsDeleted = 0
     """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{food_name}%', f'%{food_name}%'))
     
     mon_an = cursor.fetchone()
@@ -255,3 +255,223 @@ def insert_generated_food_data(food_name_english: str, data: dict):
     except Exception as e:
         print(f"[Database Insert Error] {e}")
         return False
+
+# --- ADMIN API FUNCTIONS ---
+
+def get_all_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MaNguoiDung, TenNguoiDung, Email, NgayDangKy, VaiTro FROM NguoiDung ORDER BY MaNguoiDung DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def delete_user(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM NguoiDung WHERE MaNguoiDung = ?", (user_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"[Delete User Error] {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_system_stats():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    stats = {
+        'total_users': cursor.execute("SELECT COUNT(*) FROM NguoiDung").fetchone()[0],
+        'total_foods': cursor.execute("SELECT COUNT(*) FROM MonAn WHERE IsDeleted = 0").fetchone()[0],
+        'total_recognitions': cursor.execute("SELECT COUNT(*) FROM LichSuNhanDien").fetchone()[0]
+    }
+    conn.close()
+    return stats
+
+def get_all_history_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT l.MaLichSu, l.HinhAnh, l.KetQuaNhanDien, l.DoChinhXac, l.ThoiGianNhanDien, 
+               n.TenNguoiDung, n.Email
+        FROM LichSuNhanDien l
+        LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
+        ORDER BY l.ThoiGianNhanDien DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_all_foods_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT MaMonAn, TenMonAn, MoTa, PhanLoai, NgayTao, IsDeleted
+        FROM MonAn 
+        ORDER BY MaMonAn DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_food_detail_admin(food_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM MonAn WHERE MaMonAn = ?", (food_id,))
+    mon_an = cursor.fetchone()
+    if not mon_an: return None
+    
+    result = dict(mon_an)
+    
+    cursor.execute("SELECT * FROM DinhDuong WHERE MaMonAn = ?", (food_id,))
+    dinh_duong = cursor.fetchone()
+    result['DinhDuong'] = dict(dinh_duong) if dinh_duong else None
+    
+    cursor.execute("SELECT * FROM CongThuc WHERE MaMonAn = ?", (food_id,))
+    cong_thuc = cursor.fetchone()
+    if cong_thuc:
+        ct_dict = dict(cong_thuc)
+        cursor.execute("""
+            SELECT nl.MaNguyenLieu, nl.TenNguyenLieu, ctnl.SoLuong 
+            FROM ChiTietNguyenLieu ctnl
+            JOIN NguyenLieu nl ON ctnl.MaNguyenLieu = nl.MaNguyenLieu
+            WHERE ctnl.MaCongThuc = ?
+        """, (ct_dict['MaCongThuc'],))
+        ct_dict['NguyenLieu'] = [dict(r) for r in cursor.fetchall()]
+        result['CongThuc'] = ct_dict
+    else:
+        result['CongThuc'] = None
+        
+    conn.close()
+    return result
+
+def insert_food_full(data):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+             INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao, IsDeleted)
+             VALUES (?, ?, ?, date('now'), 0)
+        """, (data.get('TenMonAn'), data.get('MoTa'), data.get('PhanLoai')))
+        food_id = cursor.lastrowid
+        
+        dinh_duong = data.get('DinhDuong', {})
+        cursor.execute("""
+            INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (food_id, dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin')))
+        
+        cong_thuc = data.get('CongThuc', {})
+        cursor.execute("""
+            INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
+            VALUES (?, ?, ?, ?)
+        """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
+        ct_id = cursor.lastrowid
+        
+        for nl in cong_thuc.get('NguyenLieu', []):
+            ten_nl = nl.get('TenNguyenLieu')
+            if not ten_nl: continue
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            row = cursor.fetchone()
+            if row:
+                ma_nl = row['MaNguyenLieu']
+            else:
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
+                ma_nl = cursor.lastrowid
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ct_id, ma_nl, nl.get('SoLuong')))
+            
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error insert_food_full: {e}")
+        return False
+    finally:
+        conn.close()
+
+def update_food_full(food_id, data):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+             UPDATE MonAn SET TenMonAn=?, MoTa=?, PhanLoai=?, IsDeleted=?
+             WHERE MaMonAn=?
+        """, (data.get('TenMonAn'), data.get('MoTa'), data.get('PhanLoai'), data.get('IsDeleted', 0), food_id))
+        
+        dinh_duong = data.get('DinhDuong', {})
+        cursor.execute("SELECT MaDinhDuong FROM DinhDuong WHERE MaMonAn=?", (food_id,))
+        if cursor.fetchone():
+            cursor.execute("""
+                UPDATE DinhDuong SET Calo=?, Protein=?, ChatBeo=?, Carbohydrate=?, Vitamin=?
+                WHERE MaMonAn=?
+            """, (dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin'), food_id))
+        else:
+            cursor.execute("""
+                INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (food_id, dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin')))
+            
+        cong_thuc = data.get('CongThuc', {})
+        cursor.execute("SELECT MaCongThuc FROM CongThuc WHERE MaMonAn=?", (food_id,))
+        ct_row = cursor.fetchone()
+        if ct_row:
+            ct_id = ct_row['MaCongThuc']
+            cursor.execute("""
+                UPDATE CongThuc SET HuongDan=?, ThoiGianNau=?, KhauPhan=? WHERE MaCongThuc=?
+            """, (cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan'), ct_id))
+            cursor.execute("DELETE FROM ChiTietNguyenLieu WHERE MaCongThuc=?", (ct_id,))
+        else:
+            cursor.execute("""
+                INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
+                VALUES (?, ?, ?, ?)
+            """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
+            ct_id = cursor.lastrowid
+            
+        for nl in cong_thuc.get('NguyenLieu', []):
+            ten_nl = nl.get('TenNguyenLieu')
+            if not ten_nl: continue
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            row = cursor.fetchone()
+            if row: ma_nl = row['MaNguyenLieu']
+            else:
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
+                ma_nl = cursor.lastrowid
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ct_id, ma_nl, nl.get('SoLuong')))
+            
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error update_food_full: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_food_soft(food_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE MonAn SET IsDeleted = 1 WHERE MaMonAn = ?", (food_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error delete_food_soft: {e}")
+        return False
+    finally:
+        conn.close()
+
+def restore_food_soft(food_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE MonAn SET IsDeleted = 0 WHERE MaMonAn = ?", (food_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error restore_food_soft: {e}")
+        return False
+    finally:
+        conn.close()
