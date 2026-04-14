@@ -182,6 +182,50 @@ def api_admin_restore_food(food_id):
         return jsonify({"success": True, "message": "Đã khôi phục món ăn từ thùng rác thành công"})
     return jsonify({"success": False, "message": "Lỗi khi khôi phục món ăn"}), 500
 
+@app.route("/api/dishes/<food_name>", methods=["GET"])
+def get_dish_info(food_name):
+    """API lấy thông tin món ăn trực tiếp từ database (cho demo mode)"""
+    try:
+        food_data = search_food_by_name(food_name)
+        
+        if not food_data:
+            return jsonify({
+                "success": False,
+                "message": f"Không tìm thấy món ăn '{food_name}' trong database"
+            }), 404
+        
+        # Format giống như predict endpoint
+        dinh_duong = food_data.get("DinhDuong") or {}
+        cong_thuc = food_data.get("CongThuc") or {}
+        nguyen_lieu = cong_thuc.get("NguyenLieu") or []
+        
+        response_data = {
+            "success": True,
+            "predicted_class_name": food_name,
+            "confidence": 100.0,  # Demo mode = 100% confidence
+            "food_data": {
+                "name": food_data.get("TenMonAn", food_name),
+                "description": food_data.get("MoTa", ""),
+                "calories": dinh_duong.get("Calo", "--"),
+                "proteins": dinh_duong.get("Protein", "--"),
+                "carbs": dinh_duong.get("Carbohydrate", "--"),
+                "fats": dinh_duong.get("ChatBeo", "--"),
+                "recipe_instructions": cong_thuc.get("HuongDan", ""),
+                "recipe_time": cong_thuc.get("ThoiGianNau", ""),
+                "ingredients": nguyen_lieu
+            },
+            "message": "Chế độ demo - Dữ liệu từ database"
+        }
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        print(f"[Get Dish Error] {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi server: {str(e)}"
+        }), 500
+
 @app.route("/predict", methods=["POST"])
 def predict():
     if 'file' not in request.files:
@@ -199,21 +243,28 @@ def predict():
     if not food_name:
         return jsonify({
             "success": False,
-            "message": f"Không thể nhận diện hình ảnh qua API. Chi tiết lỗi: {error_msg}"
-        })
+            "message": "Không thể nhận diện hình ảnh. API đang gặp sự cố (timeout hoặc quá tải). Vui lòng thử lại sau hoặc chọn ảnh khác.",
+            "error_detail": error_msg,
+            "suggestion": "Bạn có thể thử upload ảnh Phở, Bánh Mì hoặc Bún Chả để xem demo với dữ liệu có sẵn."
+        }), 503  # Service Unavailable
         
     # 2. Truy vấn Database dựa trên tên món ăn
     food_data = search_food_by_name(food_name)
     
+    # TẠM THỜI TẮT AI GENERATOR DO QUOTA EXCEEDED
     # KÍCH HOẠT AI TỰ ĐỘNG SINH DỮ LIỆU NẾU KHÔNG TÌM THẤY
     is_newly_generated = False
-    if not food_data:
-        ai_data = generate_food_data_vietnamese(food_name)
-        if ai_data:
-            success = insert_generated_food_data(food_name, ai_data)
-            if success:
-                food_data = search_food_by_name(food_name)
-                is_newly_generated = True
+    # if not food_data:
+    #     try:
+    #         ai_data = generate_food_data_vietnamese(food_name)
+    #         if ai_data:
+    #             success = insert_generated_food_data(food_name, ai_data)
+    #             if success:
+    #                 food_data = search_food_by_name(food_name)
+    #                 is_newly_generated = True
+    #     except Exception as e:
+    #         print(f"[AI Generator Error] {e}")
+    #         # Không làm gián đoạn flow nếu AI generator lỗi
 
     # 3. Format Kết quả
     confidence_pct = round(confidence * 100, 2) if confidence else 0

@@ -96,6 +96,85 @@ window.addEventListener('scroll', () => {
     }
 });
 
+// ---- FOOD BANNER SLIDER ----
+function initFoodSlider() {
+    const sliderTrack = document.getElementById('slider-track');
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.getElementById('slider-prev');
+    const nextBtn = document.getElementById('slider-next');
+    const dots = document.querySelectorAll('.dot');
+    
+    if (!sliderTrack || slides.length === 0) return;
+    
+    let currentSlide = 0;
+    const totalSlides = slides.length;
+    let autoSlideInterval;
+    
+    function goToSlide(index) {
+        // Remove active class from all slides
+        slides.forEach(slide => slide.classList.remove('active'));
+        dots.forEach(dot => dot.classList.remove('active'));
+        
+        // Add active class to current slide
+        currentSlide = index;
+        slides[currentSlide].classList.add('active');
+        dots[currentSlide].classList.add('active');
+        
+        // Move slider track
+        sliderTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+    }
+    
+    function nextSlide() {
+        const next = (currentSlide + 1) % totalSlides;
+        goToSlide(next);
+    }
+    
+    function prevSlide() {
+        const prev = (currentSlide - 1 + totalSlides) % totalSlides;
+        goToSlide(prev);
+    }
+    
+    function startAutoSlide() {
+        autoSlideInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds
+    }
+    
+    function stopAutoSlide() {
+        clearInterval(autoSlideInterval);
+    }
+    
+    // Event listeners
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            nextSlide();
+            stopAutoSlide();
+            startAutoSlide(); // Restart auto slide after manual interaction
+        });
+    }
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            prevSlide();
+            stopAutoSlide();
+            startAutoSlide();
+        });
+    }
+    
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+            goToSlide(index);
+            stopAutoSlide();
+            startAutoSlide();
+        });
+    });
+    
+    // Pause auto slide on hover
+    sliderTrack.addEventListener('mouseenter', stopAutoSlide);
+    sliderTrack.addEventListener('mouseleave', startAutoSlide);
+    
+    // Start auto slide
+    startAutoSlide();
+}
+
 // ---- SCROLL REVEAL ANIMATIONS ----
 function initRevealAnimations() {
     const reveals = document.querySelectorAll('.reveal');
@@ -129,6 +208,40 @@ function initAnalyzePage() {
     if (!dropZone) return;
 
     let currentFile = null;
+
+    // Demo food buttons
+    const demoFoodBtns = document.querySelectorAll('.demo-food-btn');
+    demoFoodBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const foodName = btn.dataset.food;
+            await loadDemoFood(foodName);
+        });
+    });
+
+    async function loadDemoFood(foodName) {
+        uploadContent.classList.add('hidden');
+        loading.classList.remove('hidden');
+        resultSection.classList.add('hidden');
+        
+        try {
+            const response = await fetch(`/api/dishes/${foodName}`);
+            const data = await response.json();
+            
+            loading.classList.add('hidden');
+            uploadContent.classList.remove('hidden');
+            
+            if (data.success) {
+                showResult(data);
+            } else {
+                showError(data.message || 'Không tìm thấy món ăn');
+            }
+        } catch (err) {
+            console.error('Demo food error:', err);
+            loading.classList.add('hidden');
+            uploadContent.classList.remove('hidden');
+            showError('Lỗi khi tải dữ liệu demo');
+        }
+    }
 
     // Drag & Drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -219,7 +332,10 @@ function initAnalyzePage() {
             if (data.success) {
                 showResult(data);
             } else {
-                showError(data.message || 'Lỗi từ Backend Server!');
+                showError(
+                    data.message || 'Lỗi từ Backend Server!',
+                    data.suggestion || null
+                );
             }
 
         } catch (err) {
@@ -302,16 +418,22 @@ function showResult(data) {
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function showError(message) {
+function showError(message, suggestion = null) {
     const sysMsg = document.getElementById('sys-msg');
     const resultSection = document.getElementById('result-section');
 
     resultSection.classList.remove('hidden');
     document.getElementById('food-name').textContent = 'Lỗi Phân Tích';
-    document.getElementById('food-desc').textContent = message;
+    
+    let fullMessage = message;
+    if (suggestion) {
+        fullMessage += `\n\n💡 ${suggestion}`;
+    }
+    
+    document.getElementById('food-desc').textContent = fullMessage;
     document.getElementById('confidence-score').textContent = '0';
 
-    sysMsg.textContent = message;
+    sysMsg.textContent = fullMessage;
     sysMsg.classList.add('visible');
 
     ['val-cal', 'val-prot', 'val-carb', 'val-fat'].forEach(id => {
@@ -873,4 +995,5 @@ document.addEventListener('DOMContentLoaded', () => {
     checkLoginState();
     initAnalyzePage();
     initRevealAnimations();
+    initFoodSlider(); // Initialize food banner slider
 });
