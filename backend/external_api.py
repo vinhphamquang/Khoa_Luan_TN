@@ -55,7 +55,7 @@ def recognize_food_spoonacular(image_bytes: bytes):
     
     try:
         files = {'file': ('image.jpg', image_bytes, 'image/jpeg')}
-        response = requests.post(url, files=files, timeout=3)
+        response = requests.post(url, files=files, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
