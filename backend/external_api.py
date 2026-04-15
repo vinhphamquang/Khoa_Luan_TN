@@ -294,3 +294,119 @@ def analyze_image(image_bytes: bytes):
         return food_name_off, confidence_off, None
     
     return None, 0.0, " | ".join(errors) if errors else "Không thể nhận diện món ăn"
+
+
+def get_food_info_from_spoonacular(food_name: str):
+    """
+    Lấy thông tin chi tiết món ăn từ Spoonacular API
+    Trả về: dict với thông tin dinh dưỡng, công thức, nguyên liệu
+    """
+    try:
+        print(f"[INFO] Đang lấy thông tin '{food_name}' từ Spoonacular...")
+        
+        # 1. Search recipe by name
+        search_url = "https://api.spoonacular.com/recipes/complexSearch"
+        search_params = {
+            "apiKey": SPOONACULAR_API_KEY,
+            "query": food_name,
+            "number": 1,
+            "addRecipeInformation": True,
+            "addRecipeNutrition": True
+        }
+        
+        response = requests.get(search_url, params=search_params, timeout=30)
+        
+        if response.status_code != 200:
+            print(f"[ERROR] Spoonacular search failed: {response.status_code}")
+            return None
+            
+        data = response.json()
+        
+        if not data.get("results") or len(data["results"]) == 0:
+            print(f"[WARNING] Không tìm thấy '{food_name}' trên Spoonacular")
+            return None
+            
+        recipe = data["results"][0]
+        
+        # 2. Extract information
+        nutrition = recipe.get("nutrition", {})
+        nutrients = nutrition.get("nutrients", [])
+        
+        # Parse nutrients
+        calories = 0
+        protein = 0
+        fat = 0
+        carbs = 0
+        
+        for nutrient in nutrients:
+            name = nutrient.get("name", "").lower()
+            amount = nutrient.get("amount", 0)
+            
+            if "calorie" in name:
+                calories = amount
+            elif "protein" in name:
+                protein = amount
+            elif "fat" in name and "saturated" not in name:
+                fat = amount
+            elif "carbohydrate" in name:
+                carbs = amount
+        
+        # Parse ingredients
+        ingredients = []
+        extended_ingredients = recipe.get("extendedIngredients", [])
+        for ing in extended_ingredients:
+            ingredients.append({
+                "TenNguyenLieu": ing.get("name", ""),
+                "SoLuong": ing.get("original", "")
+            })
+        
+        # Parse instructions
+        instructions = recipe.get("instructions", "")
+        if not instructions:
+            # Try analyzedInstructions
+            analyzed = recipe.get("analyzedInstructions", [])
+            if analyzed and len(analyzed) > 0:
+                steps = analyzed[0].get("steps", [])
+                instructions = "\n".join([f"{i+1}. {step.get('step', '')}" for i, step in enumerate(steps)])
+        
+        # Cooking time
+        cooking_time = recipe.get("readyInMinutes", 30)
+        servings = recipe.get("servings", 1)
+        
+        # Category/Dish types
+        dish_types = recipe.get("dishTypes", [])
+        category = dish_types[0] if dish_types else "Món ăn"
+        
+        # Description
+        summary = recipe.get("summary", "")
+        # Remove HTML tags from summary
+        import re
+        description = re.sub('<[^<]+?>', '', summary) if summary else f"Món ăn {food_name}"
+        
+        result = {
+            "description": description[:200],  # Limit length
+            "category": category.capitalize(),
+            "calories": round(calories, 1),
+            "protein": round(protein, 1),
+            "fat": round(fat, 1),
+            "carbs": round(carbs, 1),
+            "vitamins": "",  # Spoonacular có thể có vitamin info
+            "instructions": instructions if instructions else "Chưa có hướng dẫn chi tiết",
+            "cooking_time": cooking_time,
+            "servings": servings,
+            "ingredients": ingredients[:10]  # Limit to 10 ingredients
+        }
+        
+        print(f"[SUCCESS] Đã lấy thông tin '{food_name}' từ Spoonacular")
+        print(f"  - Calories: {result['calories']} kcal")
+        print(f"  - Protein: {result['protein']}g")
+        print(f"  - Ingredients: {len(ingredients)} items")
+        
+        return result
+        
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] Spoonacular API timeout")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi lấy thông tin từ Spoonacular: {e}")
+        return None

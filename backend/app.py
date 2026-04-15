@@ -9,6 +9,7 @@ from db_queries import (
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, delete_food_soft, restore_food_soft
 )
 from ai_generator import generate_food_data_vietnamese
+from food_translator import translate_food_name, get_search_variants
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, static_folder="../frontend")
@@ -237,41 +238,86 @@ def predict():
         
     image_bytes = file.read()
     
-    # 1. Gọi API nhận diện ngoại
-    food_name, confidence, error_msg = analyze_image(image_bytes)
+    # 1. Gọi API nhận diện món ăn từ hình ảnh (tiếng Anh)
+    food_name_english, confidence, error_msg = analyze_image(image_bytes)
     
-    if not food_name:
+    if not food_name_english:
         return jsonify({
             "success": False,
             "message": "Không thể nhận diện hình ảnh. API đang gặp sự cố (timeout hoặc quá tải). Vui lòng thử lại sau hoặc chọn ảnh khác.",
             "error_detail": error_msg,
             "suggestion": "Bạn có thể thử upload ảnh Phở, Bánh Mì hoặc Bún Chả để xem demo với dữ liệu có sẵn."
         }), 503  # Service Unavailable
-        
-    # 2. Truy vấn Database dựa trên tên món ăn
-    food_data = search_food_by_name(food_name)
     
-    # TẠM THỜI TẮT AI GENERATOR DO QUOTA EXCEEDED
-    # KÍCH HOẠT AI TỰ ĐỘNG SINH DỮ LIỆU NẾU KHÔNG TÌM THẤY
-    is_newly_generated = False
-    # if not food_data:
-    #     try:
-    #         ai_data = generate_food_data_vietnamese(food_name)
-    #         if ai_data:
-    #             success = insert_generated_food_data(food_name, ai_data)
-    #             if success:
-    #                 food_data = search_food_by_name(food_name)
-    #                 is_newly_generated = True
-    #     except Exception as e:
-    #         print(f"[AI Generator Error] {e}")
-    #         # Không làm gián đoạn flow nếu AI generator lỗi
+    # 2. Dịch tên món ăn sang tiếng Việt
+    food_name_vietnamese = translate_food_name(food_name_english)
+    print(f"[TRANSLATE] '{food_name_english}' → '{food_name_vietnamese}'")
+    
+    # 3. Tìm kiếm món ăn trong Database (thử cả tiếng Anh và tiếng Việt)
+    print(f"[INFO] Tìm kiếm '{food_name_vietnamese}' trong database...")
+    food_data = search_food_by_name(food_name_vietnamese)
+    
+    # Nếu không tìm thấy bằng tiếng Việt, thử tiếng Anh
+    if not food_data and food_name_vietnamese != food_name_english:
+        print(f"[INFO] Thử tìm bằng tên tiếng Anh: '{food_name_english}'")
+        food_data = search_food_by_name(food_name_english)
+    
+    is_newly_added = False
+    
+    # 4. Nếu không có trong database, tự động lấy thông tin từ external API và thêm vào
+    if not food_data:
+        print(f"[INFO] Không tìm thấy '{food_name_vietnamese}' trong database. Đang lấy thông tin từ external API...")
+        try:
+            from external_api import get_food_info_from_spoonacular
+            
+            # Lấy thông tin từ Spoonacular API (sử dụng tên tiếng Anh)
+            external_food_data = get_food_info_from_spoonacular(food_name_english)
+            
+            if external_food_data:
+                print(f"[INFO] Đã lấy thông tin từ API. Đang thêm vào database...")
+                
+                # Chuẩn bị dữ liệu để insert vào database (sử dụng tên tiếng Việt)
+                food_to_insert = {
+                    "TenMonAn": food_name_vietnamese,  # Lưu tên tiếng Việt
+                    "MoTa": external_food_data.get("description", f"Món ăn {food_name_vietnamese}") + f" [English: {food_name_english}]",
+                    "PhanLoai": external_food_data.get("category", "Món ăn"),
+                    "DinhDuong": {
+                        "Calo": external_food_data.get("calories", 0),
+                        "Protein": external_food_data.get("protein", 0),
+                        "ChatBeo": external_food_data.get("fat", 0),
+                        "Carbohydrate": external_food_data.get("carbs", 0),
+                        "Vitamin": external_food_data.get("vitamins", "")
+                    },
+                    "CongThuc": {
+                        "HuongDan": external_food_data.get("instructions", "Chưa có hướng dẫn"),
+                        "ThoiGianNau": external_food_data.get("cooking_time", 30),
+                        "KhauPhan": external_food_data.get("servings", 1),
+                        "NguyenLieu": external_food_data.get("ingredients", [])
+                    }
+                }
+                
+                # Thêm vào database
+                if insert_food_full(food_to_insert):
+                    print(f"[SUCCESS] Đã thêm '{food_name_vietnamese}' vào database!")
+                    is_newly_added = True
+                    
+                    # Tìm lại trong database
+                    food_data = search_food_by_name(food_name_vietnamese)
+                else:
+                    print(f"[ERROR] Không thể thêm '{food_name_vietnamese}' vào database")
+            else:
+                print(f"[WARNING] Không lấy được thông tin từ external API cho '{food_name_english}'")
+                
+        except Exception as e:
+            print(f"[ERROR] Lỗi khi lấy thông tin từ external API: {e}")
+            # Không làm gián đoạn flow nếu external API lỗi
 
-    # 3. Format Kết quả
+    # 5. Format Kết quả (sử dụng tên tiếng Việt)
     confidence_pct = round(confidence * 100, 2) if confidence else 0
     
     response_data = {
         "success": True,
-        "predicted_class_name": food_name,
+        "predicted_class_name": food_name_vietnamese,  # Trả về tên tiếng Việt
         "confidence": confidence_pct,
         "food_data": None,
         "message": ""
@@ -284,7 +330,7 @@ def predict():
         nguyen_lieu = cong_thuc.get("NguyenLieu") or []
         
         response_data["food_data"] = {
-            "name": food_data.get("TenMonAn", food_name),
+            "name": food_data.get("TenMonAn", food_name_vietnamese),
             "description": food_data.get("MoTa", ""),
             "calories": dinh_duong.get("Calo", "--"),
             "proteins": dinh_duong.get("Protein", "--"),
@@ -294,15 +340,20 @@ def predict():
             "recipe_time": cong_thuc.get("ThoiGianNau", ""),
             "ingredients": nguyen_lieu
         }
-        if is_newly_generated:
-            response_data["message"] = f"Món ăn mới '{food_name}' vừa được AI phân tích và lưu vào cơ sở dữ liệu thành công!"
+        
+        if is_newly_added:
+            response_data["message"] = f"✨ Món ăn '{food_name_vietnamese}' vừa được thêm vào cơ sở dữ liệu!"
+        else:
+            response_data["message"] = f"✅ Đã tìm thấy thông tin món '{food_name_vietnamese}' trong cơ sở dữ liệu"
     else:
-        response_data["message"] = f"[Cảnh Báo] API nhận diện ra '{food_name}' nhưng trên SQLite chưa có dữ liệu và AI Generator không hoạt động."
+        response_data["message"] = f"⚠️ Nhận diện được '{food_name_vietnamese}' nhưng chưa có đầy đủ thông tin. Vui lòng thử lại sau."
+
 
     user_id = request.form.get("user_id")
     if user_id and str(user_id).isdigit():
         try:
-            insert_lich_su(int(user_id), "", food_name, confidence_pct)
+            # Lưu lịch sử với tên tiếng Việt
+            insert_lich_su(int(user_id), "", food_name_vietnamese, confidence_pct)
         except Exception as e:
             print(f"Error saving history: {e}")
 

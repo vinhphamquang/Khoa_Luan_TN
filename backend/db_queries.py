@@ -50,22 +50,33 @@ def get_mapped_food_name(food_name: str) -> str:
 def search_food_by_name(food_name: str):
     """
     Search for a food item by name or English translation in the database.
-    Since Google Cloud Vision might return English labels (e.g., 'Pho', 'Banh mi', 'Noodle'),
-    we will use a LIKE query.
+    Uses multiple search variants (Vietnamese, English, case variations) for better matching.
     """
-    mapped_name = get_mapped_food_name(food_name)
+    from food_translator import get_search_variants
+    
+    # Get all search variants (Vietnamese, English, case variations)
+    search_variants = get_search_variants(food_name)
+    print(f"[SEARCH] Variants: {search_variants}")
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 1. Look for MonAn (Tìm theo tên đã map HOẶC tên gốc)
-    # Thêm MoTa LIKE ? để quét các món do AI sinh ra (AI sẽ nhúng tên tiếng Anh vào MoTa)
-    cursor.execute("""
-        SELECT * FROM MonAn 
-        WHERE (TenMonAn LIKE ? OR PhanLoai LIKE ? OR TenMonAn LIKE ? OR MoTa LIKE ?) AND IsDeleted = 0
-    """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{food_name}%', f'%{food_name}%'))
-    
-    mon_an = cursor.fetchone()
+    # Try each variant until we find a match
+    mon_an = None
+    for variant in search_variants:
+        mapped_name = get_mapped_food_name(variant)
+        
+        # Search in TenMonAn, PhanLoai, and MoTa
+        cursor.execute("""
+            SELECT * FROM MonAn 
+            WHERE (TenMonAn LIKE ? OR PhanLoai LIKE ? OR MoTa LIKE ?) AND IsDeleted = 0
+            LIMIT 1
+        """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{variant}%'))
+        
+        mon_an = cursor.fetchone()
+        if mon_an:
+            print(f"[SEARCH] Found match with variant: '{variant}'")
+            break
     
     if not mon_an:
         conn.close()
