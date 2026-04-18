@@ -5,6 +5,14 @@ Food Name Translator - English to Vietnamese
 Chuyển đổi tên món ăn từ tiếng Anh sang tiếng Việt
 """
 
+import sys
+import io
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # Dictionary ánh xạ tên món ăn Anh - Việt
 FOOD_TRANSLATION = {
     # Vietnamese dishes
@@ -101,7 +109,88 @@ FOOD_TRANSLATION = {
     "com hen": "Cơm Hến",
     "clam rice": "Cơm Hến",
     
-    # Desserts
+    # Seafood & Sandwiches
+    "lobster_roll": "Bánh Mì Tôm Hùm",
+    "lobster roll": "Bánh Mì Tôm Hùm",
+    "crab roll": "Bánh Mì Cua",
+    "shrimp roll": "Bánh Mì Tôm",
+    
+    # Chinese dishes
+    "chow mein": "Mì Xào",
+    "chow_mein": "Mì Xào",
+    "lo mein": "Mì Lộn",
+    "fried noodles": "Mì Xào",
+    "stir fried noodles": "Mì Xào",
+    "fried rice": "Cơm Chiên",
+    "yangzhou fried rice": "Cơm Chiên Dương Châu",
+    "egg fried rice": "Cơm Chiên Trứng",
+    "dim sum": "Dimsum",
+    "dumpling": "Há Cảo",
+    "dumplings": "Há Cảo",
+    "wonton": "Hoành Thánh",
+    "spring roll": "Chả Giò",
+    "peking duck": "Vịt Quay Bắc Kinh",
+    "sweet and sour pork": "Thịt Lợn Xào Chua Ngọt",
+    "kung pao chicken": "Gà Kung Pao",
+    "mapo tofu": "Đậu Hũ Tứ Xuyên",
+    "hot pot": "Lẩu",
+    "hotpot": "Lẩu",
+    "congee": "Cháo",
+    "porridge": "Cháo",
+    "char siu": "Xá Xíu",
+    "bbq pork": "Thịt Nướng",
+    
+    # Japanese dishes
+    "sushi": "Sushi",
+    "sashimi": "Sashimi",
+    "ramen": "Ramen",
+    "udon": "Udon",
+    "tempura": "Tempura",
+    "teriyaki": "Teriyaki",
+    "yakitori": "Yakitori",
+    "tonkatsu": "Tonkatsu",
+    "okonomiyaki": "Okonomiyaki",
+    "takoyaki": "Takoyaki",
+    "miso soup": "Súp Miso",
+    "edamame": "Đậu Nành Luộc",
+    
+    # Korean dishes
+    "kimchi": "Kim Chi",
+    "bibimbap": "Cơm Trộn Hàn Quốc",
+    "bulgogi": "Thịt Bò Nướng Hàn Quốc",
+    "korean bbq": "BBQ Hàn Quốc",
+    "tteokbokki": "Bánh Gạo Cay Hàn Quốc",
+    "japchae": "Miến Xào Hàn Quốc",
+    "samgyeopsal": "Thịt Ba Chỉ Nướng",
+    
+    # Western dishes
+    "pizza": "Pizza",
+    "burger": "Burger",
+    "hamburger": "Hamburger",
+    "pasta": "Mì Ý",
+    "spaghetti": "Mì Ý Spaghetti",
+    "lasagna": "Lasagna",
+    "steak": "Bít Tết",
+    "salad": "Salad",
+    "sandwich": "Sandwich",
+    "hot dog": "Xúc Xích",
+    "taco": "Taco",
+    "burrito": "Burrito",
+    "beef stew": "Bò Kho",
+    "beef_stew": "Bò Kho",
+    "stew": "Món Hầm",
+    "nachos": "Nachos",
+    "french fries": "Khoai Tây Chiên",
+    "fish and chips": "Cá Chiên Khoai Tây",
+    "fish_and_chips": "Cá Chiên Khoai Tây",
+    "fried fish": "Cá Chiên",
+    "fish fillet": "Phi Lê Cá",
+
+    "fries": "Khoai Tây Chiên",
+    "chicken wings": "Cánh Gà Chiên",
+    "fried chicken": "Gà Rán",
+    
+    # Desserts (continued)
     "che": "Chè",
     "sweet soup": "Chè",
     "che buoi": "Chè Bưởi",
@@ -149,17 +238,17 @@ def translate_food_name(english_name: str) -> str:
     # Tìm trong dictionary
     if english_lower in FOOD_TRANSLATION:
         vietnamese_name = FOOD_TRANSLATION[english_lower]
-        print(f"[TRANSLATE] '{english_name}' → '{vietnamese_name}'")
+        print(f"[TRANSLATE] '{english_name}' -> '{vietnamese_name}'")
         return vietnamese_name
     
     # Thử tìm partial match
     for eng_key, viet_value in FOOD_TRANSLATION.items():
         if eng_key in english_lower or english_lower in eng_key:
-            print(f"[TRANSLATE] '{english_name}' → '{viet_value}' (partial match)")
+            print(f"[TRANSLATE] '{english_name}' -> '{viet_value}' (partial match)")
             return viet_value
     
     # Không tìm thấy, giữ nguyên tên gốc
-    print(f"[TRANSLATE] '{english_name}' → Giữ nguyên (không tìm thấy bản dịch)")
+    print(f"[TRANSLATE] '{english_name}' -> Giu nguyen (khong tim thay ban dich)")
     return english_name
 
 def get_search_variants(food_name: str) -> list:

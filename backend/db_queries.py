@@ -9,76 +9,168 @@ def get_db_connection():
     return conn
 
 def get_mapped_food_name(food_name: str) -> str:
-    """Ánh xạ tên/nhãn tiếng Anh thường gặp từ API về tên món ăn trong Database"""
+    """
+    Ánh xạ tên/nhãn tiếng Anh thường gặp từ API về tên món ăn trong Database.
+    CHỈ map những trường hợp rất cụ thể để tránh nhầm lẫn.
+    """
     food_lower = food_name.lower().strip()
+    
+    # CHỈ map những trường hợp RẤT CỤ THỂ
     alias_map = {
-        # Tập Alias cho Phở
-        'chowder': 'Pho',
-        'noodle soup': 'Pho',
-        'noodle': 'Pho',
-        'pho': 'Pho',
-        'beef soup': 'Pho',
-        'soup': 'Pho',
-        'broth': 'Pho',
+        # Phở - chỉ map những tên rất cụ thể
+        'pho': 'Phở',
+        'pho bo': 'Phở Bò',
+        'beef pho': 'Phở Bò',
+        'chicken pho': 'Phở Gà',
+        'vietnamese noodle soup': 'Phở',
         
-        # Tập Alias cho Bánh Mì
-        'sandwich': 'Banh mi',
-        'baguette': 'Banh mi',
-        'banh mi': 'Banh mi',
-        'bread': 'Banh mi',
-        'burger': 'Banh mi',
-        'burrito': 'Banh mi',
-        'wrap': 'Banh mi',
+        # Bánh Mì - chỉ map tên cụ thể
+        'banh mi': 'Bánh Mì',
+        'banh my': 'Bánh Mì',
+        'vietnamese sandwich': 'Bánh Mì',
+        'vietnamese baguette': 'Bánh Mì',
         
-        # Tập Alias cho Bún Chả
-        'bun cha': 'Bun cha',
-        'pork meatball': 'Bun cha',
-        'grilled pork': 'Bun cha',
-        'meatball': 'Bun cha',
-        'noodles with pork': 'Bun cha',
+        # Bún Chả
+        'bun cha': 'Bún Chả',
+        'grilled pork with noodles': 'Bún Chả',
+        'vietnamese grilled pork': 'Bún Chả',
         
-        # Tập Alias cho Bún bò Huế
-        'bun bo hue': 'Bún bò Huế',
-        'bun bo': 'Bún bò Huế',
-        'beef stew': 'Bún bò Huế',
-        'beef_stew': 'Bún bò Huế',
-        'spicy beef noodle': 'Bún bò Huế',
-        'beef noodle': 'Bún bò Huế'
+        # Bún Bò Huế
+        'bun bo hue': 'Bún Bò Huế',
+        'bun bo': 'Bún Bò Huế',
+        'hue beef noodle': 'Bún Bò Huế',
+        'spicy beef noodle soup': 'Bún Bò Huế',
+        
+        # Gỏi Cuốn
+        'goi cuon': 'Gỏi Cuốn',
+        'fresh spring rolls': 'Gỏi Cuốn',
+        'summer rolls': 'Gỏi Cuốn',
+        'vietnamese spring rolls': 'Gỏi Cuốn',
+        
+        # Chả Giò
+        'cha gio': 'Chả Giò',
+        'fried spring rolls': 'Chả Giò',
+        'vietnamese egg rolls': 'Chả Giò',
+        
+        # Cơm Tấm
+        'com tam': 'Cơm Tấm',
+        'broken rice': 'Cơm Tấm',
+        'vietnamese broken rice': 'Cơm Tấm',
     }
+    
     return alias_map.get(food_lower, food_name)
 
 def search_food_by_name(food_name: str):
     """
     Search for a food item by name or English translation in the database.
     Uses multiple search variants (Vietnamese, English, case variations) for better matching.
+    Priority: Exact match > Normalized match > Partial match
     """
-    from food_translator import get_search_variants
+    try:
+        from food_translator import get_search_variants
+        from unicode_utils import normalize_for_search
+    except ImportError:
+        from backend.food_translator import get_search_variants
+        from backend.unicode_utils import normalize_for_search
     
     # Get all search variants (Vietnamese, English, case variations)
     search_variants = get_search_variants(food_name)
+    print(f"[SEARCH] Searching for: '{food_name}'")
     print(f"[SEARCH] Variants: {search_variants}")
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Try each variant until we find a match
+    # Try each variant with priority matching
     mon_an = None
+    
+    # Priority 1: Exact match (case-insensitive)
     for variant in search_variants:
+        if mon_an:
+            break
+            
         mapped_name = get_mapped_food_name(variant)
         
-        # Search in TenMonAn, PhanLoai, and MoTa
+        # Try exact match with mapped name
         cursor.execute("""
             SELECT * FROM MonAn 
-            WHERE (TenMonAn LIKE ? OR PhanLoai LIKE ? OR MoTa LIKE ?) AND IsDeleted = 0
+            WHERE LOWER(TenMonAn) = LOWER(?) AND IsDeleted = 0
             LIMIT 1
-        """, (f'%{mapped_name}%', f'%{mapped_name}%', f'%{variant}%'))
-        
+        """, (mapped_name,))
         mon_an = cursor.fetchone()
+        
         if mon_an:
-            print(f"[SEARCH] Found match with variant: '{variant}'")
+            print(f"[SEARCH] ✅ Exact match: '{variant}' = '{dict(mon_an)['TenMonAn']}'")
+            break
+        
+        # Try exact match with original variant
+        cursor.execute("""
+            SELECT * FROM MonAn 
+            WHERE LOWER(TenMonAn) = LOWER(?) AND IsDeleted = 0
+            LIMIT 1
+        """, (variant,))
+        mon_an = cursor.fetchone()
+        
+        if mon_an:
+            print(f"[SEARCH] ✅ Exact match: '{variant}' = '{dict(mon_an)['TenMonAn']}'")
             break
     
+    # Priority 2: Normalized match (without accents)
     if not mon_an:
+        for variant in search_variants:
+            if mon_an:
+                break
+            
+            normalized_search = normalize_for_search(variant)
+            
+            # Get all foods and compare normalized
+            cursor.execute("""
+                SELECT * FROM MonAn WHERE IsDeleted = 0
+            """)
+            all_foods = cursor.fetchall()
+            
+            for food in all_foods:
+                food_dict = dict(food)
+                normalized_db = normalize_for_search(food_dict['TenMonAn'])
+                
+                if normalized_db == normalized_search:
+                    mon_an = food
+                    print(f"[SEARCH] ✅ Normalized match: '{variant}' ≈ '{food_dict['TenMonAn']}'")
+                    break
+            
+            if mon_an:
+                break
+    
+    # Priority 3: Partial match (only if search term is long enough)
+    if not mon_an and len(food_name) >= 4:
+        for variant in search_variants:
+            if mon_an:
+                break
+                
+            mapped_name = get_mapped_food_name(variant)
+            normalized_search = normalize_for_search(variant)
+            
+            # Get all foods and check if search term is contained
+            cursor.execute("""
+                SELECT * FROM MonAn WHERE IsDeleted = 0
+            """)
+            all_foods = cursor.fetchall()
+            
+            for food in all_foods:
+                food_dict = dict(food)
+                normalized_db = normalize_for_search(food_dict['TenMonAn'])
+                
+                # Check if search term is in food name
+                if normalized_search in normalized_db or normalized_db in normalized_search:
+                    mon_an = food
+                    print(f"[SEARCH] ⚠️  Partial match: '{variant}' in '{food_dict['TenMonAn']}'")
+                    break
+            
+            if mon_an:
+                break
+    
+    if not mon_an:
+        print(f"[SEARCH] ❌ No match found for '{food_name}'")
         conn.close()
         return None
         

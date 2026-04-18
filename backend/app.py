@@ -19,6 +19,10 @@ CORS(app)
 def index():
     return send_file(os.path.join(app.static_folder, "index.html"))
 
+@app.route("/admin")
+def admin_page():
+    return send_file(os.path.join(app.static_folder, "admin.html"))
+
 @app.route("/static/<path:path>")
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
@@ -264,36 +268,35 @@ def predict():
     
     is_newly_added = False
     
-    # 4. Nếu không có trong database, tự động lấy thông tin từ external API và thêm vào
+    # 4. Nếu không có trong database, tự động lấy thông tin từ AI (Tiếng Việt) và thêm vào
     if not food_data:
-        print(f"[INFO] Không tìm thấy '{food_name_vietnamese}' trong database. Đang lấy thông tin từ external API...")
+        print(f"[INFO] Không tìm thấy '{food_name_vietnamese}' trong database. Đang tạo thông tin mới bằng AI...")
         try:
-            from external_api import get_food_info_from_spoonacular
+            from ai_generator import generate_food_data_vietnamese
             
-            # Lấy thông tin từ Spoonacular API (sử dụng tên tiếng Anh)
-            external_food_data = get_food_info_from_spoonacular(food_name_english)
+            ai_data = generate_food_data_vietnamese(food_name_english)
             
-            if external_food_data:
-                print(f"[INFO] Đã lấy thông tin từ API. Đang thêm vào database...")
+            if ai_data:
+                print(f"[INFO] Đã tạo thông tin từ AI. Đang thêm vào database...")
                 
-                # Chuẩn bị dữ liệu để insert vào database (sử dụng tên tiếng Việt)
+                # Nếu translation dictionary không có, dùng tên tiếng Việt do AI trả về
+                if food_name_vietnamese == food_name_english and "TenMonAn" in ai_data:
+                    food_name_vietnamese = ai_data["TenMonAn"]
+                
+                # Chuẩn bị dữ liệu để insert vào database
                 food_to_insert = {
-                    "TenMonAn": food_name_vietnamese,  # Lưu tên tiếng Việt
-                    "MoTa": external_food_data.get("description", f"Món ăn {food_name_vietnamese}") + f" [English: {food_name_english}]",
-                    "PhanLoai": external_food_data.get("category", "Món ăn"),
-                    "DinhDuong": {
-                        "Calo": external_food_data.get("calories", 0),
-                        "Protein": external_food_data.get("protein", 0),
-                        "ChatBeo": external_food_data.get("fat", 0),
-                        "Carbohydrate": external_food_data.get("carbs", 0),
-                        "Vitamin": external_food_data.get("vitamins", "")
-                    },
-                    "CongThuc": {
-                        "HuongDan": external_food_data.get("instructions", "Chưa có hướng dẫn"),
-                        "ThoiGianNau": external_food_data.get("cooking_time", 30),
-                        "KhauPhan": external_food_data.get("servings", 1),
-                        "NguyenLieu": external_food_data.get("ingredients", [])
-                    }
+                    "TenMonAn": food_name_vietnamese,
+                    "MoTa": ai_data.get("MoTa", f"Món ăn {food_name_vietnamese}"),
+                    "PhanLoai": ai_data.get("PhanLoai", "Món ăn"),
+                    "DinhDuong": ai_data.get("DinhDuong", {
+                        "Calo": 0, "Protein": 0, "ChatBeo": 0, "Carbohydrate": 0, "Vitamin": ""
+                    }),
+                    "CongThuc": ai_data.get("CongThuc", {
+                        "HuongDan": "Chưa có hướng dẫn",
+                        "ThoiGianNau": 30,
+                        "KhauPhan": 1,
+                        "NguyenLieu": []
+                    })
                 }
                 
                 # Thêm vào database
@@ -306,10 +309,10 @@ def predict():
                 else:
                     print(f"[ERROR] Không thể thêm '{food_name_vietnamese}' vào database")
             else:
-                print(f"[WARNING] Không lấy được thông tin từ external API cho '{food_name_english}'")
+                print(f"[WARNING] Không tạo được dữ liệu từ AI cho '{food_name_english}'")
                 
         except Exception as e:
-            print(f"[ERROR] Lỗi khi lấy thông tin từ external API: {e}")
+            print(f"[ERROR] Lỗi khi tạo dữ liệu từ AI: {e}")
             # Không làm gián đoạn flow nếu external API lỗi
 
     # 5. Format Kết quả (sử dụng tên tiếng Việt)
@@ -361,3 +364,152 @@ def predict():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+    """API để user đánh giá kết quả nhận diện"""
+    data = request.json
+    
+    user_id = data.get("user_id")
+    food_name = data.get("food_name")
+    confidence = data.get("confidence", 0)
+    rating = data.get("rating")  # 'accurate' hoặc 'inaccurate'
+    correct_name = data.get("correct_name")  # Tên đúng nếu user sửa
+    
+    if not food_name or not rating:
+        return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO FeedbackNhanDien (MaNguoiDung, TenMonNhanDien, DoChinhXac, DanhGia, TenMonDung)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, food_name, confidence, rating, correct_name))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Cảm ơn bạn đã đánh giá!"
+        })
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi lưu feedback: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/retry-recognition", methods=["POST"])
+def retry_recognition():
+    """API để nhận diện lại với các API khác"""
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "No file uploaded"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "message": "No file selected"}), 400
+    
+    # Lấy kết quả cũ để skip API đó
+    skip_api = request.form.get("skip_api", "")
+    
+    image_bytes = file.read()
+    
+    print(f"[RETRY] Nhận diện lại, skip API: {skip_api}")
+    
+    # Gọi API nhận diện với logic retry
+    from external_api import analyze_image_with_retry
+    food_name_english, confidence, error_msg = analyze_image_with_retry(image_bytes, skip_api)
+    
+    if not food_name_english:
+        return jsonify({
+            "success": False,
+            "message": "Vẫn không thể nhận diện. Vui lòng thử ảnh khác hoặc chọn món thủ công.",
+            "error_detail": error_msg
+        }), 503
+    
+    # Dịch sang tiếng Việt
+    food_name_vietnamese = translate_food_name(food_name_english)
+    print(f"[RETRY TRANSLATE] '{food_name_english}' → '{food_name_vietnamese}'")
+    
+    # Tìm trong database
+    food_data = search_food_by_name(food_name_vietnamese)
+    
+    if not food_data and food_name_vietnamese != food_name_english:
+        food_data = search_food_by_name(food_name_english)
+    
+    # Tự động thêm nếu chưa có
+    is_newly_added = False
+    if not food_data:
+        try:
+            from ai_generator import generate_food_data_vietnamese
+            
+            ai_data = generate_food_data_vietnamese(food_name_english)
+            
+            if ai_data:
+                if food_name_vietnamese == food_name_english and "TenMonAn" in ai_data:
+                    food_name_vietnamese = ai_data["TenMonAn"]
+                
+                food_to_insert = {
+                    "TenMonAn": food_name_vietnamese,
+                    "MoTa": ai_data.get("MoTa", f"Món ăn {food_name_vietnamese}"),
+                    "PhanLoai": ai_data.get("PhanLoai", "Món ăn"),
+                    "DinhDuong": ai_data.get("DinhDuong", {
+                        "Calo": 0, "Protein": 0, "ChatBeo": 0, "Carbohydrate": 0, "Vitamin": ""
+                    }),
+                    "CongThuc": ai_data.get("CongThuc", {
+                        "HuongDan": "Chưa có hướng dẫn",
+                        "ThoiGianNau": 30,
+                        "KhauPhan": 1,
+                        "NguyenLieu": []
+                    })
+                }
+                
+                if insert_food_full(food_to_insert):
+                    is_newly_added = True
+                    food_data = search_food_by_name(food_name_vietnamese)
+        except Exception as e:
+            print(f"[ERROR] Lỗi khi thêm món: {e}")
+    
+    # Format response
+    confidence_pct = round(confidence * 100, 2) if confidence else 0
+    
+    response_data = {
+        "success": True,
+        "predicted_class_name": food_name_vietnamese,
+        "confidence": confidence_pct,
+        "food_data": None,
+        "message": ""
+    }
+    
+    if food_data:
+        dinh_duong = food_data.get("DinhDuong") or {}
+        cong_thuc = food_data.get("CongThuc") or {}
+        nguyen_lieu = cong_thuc.get("NguyenLieu") or []
+        
+        response_data["food_data"] = {
+            "name": food_data.get("TenMonAn", food_name_vietnamese),
+            "description": food_data.get("MoTa", ""),
+            "calories": dinh_duong.get("Calo", "--"),
+            "proteins": dinh_duong.get("Protein", "--"),
+            "carbs": dinh_duong.get("Carbohydrate", "--"),
+            "fats": dinh_duong.get("ChatBeo", "--"),
+            "recipe_instructions": cong_thuc.get("HuongDan", ""),
+            "recipe_time": cong_thuc.get("ThoiGianNau", ""),
+            "ingredients": nguyen_lieu
+        }
+        
+        if is_newly_added:
+            response_data["message"] = f"✨ Nhận diện lại thành công! Món '{food_name_vietnamese}' vừa được thêm vào."
+        else:
+            response_data["message"] = f"✅ Nhận diện lại thành công: '{food_name_vietnamese}'"
+    
+    # Lưu lịch sử
+    user_id = request.form.get("user_id")
+    if user_id and str(user_id).isdigit():
+        try:
+            insert_lich_su(int(user_id), "", food_name_vietnamese, confidence_pct)
+        except Exception as e:
+            print(f"Error saving history: {e}")
+    
+    return jsonify(response_data)

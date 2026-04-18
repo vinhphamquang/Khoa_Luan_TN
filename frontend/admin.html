@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Smart Food Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/admin_append.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <!-- Animated Background Blobs -->
+    <div class="bg-blobs" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- ========== HEADER / NAVBAR ========== -->
+    <header class="navbar scrolled" id="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <i class="fa-solid fa-bowl-food"></i>
+                <span>SmartFood<strong>AI</strong></span>
+            </a>
+            <nav class="nav-links open" id="nav-links">
+                <div class="nav-auth">
+                    <a href="/" class="nav-link"><i class="fa-solid fa-house"></i> Về Trang Chính</a>
+                    <button id="btn-admin-logout" class="btn btn-outline" style="padding: 8px 16px; font-size: 14px;"><i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ========== PAGE: ADMIN ========== -->
+    <section class="page active" id="page-admin" style="margin-top: 80px;">
+        <div class="admin-wrapper">
+            <div class="admin-hero reveal">
+                <div class="admin-hero-content">
+                    <div class="admin-hero-badge"><i class="fa-solid fa-shield-halved"></i> Bảng Quản Trị</div>
+                    <h2 class="admin-hero-title">Xin chào, <span class="gradient-text">Admin</span> 👋</h2>
+                    <p class="admin-hero-desc">Quản lý toàn bộ dữ liệu hệ thống nhận diện món ăn từ bảng điều khiển này.</p>
+                </div>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="admin-stats">
+                    <i class="fa-solid fa-chart-pie"></i><span>Tổng Quan</span>
+                </button>
+                <button class="admin-tab" data-tab="admin-foods">
+                    <i class="fa-solid fa-utensils"></i><span>Món Ăn</span>
+                </button>
+                <button class="admin-tab" data-tab="admin-users">
+                    <i class="fa-solid fa-user-group"></i><span>Người Dùng</span>
+                </button>
+                <button class="admin-tab" data-tab="admin-history">
+                    <i class="fa-solid fa-timeline"></i><span>Lịch Sử</span>
+                </button>
+            </div>
+
+            <!-- TAB: Tổng Quan -->
+            <div id="admin-stats" class="admin-tab-content active">
+                <div class="admin-stats-grid">
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #4CAF50, #66BB6A);">
+                            <i class="fa-solid fa-bowl-food"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <span class="admin-stat-label">Tổng Món Ăn</span>
+                            <span class="admin-stat-value" id="st-foods">--</span>
+                        </div>
+                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(76,175,80,0.15), transparent);"></div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #06b6d4, #67e8f9);">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <span class="admin-stat-label">Người Dùng</span>
+                            <span class="admin-stat-value" id="st-users">--</span>
+                        </div>
+                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(6,182,212,0.15), transparent);"></div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
+                            <i class="fa-solid fa-camera-retro"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <span class="admin-stat-label">Lượt Nhận Diện</span>
+                            <span class="admin-stat-value" id="st-recs">--</span>
+                        </div>
+                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Món Ăn -->
+            <div id="admin-foods" class="admin-tab-content hidden">
+                <div class="admin-panel">
+                    <div class="admin-panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-utensils"></i> Quản Lý Món Ăn</h3>
+                            <p>Thêm, sửa, xóa mềm các món ăn trong hệ thống</p>
+                        </div>
+                        <button class="btn btn-primary" id="btn-admin-add-food"><i class="fa-solid fa-plus"></i> Thêm Món</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead><tr><th>ID</th><th>Tên Món</th><th>Phân Loại</th><th>Trạng Thái</th><th>Thao Tác</th></tr></thead>
+                            <tbody id="tb-foods"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Người Dùng -->
+            <div id="admin-users" class="admin-tab-content hidden">
+                <div class="admin-panel">
+                    <div class="admin-panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-user-group"></i> Quản Lý Người Dùng</h3>
+                            <p>Xem thông tin và quản lý tài khoản người dùng trên hệ thống</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead><tr><th>ID</th><th>Tên</th><th>Email</th><th>Vai Trò</th><th>Đăng Ký</th><th>Thao Tác</th></tr></thead>
+                            <tbody id="tb-users"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Lịch Sử -->
+            <div id="admin-history" class="admin-tab-content hidden">
+                <div class="admin-panel">
+                    <div class="admin-panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-timeline"></i> Lịch Sử Nhận Diện</h3>
+                            <p>Theo dõi toàn bộ hoạt động nhận diện của người dùng trên hệ thống</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead><tr><th>ID</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Chính Xác</th><th>Thời Gian</th></tr></thead>
+                            <tbody id="tb-history"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== ADMIN FOOD MODAL ========== -->
+    <div id="admin-modal-overlay" class="modal-overlay hidden">
+        <div id="admin-food-modal" class="glass-card modal-box" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+            <h2 class="section-title" id="food-modal-title" style="font-size: 24px; text-align: center; margin-bottom: 20px;">Thêm Món Ăn</h2>
+            <form id="food-admin-form">
+                <input type="hidden" id="fa-id">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group"><label>Tên Món Ăn</label><input type="text" id="fa-name" required class="form-input"></div>
+                    <div class="form-group"><label>Phân Loại</label><input type="text" id="fa-cate" class="form-input"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Mô Tả</label><textarea id="fa-desc" class="form-input" rows="2"></textarea></div>
+                    <div class="form-group"><label>Calo (kcal)</label><input type="number" step="0.1" id="fa-cal" class="form-input"></div>
+                    <div class="form-group"><label>Protein (g)</label><input type="number" step="0.1" id="fa-pro" class="form-input"></div>
+                    <div class="form-group"><label>Chất Béo (g)</label><input type="number" step="0.1" id="fa-fat" class="form-input"></div>
+                    <div class="form-group"><label>Carbohydrate (g)</label><input type="number" step="0.1" id="fa-car" class="form-input"></div>
+                </div>
+                <div class="form-group" style="margin-top: 15px;"><label>Hướng Dẫn Nấu</label><textarea id="fa-instruct" class="form-input" rows="3"></textarea></div>
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center;">
+                        <label>Nguyên Liệu</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="file" id="fa-upload-excel" accept=".xlsx, .xls, .csv" style="display: none;">
+                            <button type="button" id="btn-upload-excel" class="btn btn-outline" style="padding: 2px 8px; font-size: 12px;"><i class="fa-solid fa-file-excel"></i> Tải Excel</button>
+                            <button type="button" id="fa-add-ing" class="btn btn-outline" style="padding: 2px 8px; font-size: 12px;"><i class="fa-solid fa-plus"></i> Thêm</button>
+                        </div>
+                    </div>
+                    <div id="fa-ingredients" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+                <div class="form-group"><label>Trạng Thái</label>
+                    <select id="fa-deleted" class="form-input">
+                        <option value="0">Đang hiển thị</option>
+                        <option value="1">Đã khóa (Soft Delete)</option>
+                    </select>
+                </div>
+                <div id="fa-error" class="form-error hidden"></div>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')">Hủy</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Lưu Dữ Liệu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="/static/admin.js?v=3"></script>
+</body>
+</html>

@@ -38,7 +38,7 @@
                     <button id="btn-show-register" class="btn btn-primary" style="padding: 8px 16px; font-size: 14px;">Đăng Ký</button>
                 </div>
                 <div id="user-section" class="nav-auth hidden">
-                    <a href="#admin" id="nav-admin-link" class="nav-link hidden" data-page="admin"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+                    <a href="/admin" id="nav-admin-link" class="nav-link hidden"><i class="fa-solid fa-shield-halved"></i> Admin</a>
                     <a href="#profile" id="user-name-display" class="nav-link" data-page="profile"><i class="fa-solid fa-user"></i> User</a>
                 </div>
             </nav>
@@ -213,6 +213,117 @@
             </div>
         </div>
 
+        <!-- Tính Năng Nổi Bật -->
+        <div class="section" id="section-features">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-star"></i> Tính Năng</span>
+                <h2 class="section-title">Tại Sao Chọn <span class="gradient-text">SmartFoodAI</span>?</h2>
+                <p class="section-desc">Hệ thống tích hợp nhiều công nghệ tiên tiến mang đến trải nghiệm phân tích thực phẩm toàn diện</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="feature-icon-wrap cal-bg"><i class="fa-solid fa-bolt-lightning"></i></div>
+                    <h3>Nhận Diện Nhanh Chóng</h3>
+                    <p>Chỉ cần vài giây để AI phân tích và trả về kết quả chính xác nhờ tích hợp Google Cloud Vision và Gemini.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="feature-icon-wrap prot-bg"><i class="fa-solid fa-chart-column"></i></div>
+                    <h3>Phân Tích Dinh Dưỡng</h3>
+                    <p>Cung cấp thông tin chi tiết về calo, protein, chất béo, carbohydrate giúp bạn kiểm soát chế độ ăn uống.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="feature-icon-wrap carb-bg"><i class="fa-solid fa-book-open-reader"></i></div>
+                    <h3>Công Thức Nấu Ăn</h3>
+                    <p>Mỗi món ăn đi kèm công thức nấu chi tiết với nguyên liệu, hướng dẫn từng bước và thời gian nấu.</p>
+                </div>
+                <div class="feature-card glass-card reveal" style="--delay: 0.4s">
+                    <div class="feature-icon-wrap fat-bg"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <h3>Lưu Lịch Sử Tra Cứu</h3>
+                    <p>Đăng nhập để lưu lại toàn bộ lịch sử nhận diện, dễ dàng xem lại bất cứ lúc nào từ hồ sơ cá nhân.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Công Nghệ Sử Dụng -->
+        <div class="section" id="section-tech">
+            <div class="section-header reveal">
+                <span class="section-tag"><i class="fa-solid fa-microchip"></i> Công Nghệ</span>
+                <h2 class="section-title">Nền Tảng <span class="gradient-text">Công Nghệ</span></h2>
+                <p class="section-desc">Được xây dựng trên nền tảng các công nghệ hiện đại và đáng tin cậy</p>
+            </div>
+            <div class="tech-grid">
+                <div class="tech-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="tech-icon python"><i class="fa-brands fa-python"></i></div>
+                    <h4>Python & Flask</h4>
+                    <p>Backend mạnh mẽ, linh hoạt xử lý API và logic nghiệp vụ</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="tech-icon vision"><i class="fa-solid fa-eye"></i></div>
+                    <h4>Cloud Vision API</h4>
+                    <p>Nhận diện hình ảnh chính xác từ Google Cloud Platform</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="tech-icon spoon"><i class="fa-solid fa-brain"></i></div>
+                    <h4>Gemini AI</h4>
+                    <p>Sinh dữ liệu dinh dưỡng & công thức tự động bằng AI</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.4s">
+                    <div class="tech-icon sqlite"><i class="fa-solid fa-database"></i></div>
+                    <h4>SQLite</h4>
+                    <p>Cơ sở dữ liệu nhẹ, lưu trữ món ăn và lịch sử người dùng</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.5s">
+                    <div class="tech-icon frontend"><i class="fa-brands fa-js"></i></div>
+                    <h4>JavaScript SPA</h4>
+                    <p>Giao diện đơn trang mượt mà, tương tác nhanh không tải lại</p>
+                </div>
+                <div class="tech-card glass-card reveal" style="--delay: 0.6s">
+                    <div class="tech-icon" style="background: rgba(34,197,94,0.15); color: var(--primary);"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h4>Bảo Mật</h4>
+                    <p>Mã hoá mật khẩu, phân quyền Admin/User an toàn</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thống Kê -->
+        <div class="section" id="section-stats-counter">
+            <div class="stats-counter-grid">
+                <div class="stats-counter-card glass-card reveal" style="--delay: 0.1s">
+                    <div class="stats-counter-icon"><i class="fa-solid fa-utensils"></i></div>
+                    <div class="stats-counter-value" id="counter-foods">50+</div>
+                    <div class="stats-counter-label">Món Ăn Hỗ Trợ</div>
+                </div>
+                <div class="stats-counter-card glass-card reveal" style="--delay: 0.2s">
+                    <div class="stats-counter-icon"><i class="fa-solid fa-robot"></i></div>
+                    <div class="stats-counter-value">3</div>
+                    <div class="stats-counter-label">API AI Tích Hợp</div>
+                </div>
+                <div class="stats-counter-card glass-card reveal" style="--delay: 0.3s">
+                    <div class="stats-counter-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                    <div class="stats-counter-value">95%</div>
+                    <div class="stats-counter-label">Độ Chính Xác</div>
+                </div>
+                <div class="stats-counter-card glass-card reveal" style="--delay: 0.4s">
+                    <div class="stats-counter-icon"><i class="fa-solid fa-clock"></i></div>
+                    <div class="stats-counter-value">&lt;5s</div>
+                    <div class="stats-counter-label">Thời Gian Phân Tích</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA cuối -->
+        <div class="section" id="section-cta">
+            <div class="cta-banner glass-card reveal">
+                <div class="cta-content">
+                    <h2>Sẵn Sàng Khám Phá?</h2>
+                    <p>Hãy thử ngay tính năng nhận diện món ăn bằng trí tuệ nhân tạo — hoàn toàn miễn phí!</p>
+                    <a href="#analyze" class="btn btn-primary" data-page="analyze">
+                        <i class="fa-solid fa-camera"></i> Bắt Đầu Phân Tích Ngay
+                    </a>
+                </div>
+            </div>
+        </div>
+
     </section>
 
     <!-- ========== PAGE: PHÂN TÍCH ========== -->
@@ -296,46 +407,97 @@
                     
                     <div class="system-msg" id="sys-msg"></div>
                     
-                    <div class="nutrition-grid">
-                        <div class="nutri-card cal">
-                            <div class="nutri-icon"><i class="fa-solid fa-fire"></i></div>
-                            <div class="nutri-info">
-                                <span class="nutri-value" id="val-cal">--</span>
-                                <span class="nutri-label">Calo (kcal)</span>
-                            </div>
+                    <!-- Feedback & Retry Section -->
+                    <div class="feedback-section" id="feedback-section" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; display: none;">
+                        <p style="margin-bottom: 10px; font-weight: 500;">
+                            <i class="fa-solid fa-star"></i> Kết quả có chính xác không?
+                        </p>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button id="btn-accurate" class="btn-feedback btn-success" style="flex: 1; min-width: 120px;">
+                                <i class="fa-solid fa-thumbs-up"></i> Chính xác
+                            </button>
+                            <button id="btn-inaccurate" class="btn-feedback btn-warning" style="flex: 1; min-width: 120px;">
+                                <i class="fa-solid fa-thumbs-down"></i> Không chính xác
+                            </button>
+                            <button id="btn-retry" class="btn-feedback btn-primary" style="flex: 1; min-width: 120px;">
+                                <i class="fa-solid fa-rotate"></i> Nhận diện lại
+                            </button>
                         </div>
-                        <div class="nutri-card prot">
-                            <div class="nutri-icon"><i class="fa-solid fa-dumbbell"></i></div>
-                            <div class="nutri-info">
-                                <span class="nutri-value" id="val-prot">--</span>
-                                <span class="nutri-label">Protein (g)</span>
-                            </div>
-                        </div>
-                        <div class="nutri-card carb">
-                            <div class="nutri-icon"><i class="fa-solid fa-wheat-awn"></i></div>
-                            <div class="nutri-info">
-                                <span class="nutri-value" id="val-carb">--</span>
-                                <span class="nutri-label">Tinh bột (g)</span>
-                            </div>
-                        </div>
-                        <div class="nutri-card fat">
-                            <div class="nutri-icon"><i class="fa-solid fa-droplet"></i></div>
-                            <div class="nutri-info">
-                                <span class="nutri-value" id="val-fat">--</span>
-                                <span class="nutri-label">Chất béo (g)</span>
-                            </div>
-                        </div>
+                        <div id="feedback-message" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
                     </div>
-
-                    <!-- Công thức & Nguyên liệu -->
-                    <div class="recipe-panel hidden" id="recipe-container">
-                        <div class="recipe-block">
-                            <h3><i class="fa-solid fa-basket-shopping"></i> Nguyên Liệu</h3>
-                            <ul id="ingredients-list" class="ingredients-list"></ul>
+                    
+                    <!-- Accordion Sections -->
+                    <div class="result-accordion">
+                        <!-- Dinh Dưỡng Accordion -->
+                        <div class="accordion-item">
+                            <button class="accordion-header" data-target="nutrition-content">
+                                <div class="accordion-title">
+                                    <i class="fa-solid fa-chart-pie"></i>
+                                    <span>Thông Tin Dinh Dưỡng</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down accordion-icon"></i>
+                            </button>
+                            <div class="accordion-content" id="nutrition-content">
+                                <div class="nutrition-grid">
+                                    <div class="nutri-card cal">
+                                        <div class="nutri-icon"><i class="fa-solid fa-fire"></i></div>
+                                        <div class="nutri-info">
+                                            <span class="nutri-value" id="val-cal">--</span>
+                                            <span class="nutri-label">Calo (kcal)</span>
+                                        </div>
+                                    </div>
+                                    <div class="nutri-card prot">
+                                        <div class="nutri-icon"><i class="fa-solid fa-dumbbell"></i></div>
+                                        <div class="nutri-info">
+                                            <span class="nutri-value" id="val-prot">--</span>
+                                            <span class="nutri-label">Protein (g)</span>
+                                        </div>
+                                    </div>
+                                    <div class="nutri-card carb">
+                                        <div class="nutri-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                                        <div class="nutri-info">
+                                            <span class="nutri-value" id="val-carb">--</span>
+                                            <span class="nutri-label">Tinh bột (g)</span>
+                                        </div>
+                                    </div>
+                                    <div class="nutri-card fat">
+                                        <div class="nutri-icon"><i class="fa-solid fa-droplet"></i></div>
+                                        <div class="nutri-info">
+                                            <span class="nutri-value" id="val-fat">--</span>
+                                            <span class="nutri-label">Chất béo (g)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="recipe-block">
-                            <h3><i class="fa-solid fa-fire-burner"></i> Công Thức Nấu <span id="recipe-time" class="recipe-time-badge"></span></h3>
-                            <p id="recipe-instructions" class="recipe-text"></p>
+
+                        <!-- Nguyên Liệu Accordion -->
+                        <div class="accordion-item" id="ingredients-accordion">
+                            <button class="accordion-header" data-target="ingredients-content">
+                                <div class="accordion-title">
+                                    <i class="fa-solid fa-basket-shopping"></i>
+                                    <span>Nguyên Liệu</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down accordion-icon"></i>
+                            </button>
+                            <div class="accordion-content" id="ingredients-content">
+                                <ul id="ingredients-list" class="ingredients-list"></ul>
+                            </div>
+                        </div>
+
+                        <!-- Công Thức Accordion -->
+                        <div class="accordion-item" id="recipe-accordion">
+                            <button class="accordion-header" data-target="recipe-content">
+                                <div class="accordion-title">
+                                    <i class="fa-solid fa-fire-burner"></i>
+                                    <span>Công Thức Nấu</span>
+                                    <span id="recipe-time" class="recipe-time-badge"></span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down accordion-icon"></i>
+                            </button>
+                            <div class="accordion-content" id="recipe-content">
+                                <p id="recipe-instructions" class="recipe-text"></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -401,124 +563,6 @@
         </div>
     </section>
 
-    <!-- ========== PAGE: ADMIN ========== -->
-    <section class="page" id="page-admin">
-        <div class="admin-wrapper">
-            <div class="admin-hero reveal">
-                <div class="admin-hero-content">
-                    <div class="admin-hero-badge"><i class="fa-solid fa-shield-halved"></i> Bảng Quản Trị</div>
-                    <h2 class="admin-hero-title">Xin chào, <span class="gradient-text">Admin</span> 👋</h2>
-                    <p class="admin-hero-desc">Quản lý toàn bộ dữ liệu hệ thống nhận diện món ăn từ bảng điều khiển này.</p>
-                </div>
-            </div>
-
-            <div class="admin-tabs">
-                <button class="admin-tab active" data-tab="admin-stats">
-                    <i class="fa-solid fa-chart-pie"></i><span>Tổng Quan</span>
-                </button>
-                <button class="admin-tab" data-tab="admin-foods">
-                    <i class="fa-solid fa-utensils"></i><span>Món Ăn</span>
-                </button>
-                <button class="admin-tab" data-tab="admin-users">
-                    <i class="fa-solid fa-user-group"></i><span>Người Dùng</span>
-                </button>
-                <button class="admin-tab" data-tab="admin-history">
-                    <i class="fa-solid fa-timeline"></i><span>Lịch Sử</span>
-                </button>
-            </div>
-
-            <!-- TAB: Tổng Quan -->
-            <div id="admin-stats" class="admin-tab-content active">
-                <div class="admin-stats-grid">
-                    <div class="admin-stat-card">
-                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #4CAF50, #66BB6A);">
-                            <i class="fa-solid fa-bowl-food"></i>
-                        </div>
-                        <div class="admin-stat-info">
-                            <span class="admin-stat-label">Tổng Món Ăn</span>
-                            <span class="admin-stat-value" id="st-foods">--</span>
-                        </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(76,175,80,0.15), transparent);"></div>
-                    </div>
-                    <div class="admin-stat-card">
-                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #06b6d4, #67e8f9);">
-                            <i class="fa-solid fa-users"></i>
-                        </div>
-                        <div class="admin-stat-info">
-                            <span class="admin-stat-label">Người Dùng</span>
-                            <span class="admin-stat-value" id="st-users">--</span>
-                        </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(6,182,212,0.15), transparent);"></div>
-                    </div>
-                    <div class="admin-stat-card">
-                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
-                            <i class="fa-solid fa-camera-retro"></i>
-                        </div>
-                        <div class="admin-stat-info">
-                            <span class="admin-stat-label">Lượt Nhận Diện</span>
-                            <span class="admin-stat-value" id="st-recs">--</span>
-                        </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Món Ăn -->
-            <div id="admin-foods" class="admin-tab-content hidden">
-                <div class="admin-panel">
-                    <div class="admin-panel-header">
-                        <div>
-                            <h3><i class="fa-solid fa-utensils"></i> Quản Lý Món Ăn</h3>
-                            <p>Thêm, sửa, xóa mềm các món ăn trong hệ thống</p>
-                        </div>
-                        <button class="btn btn-primary" id="btn-admin-add-food"><i class="fa-solid fa-plus"></i> Thêm Món</button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Tên Món</th><th>Phân Loại</th><th>Trạng Thái</th><th>Thao Tác</th></tr></thead>
-                            <tbody id="tb-foods"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Người Dùng -->
-            <div id="admin-users" class="admin-tab-content hidden">
-                <div class="admin-panel">
-                    <div class="admin-panel-header">
-                        <div>
-                            <h3><i class="fa-solid fa-user-group"></i> Quản Lý Người Dùng</h3>
-                            <p>Xem thông tin và quản lý tài khoản người dùng trên hệ thống</p>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Tên</th><th>Email</th><th>Vai Trò</th><th>Đăng Ký</th><th>Thao Tác</th></tr></thead>
-                            <tbody id="tb-users"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Lịch Sử -->
-            <div id="admin-history" class="admin-tab-content hidden">
-                <div class="admin-panel">
-                    <div class="admin-panel-header">
-                        <div>
-                            <h3><i class="fa-solid fa-timeline"></i> Lịch Sử Nhận Diện</h3>
-                            <p>Theo dõi toàn bộ hoạt động nhận diện của người dùng trên hệ thống</p>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Chính Xác</th><th>Thời Gian</th></tr></thead>
-                            <tbody id="tb-history"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <footer class="site-footer">
         <div class="footer-container">
@@ -594,44 +638,7 @@
         </div>
     </div>
 
-    <!-- ========== ADMIN FOOD MODAL (separate overlay) ========== -->
-    <div id="admin-modal-overlay" class="modal-overlay hidden">
-        <div id="admin-food-modal" class="glass-card modal-box" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <button class="modal-close" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
-            <h2 class="section-title" id="food-modal-title" style="font-size: 24px; text-align: center; margin-bottom: 20px;">Thêm Món Ăn</h2>
-            <form id="food-admin-form">
-                <input type="hidden" id="fa-id">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group"><label>Tên Món Ăn</label><input type="text" id="fa-name" required class="form-input"></div>
-                    <div class="form-group"><label>Phân Loại</label><input type="text" id="fa-cate" class="form-input"></div>
-                    <div class="form-group" style="grid-column: span 2;"><label>Mô Tả</label><textarea id="fa-desc" class="form-input" rows="2"></textarea></div>
-                    <div class="form-group"><label>Calo (kcal)</label><input type="number" step="0.1" id="fa-cal" class="form-input"></div>
-                    <div class="form-group"><label>Protein (g)</label><input type="number" step="0.1" id="fa-pro" class="form-input"></div>
-                    <div class="form-group"><label>Chất Béo (g)</label><input type="number" step="0.1" id="fa-fat" class="form-input"></div>
-                    <div class="form-group"><label>Carbohydrate (g)</label><input type="number" step="0.1" id="fa-car" class="form-input"></div>
-                </div>
-                <div class="form-group" style="margin-top: 15px;"><label>Hướng Dẫn Nấu</label><textarea id="fa-instruct" class="form-input" rows="3"></textarea></div>
-                <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <label>Nguyên Liệu</label>
-                        <button type="button" id="fa-add-ing" class="btn btn-outline" style="padding: 2px 8px; font-size: 12px;"><i class="fa-solid fa-plus"></i> Thêm</button>
-                    </div>
-                    <div id="fa-ingredients" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                </div>
-                <div class="form-group"><label>Trạng Thái</label>
-                    <select id="fa-deleted" class="form-input">
-                        <option value="0">Đang hiển thị</option>
-                        <option value="1">Đã khóa (Soft Delete)</option>
-                    </select>
-                </div>
-                <div id="fa-error" class="form-error hidden"></div>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')">Hủy</button>
-                    <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Lưu Dữ Liệu</button>
-                </div>
-            </form>
-        </div>
-    </div>
+
     <script src="/static/script.js?v=2"></script>
 </body>
 </html>

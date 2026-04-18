@@ -18,7 +18,7 @@ def generate_food_data_vietnamese(food_name_english: str):
         print("[Lỗi] Chưa cấu hình GEMINI_API_KEY trong file .env")
         return None
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     Hệ thống AI nhận diện hình ảnh món ăn trả về tên tiếng Anh là: "{food_name_english}".
@@ -71,14 +71,41 @@ def generate_food_data_vietnamese(food_name_english: str):
                 return data_dict
             except Exception as e:
                 print(f"[JSON Parse Error] Lỗi khi đọc kết quả từ AI: {e}")
-                return None
         else:
             print(f"[Gemini API Error] {response.status_code} - {response.text}")
-            return None
             
     except Exception as e:
         print(f"[Network Error] {e}")
-        return None
+
+    # --- FALLBACK TO SPOONACULAR IF GEMINI FAILS ---
+    print("[INFO] Trying Spoonacular as fallback...")
+    try:
+        from external_api import get_food_info_from_spoonacular
+        sp_data = get_food_info_from_spoonacular(food_name_english)
+        if sp_data:
+            data_dict = {
+                "TenMonAn": food_name_english.capitalize(),
+                "MoTa": sp_data.get("description", f"Food {food_name_english}"),
+                "PhanLoai": sp_data.get("category", "Food"),
+                "DinhDuong": {
+                    "Calo": sp_data.get("calories", 0),
+                    "Protein": sp_data.get("protein", 0),
+                    "ChatBeo": sp_data.get("fat", 0),
+                    "Carbohydrate": sp_data.get("carbs", 0),
+                    "Vitamin": sp_data.get("vitamins", "")
+                },
+                "CongThuc": {
+                    "HuongDan": sp_data.get("instructions", "No instructions available"),
+                    "ThoiGianNau": sp_data.get("cooking_time", 30),
+                    "KhauPhan": sp_data.get("servings", 1),
+                    "NguyenLieu": sp_data.get("ingredients", [])
+                }
+            }
+            return data_dict
+    except Exception as fallback_err:
+        print(f"[Fallback Error] Spoonacular failed too: {fallback_err}")
+        
+    return None
 
 if __name__ == "__main__":
     res = generate_food_data_vietnamese("salad")
