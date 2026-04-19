@@ -221,12 +221,20 @@ function initAnalyzePage() {
 
     async function startCamera() {
         try {
+            // Thử mở camera sau (environment)
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             cameraVideo.srcObject = stream;
         } catch (err) {
-            console.error("Camera error:", err);
-            alert("Không thể truy cập Camera. Vui lòng kiểm tra quyền truy cập.");
-            if (modeUploadBtn) modeUploadBtn.click();
+            console.warn("Không tìm thấy camera sau, thử camera mặc định...", err);
+            try {
+                // Fallback: Mở camera bất kỳ (thường là camera trước trên laptop)
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                cameraVideo.srcObject = stream;
+            } catch (fallbackErr) {
+                console.error("Camera error:", fallbackErr);
+                alert("Lỗi truy cập Camera: " + fallbackErr.name + " - " + fallbackErr.message + "\nVui lòng kiểm tra xem camera có đang bị ứng dụng khác sử dụng không.");
+                if (modeUploadBtn) modeUploadBtn.click();
+            }
         }
     }
 

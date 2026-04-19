@@ -1,11 +1,43 @@
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
+from dotenv import load_dotenv
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'food_recognition.db')
+load_dotenv()
+
+DB_URL = os.environ.get("DATABASE_URL")
+
+COLUMN_MAP = {
+    'manguoidung': 'MaNguoiDung', 'tennguoidung': 'TenNguoiDung', 'email': 'Email',
+    'matkhau': 'MatKhau', 'ngaydangky': 'NgayDangKy', 'vaitro': 'VaiTro',
+    'mamonan': 'MaMonAn', 'tenmonan': 'TenMonAn', 'mota': 'MoTa',
+    'phanloai': 'PhanLoai', 'ngaytao': 'NgayTao', 'isdeleted': 'IsDeleted',
+    'madinhduong': 'MaDinhDuong', 'calo': 'Calo', 'protein': 'Protein',
+    'chatbeo': 'ChatBeo', 'carbohydrate': 'Carbohydrate', 'vitamin': 'Vitamin',
+    'macongthuc': 'MaCongThuc', 'huongdan': 'HuongDan', 'thoigiannau': 'ThoiGianNau',
+    'khauphan': 'KhauPhan', 'manguyenlieu': 'MaNguyenLieu', 'tennguyenlieu': 'TenNguyenLieu',
+    'soluong': 'SoLuong', 'malichsu': 'MaLichSu', 'hinhanh': 'HinhAnh',
+    'ketquanhandien': 'KetQuaNhanDien', 'thoigiannhandien': 'ThoiGianNhanDien',
+    'dochinhxac': 'DoChinhXac', 'mafeedback': 'MaFeedback', 'tenmonnhandien': 'TenMonNhanDien',
+    'danhgia': 'DanhGia', 'tenmondung': 'TenMonDung', 'thoigian': 'ThoiGian',
+    'mahoso': 'MaHoSo', 'tuoi': 'Tuoi', 'chieucao': 'ChieuCao', 'cannang': 'CanNang',
+    'gioitinh': 'GioiTinh', 'muctieu': 'MucTieu'
+}
+
+def map_row(row):
+    if not row: return row
+    return {COLUMN_MAP.get(k, k): v for k, v in row.items()}
+
+class PascalCaseCursor(psycopg2.extras.RealDictCursor):
+    def fetchone(self):
+        row = super().fetchone()
+        return map_row(row) if row else None
+    def fetchall(self):
+        rows = super().fetchall()
+        return [map_row(row) for row in rows]
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DB_URL, cursor_factory=PascalCaseCursor)
     return conn
 
 def get_mapped_food_name(food_name: str) -> str:
@@ -94,7 +126,7 @@ def search_food_by_name(food_name: str):
         # Try exact match with mapped name
         cursor.execute("""
             SELECT * FROM MonAn 
-            WHERE LOWER(TenMonAn) = LOWER(?) AND IsDeleted = 0
+            WHERE LOWER(TenMonAn) = LOWER(%s) AND IsDeleted = 0
             LIMIT 1
         """, (mapped_name,))
         mon_an = cursor.fetchone()
@@ -106,7 +138,7 @@ def search_food_by_name(food_name: str):
         # Try exact match with original variant
         cursor.execute("""
             SELECT * FROM MonAn 
-            WHERE LOWER(TenMonAn) = LOWER(?) AND IsDeleted = 0
+            WHERE LOWER(TenMonAn) = LOWER(%s) AND IsDeleted = 0
             LIMIT 1
         """, (variant,))
         mon_an = cursor.fetchone()
@@ -178,7 +210,7 @@ def search_food_by_name(food_name: str):
     ma_mon_an = mon_an_dict['MaMonAn']
     
     # 2. Get DinhDuong (Nutrition)
-    cursor.execute("SELECT * FROM DinhDuong WHERE MaMonAn = ?", (ma_mon_an,))
+    cursor.execute("SELECT * FROM DinhDuong WHERE MaMonAn = %s", (ma_mon_an,))
     dinh_duong = cursor.fetchone()
     if dinh_duong:
         mon_an_dict['DinhDuong'] = dict(dinh_duong)
@@ -186,7 +218,7 @@ def search_food_by_name(food_name: str):
         mon_an_dict['DinhDuong'] = None
         
     # 3. Get CongThuc (Recipe)
-    cursor.execute("SELECT * FROM CongThuc WHERE MaMonAn = ?", (ma_mon_an,))
+    cursor.execute("SELECT * FROM CongThuc WHERE MaMonAn = %s", (ma_mon_an,))
     cong_thuc = cursor.fetchone()
     
     if cong_thuc:
@@ -198,7 +230,7 @@ def search_food_by_name(food_name: str):
             SELECT nl.TenNguyenLieu, ctnl.SoLuong 
             FROM ChiTietNguyenLieu ctnl
             JOIN NguyenLieu nl ON ctnl.MaNguyenLieu = nl.MaNguyenLieu
-            WHERE ctnl.MaCongThuc = ?
+            WHERE ctnl.MaCongThuc = %s
         """, (ma_cong_thuc,))
         nguyen_lieu_list = cursor.fetchall()
         cong_thuc_dict['NguyenLieu'] = [dict(row) for row in nguyen_lieu_list]
@@ -215,7 +247,7 @@ def insert_lich_su(ma_nguoi_dung, hinh_anh, ket_qua, do_chinh_xac):
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO LichSuNhanDien (MaNguoiDung, HinhAnh, KetQuaNhanDien, DoChinhXac, ThoiGianNhanDien)
-        VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
+        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
     """, (ma_nguoi_dung, hinh_anh, ket_qua, do_chinh_xac))
     conn.commit()
     conn.close()
@@ -226,12 +258,12 @@ def create_user(name: str, email: str, hashed_password: str):
     try:
         cursor.execute("""
             INSERT INTO NguoiDung (TenNguoiDung, Email, MatKhau, NgayDangKy, VaiTro)
-            VALUES (?, ?, ?, date('now', 'localtime'), 'user')
+            VALUES (%s, %s, %s, CURRENT_DATE, 'user')
         """, (name, email, hashed_password))
         user_id = cursor.lastrowid
         conn.commit()
         return True, "Đăng ký thành công", user_id
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         return False, "Email đã được sử dụng", None
     except Exception as e:
         return False, str(e), None
@@ -241,7 +273,7 @@ def create_user(name: str, email: str, hashed_password: str):
 def get_user_by_email(email: str):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM NguoiDung WHERE Email = ?", (email,))
+    cursor.execute("SELECT * FROM NguoiDung WHERE Email = %s", (email,))
     user = cursor.fetchone()
     conn.close()
     if user:
@@ -251,7 +283,7 @@ def get_user_by_email(email: str):
 def get_user_by_id(ma_nguoi_dung: int):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM NguoiDung WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+    cursor.execute("SELECT * FROM NguoiDung WHERE MaNguoiDung = %s", (ma_nguoi_dung,))
     user = cursor.fetchone()
     conn.close()
     if user:
@@ -262,7 +294,7 @@ def update_password(ma_nguoi_dung: int, new_hashed_password: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE NguoiDung SET MatKhau = ? WHERE MaNguoiDung = ?", (new_hashed_password, ma_nguoi_dung))
+        cursor.execute("UPDATE NguoiDung SET MatKhau = %s WHERE MaNguoiDung = %s", (new_hashed_password, ma_nguoi_dung))
         conn.commit()
         return True
     except Exception as e:
@@ -277,35 +309,19 @@ def get_user_history(ma_nguoi_dung: int):
     cursor.execute("""
         SELECT MaLichSu, HinhAnh, KetQuaNhanDien, DoChinhXac, ThoiGianNhanDien 
         FROM LichSuNhanDien 
-        WHERE MaNguoiDung = ? 
+        WHERE MaNguoiDung = %s 
         ORDER BY ThoiGianNhanDien DESC
     """, (ma_nguoi_dung,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def create_health_profile_table():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS HoSoSucKhoe (
-            MaHoSo INTEGER PRIMARY KEY AUTOINCREMENT,
-            MaNguoiDung INTEGER UNIQUE,
-            Tuoi INTEGER,
-            ChieuCao REAL,
-            CanNang REAL,
-            GioiTinh TEXT,
-            MucTieu TEXT,
-            FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE
-        )
-    """)
-    conn.commit()
-    conn.close()
+
 
 def get_health_profile(ma_nguoi_dung: int):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM HoSoSucKhoe WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+    cursor.execute("SELECT * FROM HoSoSucKhoe WHERE MaNguoiDung = %s", (ma_nguoi_dung,))
     profile = cursor.fetchone()
     conn.close()
     if profile:
@@ -316,19 +332,19 @@ def upsert_health_profile(ma_nguoi_dung: int, data: dict):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT MaHoSo FROM HoSoSucKhoe WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+        cursor.execute("SELECT MaHoSo FROM HoSoSucKhoe WHERE MaNguoiDung = %s", (ma_nguoi_dung,))
         exists = cursor.fetchone()
         
         if exists:
             cursor.execute("""
                 UPDATE HoSoSucKhoe 
-                SET Tuoi = ?, ChieuCao = ?, CanNang = ?, GioiTinh = ?, MucTieu = ?
-                WHERE MaNguoiDung = ?
+                SET Tuoi = %s, ChieuCao = %s, CanNang = %s, GioiTinh = %s, MucTieu = %s
+                WHERE MaNguoiDung = %s
             """, (data.get('Tuoi'), data.get('ChieuCao'), data.get('CanNang'), data.get('GioiTinh'), data.get('MucTieu'), ma_nguoi_dung))
         else:
             cursor.execute("""
                 INSERT INTO HoSoSucKhoe (MaNguoiDung, Tuoi, ChieuCao, CanNang, GioiTinh, MucTieu)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (ma_nguoi_dung, data.get('Tuoi'), data.get('ChieuCao'), data.get('CanNang'), data.get('GioiTinh'), data.get('MucTieu')))
         
         conn.commit()
@@ -345,7 +361,7 @@ import datetime
 def insert_generated_food_data(food_name_english: str, data: dict):
     """
     Nhận dữ liệu dạng JSON dict từ Gemini và lưu vào SQLite.
-    Bao gồm ghi chú gốc tiếng Anh vào `MoTa` để lần sau `search_food_by_name` có thể match được qua `MoTa LIKE ?`
+    Bao gồm ghi chú gốc tiếng Anh vào `MoTa` để lần sau `search_food_by_name` có thể match được qua `MoTa LIKE %s`
     """
     try:
         conn = get_db_connection()
@@ -357,15 +373,15 @@ def insert_generated_food_data(food_name_english: str, data: dict):
         # 1. Insert MonAn
         cursor.execute("""
             INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao)
-            VALUES (?, ?, ?, ?)
-        """, (data.get('TenMonAn', food_name_english), mo_ta, data.get('PhanLoai', ''), datetime.date.today().strftime('%Y-%m-%d')))
+            VALUES (%s, %s, %s, %s)
+        """, (data.get('TenMonAn', food_name_english), mo_ta, data.get('PhanLoai', ''), CURRENT_DATE))
         ma_mon_an = cursor.lastrowid
         
         dinh_duong = data.get('DinhDuong', {})
         # 2. Insert DinhDuong
         cursor.execute("""
             INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             ma_mon_an, 
             dinh_duong.get('Calo', 0), 
@@ -379,7 +395,7 @@ def insert_generated_food_data(food_name_english: str, data: dict):
         # 3. Insert CongThuc
         cursor.execute("""
             INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """, (
             ma_mon_an,
             cong_thuc.get('HuongDan', ''),
@@ -397,15 +413,15 @@ def insert_generated_food_data(food_name_english: str, data: dict):
             if not ten_nl:
                 continue
                 
-            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = %s", (ten_nl,))
             row = cursor.fetchone()
             if row:
                 ma_nl = row['MaNguyenLieu']
             else:
-                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
-                ma_nl = cursor.lastrowid
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (%s) RETURNING MaNguyenLieu", (ten_nl,))
+                ma_nl = cursor.fetchone()['MaNguyenLieu']
                 
-            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ma_cong_thuc, ma_nl, so_luong))
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (%s, %s, %s)", (ma_cong_thuc, ma_nl, so_luong))
             
         conn.commit()
         conn.close()
@@ -428,7 +444,7 @@ def delete_user(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM NguoiDung WHERE MaNguoiDung = ?", (user_id,))
+        cursor.execute("DELETE FROM NguoiDung WHERE MaNguoiDung = %s", (user_id,))
         conn.commit()
         return True
     except Exception as e:
@@ -478,17 +494,17 @@ def get_food_detail_admin(food_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT * FROM MonAn WHERE MaMonAn = ?", (food_id,))
+    cursor.execute("SELECT * FROM MonAn WHERE MaMonAn = %s", (food_id,))
     mon_an = cursor.fetchone()
     if not mon_an: return None
     
     result = dict(mon_an)
     
-    cursor.execute("SELECT * FROM DinhDuong WHERE MaMonAn = ?", (food_id,))
+    cursor.execute("SELECT * FROM DinhDuong WHERE MaMonAn = %s", (food_id,))
     dinh_duong = cursor.fetchone()
     result['DinhDuong'] = dict(dinh_duong) if dinh_duong else None
     
-    cursor.execute("SELECT * FROM CongThuc WHERE MaMonAn = ?", (food_id,))
+    cursor.execute("SELECT * FROM CongThuc WHERE MaMonAn = %s", (food_id,))
     cong_thuc = cursor.fetchone()
     if cong_thuc:
         ct_dict = dict(cong_thuc)
@@ -496,7 +512,7 @@ def get_food_detail_admin(food_id):
             SELECT nl.MaNguyenLieu, nl.TenNguyenLieu, ctnl.SoLuong 
             FROM ChiTietNguyenLieu ctnl
             JOIN NguyenLieu nl ON ctnl.MaNguyenLieu = nl.MaNguyenLieu
-            WHERE ctnl.MaCongThuc = ?
+            WHERE ctnl.MaCongThuc = %s
         """, (ct_dict['MaCongThuc'],))
         ct_dict['NguyenLieu'] = [dict(r) for r in cursor.fetchall()]
         result['CongThuc'] = ct_dict
@@ -513,34 +529,34 @@ def insert_food_full(data):
         
         cursor.execute("""
              INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao, IsDeleted)
-             VALUES (?, ?, ?, date('now'), 0)
+             VALUES (%s, %s, %s, CURRENT_DATE, 0)
         """, (data.get('TenMonAn'), data.get('MoTa'), data.get('PhanLoai')))
         food_id = cursor.lastrowid
         
         dinh_duong = data.get('DinhDuong', {})
         cursor.execute("""
             INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (food_id, dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin')))
         
         cong_thuc = data.get('CongThuc', {})
         cursor.execute("""
             INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
         ct_id = cursor.lastrowid
         
         for nl in cong_thuc.get('NguyenLieu', []):
             ten_nl = nl.get('TenNguyenLieu')
             if not ten_nl: continue
-            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = %s", (ten_nl,))
             row = cursor.fetchone()
             if row:
                 ma_nl = row['MaNguyenLieu']
             else:
-                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
-                ma_nl = cursor.lastrowid
-            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ct_id, ma_nl, nl.get('SoLuong')))
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (%s) RETURNING MaNguyenLieu", (ten_nl,))
+                ma_nl = cursor.fetchone()['MaNguyenLieu']
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (%s, %s, %s)", (ct_id, ma_nl, nl.get('SoLuong')))
             
         conn.commit()
         return True
@@ -556,49 +572,49 @@ def update_food_full(food_id, data):
         cursor = conn.cursor()
         
         cursor.execute("""
-             UPDATE MonAn SET TenMonAn=?, MoTa=?, PhanLoai=?, IsDeleted=?
-             WHERE MaMonAn=?
+             UPDATE MonAn SET TenMonAn=%s, MoTa=%s, PhanLoai=%s, IsDeleted=%s
+             WHERE MaMonAn=%s
         """, (data.get('TenMonAn'), data.get('MoTa'), data.get('PhanLoai'), data.get('IsDeleted', 0), food_id))
         
         dinh_duong = data.get('DinhDuong', {})
-        cursor.execute("SELECT MaDinhDuong FROM DinhDuong WHERE MaMonAn=?", (food_id,))
+        cursor.execute("SELECT MaDinhDuong FROM DinhDuong WHERE MaMonAn=%s", (food_id,))
         if cursor.fetchone():
             cursor.execute("""
-                UPDATE DinhDuong SET Calo=?, Protein=?, ChatBeo=?, Carbohydrate=?, Vitamin=?
-                WHERE MaMonAn=?
+                UPDATE DinhDuong SET Calo=%s, Protein=%s, ChatBeo=%s, Carbohydrate=%s, Vitamin=%s
+                WHERE MaMonAn=%s
             """, (dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin'), food_id))
         else:
             cursor.execute("""
                 INSERT INTO DinhDuong (MaMonAn, Calo, Protein, ChatBeo, Carbohydrate, Vitamin)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (food_id, dinh_duong.get('Calo'), dinh_duong.get('Protein'), dinh_duong.get('ChatBeo'), dinh_duong.get('Carbohydrate'), dinh_duong.get('Vitamin')))
             
         cong_thuc = data.get('CongThuc', {})
-        cursor.execute("SELECT MaCongThuc FROM CongThuc WHERE MaMonAn=?", (food_id,))
+        cursor.execute("SELECT MaCongThuc FROM CongThuc WHERE MaMonAn=%s", (food_id,))
         ct_row = cursor.fetchone()
         if ct_row:
             ct_id = ct_row['MaCongThuc']
             cursor.execute("""
-                UPDATE CongThuc SET HuongDan=?, ThoiGianNau=?, KhauPhan=? WHERE MaCongThuc=?
+                UPDATE CongThuc SET HuongDan=%s, ThoiGianNau=%s, KhauPhan=%s WHERE MaCongThuc=%s
             """, (cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan'), ct_id))
-            cursor.execute("DELETE FROM ChiTietNguyenLieu WHERE MaCongThuc=?", (ct_id,))
+            cursor.execute("DELETE FROM ChiTietNguyenLieu WHERE MaCongThuc=%s", (ct_id,))
         else:
             cursor.execute("""
                 INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
             ct_id = cursor.lastrowid
             
         for nl in cong_thuc.get('NguyenLieu', []):
             ten_nl = nl.get('TenNguyenLieu')
             if not ten_nl: continue
-            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = ?", (ten_nl,))
+            cursor.execute("SELECT MaNguyenLieu FROM NguyenLieu WHERE TenNguyenLieu = %s", (ten_nl,))
             row = cursor.fetchone()
             if row: ma_nl = row['MaNguyenLieu']
             else:
-                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (?)", (ten_nl,))
-                ma_nl = cursor.lastrowid
-            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (?, ?, ?)", (ct_id, ma_nl, nl.get('SoLuong')))
+                cursor.execute("INSERT INTO NguyenLieu (TenNguyenLieu) VALUES (%s) RETURNING MaNguyenLieu", (ten_nl,))
+                ma_nl = cursor.fetchone()['MaNguyenLieu']
+            cursor.execute("INSERT INTO ChiTietNguyenLieu (MaCongThuc, MaNguyenLieu, SoLuong) VALUES (%s, %s, %s)", (ct_id, ma_nl, nl.get('SoLuong')))
             
         conn.commit()
         return True
@@ -612,7 +628,7 @@ def delete_food_soft(food_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE MonAn SET IsDeleted = 1 WHERE MaMonAn = ?", (food_id,))
+        cursor.execute("UPDATE MonAn SET IsDeleted = 1 WHERE MaMonAn = %s", (food_id,))
         conn.commit()
         return True
     except Exception as e:
@@ -625,7 +641,7 @@ def restore_food_soft(food_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE MonAn SET IsDeleted = 0 WHERE MaMonAn = ?", (food_id,))
+        cursor.execute("UPDATE MonAn SET IsDeleted = 0 WHERE MaMonAn = %s", (food_id,))
         conn.commit()
         return True
     except Exception as e:
