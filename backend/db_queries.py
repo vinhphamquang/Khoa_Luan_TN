@@ -258,9 +258,9 @@ def create_user(name: str, email: str, hashed_password: str):
     try:
         cursor.execute("""
             INSERT INTO NguoiDung (TenNguoiDung, Email, MatKhau, NgayDangKy, VaiTro)
-            VALUES (%s, %s, %s, CURRENT_DATE, 'user')
+            VALUES (%s, %s, %s, CURRENT_DATE, 'user') RETURNING MaNguoiDung
         """, (name, email, hashed_password))
-        user_id = cursor.lastrowid
+        user_id = cursor.fetchone()['MaNguoiDung']
         conn.commit()
         return True, "Đăng ký thành công", user_id
     except psycopg2.IntegrityError:
@@ -373,9 +373,9 @@ def insert_generated_food_data(food_name_english: str, data: dict):
         # 1. Insert MonAn
         cursor.execute("""
             INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao)
-            VALUES (%s, %s, %s, %s)
-        """, (data.get('TenMonAn', food_name_english), mo_ta, data.get('PhanLoai', ''), CURRENT_DATE))
-        ma_mon_an = cursor.lastrowid
+            VALUES (%s, %s, %s, CURRENT_DATE) RETURNING MaMonAn
+        """, (data.get('TenMonAn', food_name_english), mo_ta, data.get('PhanLoai', '')))
+        ma_mon_an = cursor.fetchone()['MaMonAn']
         
         dinh_duong = data.get('DinhDuong', {})
         # 2. Insert DinhDuong
@@ -395,14 +395,14 @@ def insert_generated_food_data(food_name_english: str, data: dict):
         # 3. Insert CongThuc
         cursor.execute("""
             INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s) RETURNING MaCongThuc
         """, (
             ma_mon_an,
             cong_thuc.get('HuongDan', ''),
             cong_thuc.get('ThoiGianNau', 0),
             cong_thuc.get('KhauPhan', 1)
         ))
-        ma_cong_thuc = cursor.lastrowid
+        ma_cong_thuc = cursor.fetchone()['MaCongThuc']
         
         # 4. Insert NguyenLieu and ChiTietNguyenLieu
         nguyen_lieu_list = cong_thuc.get('NguyenLieu', [])
@@ -529,9 +529,9 @@ def insert_food_full(data):
         
         cursor.execute("""
              INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai, NgayTao, IsDeleted)
-             VALUES (%s, %s, %s, CURRENT_DATE, 0)
+             VALUES (%s, %s, %s, CURRENT_DATE, 0) RETURNING MaMonAn
         """, (data.get('TenMonAn'), data.get('MoTa'), data.get('PhanLoai')))
-        food_id = cursor.lastrowid
+        food_id = cursor.fetchone()['MaMonAn']
         
         dinh_duong = data.get('DinhDuong', {})
         cursor.execute("""
@@ -542,9 +542,9 @@ def insert_food_full(data):
         cong_thuc = data.get('CongThuc', {})
         cursor.execute("""
             INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s) RETURNING MaCongThuc
         """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
-        ct_id = cursor.lastrowid
+        ct_id = cursor.fetchone()['MaCongThuc']
         
         for nl in cong_thuc.get('NguyenLieu', []):
             ten_nl = nl.get('TenNguyenLieu')
@@ -601,9 +601,9 @@ def update_food_full(food_id, data):
         else:
             cursor.execute("""
                 INSERT INTO CongThuc (MaMonAn, HuongDan, ThoiGianNau, KhauPhan)
-                VALUES (%s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s) RETURNING MaCongThuc
             """, (food_id, cong_thuc.get('HuongDan'), cong_thuc.get('ThoiGianNau'), cong_thuc.get('KhauPhan')))
-            ct_id = cursor.lastrowid
+            ct_id = cursor.fetchone()['MaCongThuc']
             
         for nl in cong_thuc.get('NguyenLieu', []):
             ten_nl = nl.get('TenNguyenLieu')
