@@ -1,6 +1,9 @@
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
-import os
 from external_api import analyze_image
 from db_queries import (
     search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, 
