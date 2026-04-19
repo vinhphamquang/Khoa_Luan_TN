@@ -203,39 +203,7 @@ function initAnalyzePage() {
 
     let currentFile = null;
 
-    // Demo food buttons
-    const demoFoodBtns = document.querySelectorAll('.demo-food-btn');
-    demoFoodBtns.forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const foodName = btn.dataset.food;
-            await loadDemoFood(foodName);
-        });
-    });
 
-    async function loadDemoFood(foodName) {
-        uploadContent.classList.add('hidden');
-        loading.classList.remove('hidden');
-        resultSection.classList.add('hidden');
-        
-        try {
-            const response = await fetch(`/api/dishes/${foodName}`);
-            const data = await response.json();
-            
-            loading.classList.add('hidden');
-            uploadContent.classList.remove('hidden');
-            
-            if (data.success) {
-                showResult(data);
-            } else {
-                showError(data.message || 'Không tìm thấy món ăn');
-            }
-        } catch (err) {
-            console.error('Demo food error:', err);
-            loading.classList.add('hidden');
-            uploadContent.classList.remove('hidden');
-            showError('Lỗi khi tải dữ liệu demo');
-        }
-    }
 
     // Drag & Drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -325,7 +293,6 @@ function initAnalyzePage() {
 
             if (data.success) {
                 showResult(data);
-                storePredictionData(data, currentFile);  // Store for feedback/retry
             } else {
                 showError(
                     data.message || 'Lỗi từ Backend Server!',
@@ -413,19 +380,35 @@ function showResult(data) {
         document.getElementById('recipe-accordion').style.display = 'none';
     }
 
+    // Health Recommendation Rendering
+    const recBox = document.getElementById('health-recommendation-box');
+    if (data.health_recommendation && recBox) {
+        document.getElementById('rec-bmi').textContent = data.health_recommendation.bmi;
+        document.getElementById('rec-bmi-cat').textContent = data.health_recommendation.bmi_category;
+        const statusSpan = document.getElementById('rec-status');
+        statusSpan.textContent = data.health_recommendation.recommendation;
+        document.getElementById('rec-reason').textContent = data.health_recommendation.reason;
+        
+        // Color coding for status
+        statusSpan.style.color = "var(--text-main)";
+        if (data.health_recommendation.recommendation.includes("Hạn chế")) {
+            statusSpan.style.color = "var(--c-fat)";
+            statusSpan.style.background = "rgba(239, 68, 68, 0.1)";
+        } else if (data.health_recommendation.recommendation.includes("Nên ăn")) {
+            statusSpan.style.color = "var(--c-carb)";
+            statusSpan.style.background = "rgba(34, 197, 94, 0.1)";
+        } else {
+            statusSpan.style.color = "var(--primary)";
+            statusSpan.style.background = "rgba(249, 115, 22, 0.1)";
+        }
+        
+        recBox.style.display = 'block';
+    } else if (recBox) {
+        recBox.style.display = 'none';
+    }
+
     // Initialize accordion functionality
     initAccordion();
-    
-    // Show feedback section
-    const feedbackSection = document.getElementById('feedback-section');
-    if (feedbackSection) {
-        feedbackSection.style.display = 'block';
-        // Reset feedback message
-        const feedbackMsg = document.getElementById('feedback-message');
-        if (feedbackMsg) {
-            feedbackMsg.style.display = 'none';
-        }
-    }
 
     // Scroll result into view
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -483,14 +466,21 @@ function showError(message, suggestion = null) {
     document.getElementById('ingredients-accordion').style.display = 'none';
     document.getElementById('recipe-accordion').style.display = 'none';
     
-    // Hide feedback section on error
-    const feedbackSection = document.getElementById('feedback-section');
-    if (feedbackSection) {
-        feedbackSection.style.display = 'none';
-    }
-    
     // Initialize accordion (for nutrition section)
     initAccordion();
+}
+
+function togglePassword(inputId, iconElement) {
+    const input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        iconElement.classList.remove("fa-eye-slash");
+        iconElement.classList.add("fa-eye");
+    } else {
+        input.type = "password";
+        iconElement.classList.remove("fa-eye");
+        iconElement.classList.add("fa-eye-slash");
+    }
 }
 
 // ---- AUTH LOGIC ----
@@ -601,11 +591,22 @@ function initAuth() {
         const email = document.getElementById('reg-email').value;
         const password = document.getElementById('reg-password').value;
         
+        const payload = { 
+            name, 
+            email, 
+            password,
+            hp_age: document.getElementById('reg-age')?.value,
+            hp_height: document.getElementById('reg-height')?.value,
+            hp_weight: document.getElementById('reg-weight')?.value,
+            hp_gender: document.getElementById('reg-gender')?.value,
+            hp_goal: document.getElementById('reg-goal')?.value
+        };
+        
         try {
             const res = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, password })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             
@@ -644,6 +645,61 @@ async function initProfilePage() {
     const emailEl = document.getElementById('profile-page-email');
     if (nameEl) nameEl.textContent = loggedUser.name;
     if (emailEl) emailEl.textContent = loggedUser.email;
+
+    // Load Health Profile
+    try {
+        const hpRes = await fetch('/api/health-profile/' + loggedUser.id);
+        const hpData = await hpRes.json();
+        if (hpData.success && hpData.profile) {
+            document.getElementById('hp-age').value = hpData.profile.Tuoi || '';
+            document.getElementById('hp-gender').value = hpData.profile.GioiTinh || 'Nam';
+            document.getElementById('hp-height').value = hpData.profile.ChieuCao || '';
+            document.getElementById('hp-weight').value = hpData.profile.CanNang || '';
+            document.getElementById('hp-goal').value = hpData.profile.MucTieu || 'giu_dang';
+        }
+    } catch (e) {
+        console.error("Lỗi tải hồ sơ sức khỏe", e);
+    }
+
+    // Health Profile Form Handler
+    const hpForm = document.getElementById('health-profile-form');
+    if (hpForm && !hpForm.dataset.initialized) {
+        hpForm.dataset.initialized = 'true';
+        hpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgDiv = document.getElementById('hp-message');
+            msgDiv.classList.add('hidden');
+            
+            const payload = {
+                Tuoi: document.getElementById('hp-age').value,
+                GioiTinh: document.getElementById('hp-gender').value,
+                ChieuCao: document.getElementById('hp-height').value,
+                CanNang: document.getElementById('hp-weight').value,
+                MucTieu: document.getElementById('hp-goal').value
+            };
+            
+            try {
+                const res = await fetch('/api/health-profile/' + loggedUser.id, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const responseData = await res.json();
+                
+                msgDiv.textContent = responseData.message;
+                msgDiv.classList.remove('hidden');
+                if (responseData.success) {
+                    msgDiv.classList.add('success');
+                } else {
+                    msgDiv.classList.remove('success');
+                }
+                setTimeout(() => msgDiv.classList.add('hidden'), 3000);
+            } catch (err) {
+                msgDiv.textContent = 'Lỗi kết nối';
+                msgDiv.classList.remove('hidden', 'success');
+            }
+        });
+    }
 
     // Load History
     const historyContainer = document.getElementById('history-container');
@@ -741,150 +797,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// ---- FEEDBACK & RETRY LOGIC ----
-let currentPrediction = null;
-let currentImageFile = null;
 
-// Store prediction data for feedback
-function storePredictionData(data, imageFile) {
-    currentPrediction = data;
-    currentImageFile = imageFile;
-    
-    // Show feedback section
-    const feedbackSection = document.getElementById('feedback-section');
-    if (feedbackSection) {
-        feedbackSection.style.display = 'block';
-    }
-}
-
-// Handle accurate feedback
-document.getElementById('btn-accurate')?.addEventListener('click', async function() {
-    if (!currentPrediction) return;
-    
-    const btn = this;
-    btn.disabled = true;
-    
-    try {
-        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
-        
-        const response = await fetch('/api/feedback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: loggedUser?.id,
-                food_name: currentPrediction.predicted_class_name,
-                confidence: currentPrediction.confidence,
-                rating: 'accurate'
-            })
-        });
-        
-        const data = await response.json();
-        
-        const feedbackMsg = document.getElementById('feedback-message');
-        feedbackMsg.textContent = '✅ ' + data.message;
-        feedbackMsg.className = 'success';
-        feedbackMsg.style.display = 'block';
-        
-        // Hide feedback buttons after rating
-        setTimeout(() => {
-            document.getElementById('feedback-section').style.display = 'none';
-        }, 2000);
-        
-    } catch (error) {
-        console.error('Feedback error:', error);
-    } finally {
-        btn.disabled = false;
-    }
-});
-
-// Handle inaccurate feedback
-document.getElementById('btn-inaccurate')?.addEventListener('click', async function() {
-    if (!currentPrediction) return;
-    
-    const btn = this;
-    btn.disabled = true;
-    
-    try {
-        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
-        
-        const response = await fetch('/api/feedback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: loggedUser?.id,
-                food_name: currentPrediction.predicted_class_name,
-                confidence: currentPrediction.confidence,
-                rating: 'inaccurate'
-            })
-        });
-        
-        const data = await response.json();
-        
-        const feedbackMsg = document.getElementById('feedback-message');
-        feedbackMsg.textContent = '📝 ' + data.message + ' Bạn có thể thử "Nhận diện lại" để có kết quả tốt hơn.';
-        feedbackMsg.className = 'info';
-        feedbackMsg.style.display = 'block';
-        
-    } catch (error) {
-        console.error('Feedback error:', error);
-    } finally {
-        btn.disabled = false;
-    }
-});
-
-// Handle retry recognition
-document.getElementById('btn-retry')?.addEventListener('click', async function() {
-    if (!currentImageFile) {
-        alert('Không tìm thấy ảnh để nhận diện lại. Vui lòng upload ảnh mới.');
-        return;
-    }
-    
-    const btn = this;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhận diện lại...';
-    
-    try {
-        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
-        const formData = new FormData();
-        formData.append('file', currentImageFile);
-        if (loggedUser) {
-            formData.append('user_id', loggedUser.id);
-        }
-        
-        // Skip the API that was used before (based on confidence)
-        let skipApi = '';
-        if (currentPrediction.confidence > 90) {
-            skipApi = 'gemini';
-        } else if (currentPrediction.confidence > 70) {
-            skipApi = 'spoonacular';
-        }
-        formData.append('skip_api', skipApi);
-        
-        const response = await fetch('/api/retry-recognition', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showResult(data);
-            storePredictionData(data, currentImageFile);
-            
-            const feedbackMsg = document.getElementById('feedback-message');
-            feedbackMsg.textContent = '🔄 ' + (data.message || 'Đã nhận diện lại thành công!');
-            feedbackMsg.className = 'info';
-            feedbackMsg.style.display = 'block';
-        } else {
-            showError(data.message, data.error_detail);
-        }
-        
-    } catch (error) {
-        console.error('Retry error:', error);
-        showError('Lỗi khi nhận diện lại. Vui lòng thử lại sau.');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-});

@@ -6,7 +6,8 @@ from db_queries import (
     search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, 
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
     get_all_users, delete_user, get_system_stats, get_all_history_admin, 
-    get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, delete_food_soft, restore_food_soft
+    get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, delete_food_soft, restore_food_soft,
+    get_health_profile, upsert_health_profile
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -78,9 +79,23 @@ def register():
         return jsonify({"success": False, "message": "Vui lòng điền đầy đủ thông tin"}), 400
     
     hashed_password = generate_password_hash(data["password"])
-    success, message = create_user(data["name"], data["email"], hashed_password)
+    success, message, user_id = create_user(data["name"], data["email"], hashed_password)
     
-    if success:
+    if success and user_id:
+        # Nếu có thông tin sức khỏe thì lưu luôn
+        tuoi = data.get("hp_age")
+        chieu_cao = data.get("hp_height")
+        can_nang = data.get("hp_weight")
+        if tuoi and chieu_cao and can_nang:
+            hp_data = {
+                "Tuoi": tuoi,
+                "ChieuCao": chieu_cao,
+                "CanNang": can_nang,
+                "GioiTinh": data.get("hp_gender", "Nam"),
+                "MucTieu": data.get("hp_goal", "giu_dang")
+            }
+            upsert_health_profile(user_id, hp_data)
+            
         return jsonify({"success": True, "message": message})
     else:
         return jsonify({"success": False, "message": message}), 400
@@ -129,6 +144,20 @@ def change_password():
         return jsonify({"success": True, "message": "Đổi mật khẩu thành công"})
     else:
         return jsonify({"success": False, "message": "Có lỗi xảy ra, vui lòng thử lại"}), 500
+
+@app.route("/api/health-profile/<int:user_id>", methods=["GET"])
+def get_user_health_profile(user_id):
+    profile = get_health_profile(user_id)
+    if profile:
+        return jsonify({"success": True, "profile": profile})
+    return jsonify({"success": False, "message": "Chưa có hồ sơ sức khỏe"}), 404
+
+@app.route("/api/health-profile/<int:user_id>", methods=["POST"])
+def update_user_health_profile(user_id):
+    data = request.json
+    if upsert_health_profile(user_id, data):
+        return jsonify({"success": True, "message": "Cập nhật hồ sơ sức khỏe thành công"})
+    return jsonify({"success": False, "message": "Lỗi khi cập nhật hồ sơ"}), 500
 
 @app.route("/api/admin/users", methods=["GET"])
 def api_admin_get_users():
@@ -187,6 +216,65 @@ def api_admin_restore_food(food_id):
         return jsonify({"success": True, "message": "Đã khôi phục món ăn từ thùng rác thành công"})
     return jsonify({"success": False, "message": "Lỗi khi khôi phục món ăn"}), 500
 
+def get_recommendation(user_id, calories):
+    if not user_id or str(calories) == '--':
+        return None
+    
+    try:
+        calories = float(calories)
+    except:
+        return None
+
+    profile = get_health_profile(user_id)
+    if not profile:
+        return None
+
+    chieu_cao = profile.get('ChieuCao')
+    can_nang = profile.get('CanNang')
+    muc_tieu = profile.get('MucTieu')
+
+    if not chieu_cao or not can_nang or not muc_tieu:
+        return None
+
+    bmi = can_nang / ((chieu_cao / 100) ** 2)
+    bmi = round(bmi, 1)
+
+    if bmi < 18.5:
+        bmi_category = "Gầy"
+    elif 18.5 <= bmi < 25:
+        bmi_category = "Bình thường"
+    else:
+        bmi_category = "Thừa cân"
+
+    threshold = 350
+    recommendation = ""
+    reason = ""
+
+    if muc_tieu == "giam_can":
+        if calories > threshold:
+            recommendation = "Hạn chế"
+            reason = f"Món ăn có lượng calo ({calories} kcal) khá cao, không tốt cho mục tiêu giảm cân."
+        else:
+            recommendation = "Nên ăn"
+            reason = f"Món ăn ít calo ({calories} kcal), phù hợp với mục tiêu giảm cân."
+    elif muc_tieu == "tang_can":
+        if calories > threshold:
+            recommendation = "Nên ăn"
+            reason = f"Món ăn giàu năng lượng ({calories} kcal), rất tốt cho mục tiêu tăng cân."
+        else:
+            recommendation = "Ăn vừa phải"
+            reason = f"Món ăn ít năng lượng ({calories} kcal), nên ăn kèm các món khác để đủ calo tăng cân."
+    else: # giu_dang
+        recommendation = "Ăn cân đối"
+        reason = f"Món ăn cung cấp {calories} kcal, ăn uống cân đối để duy trì vóc dáng."
+
+    return {
+        "bmi": bmi,
+        "bmi_category": bmi_category,
+        "recommendation": recommendation,
+        "reason": reason
+    }
+
 @app.route("/api/dishes/<food_name>", methods=["GET"])
 def get_dish_info(food_name):
     """API lấy thông tin món ăn trực tiếp từ database (cho demo mode)"""
@@ -222,6 +310,12 @@ def get_dish_info(food_name):
             "message": "Chế độ demo - Dữ liệu từ database"
         }
         
+        user_id = request.args.get("user_id")
+        if user_id and str(user_id).isdigit():
+            rec = get_recommendation(int(user_id), dinh_duong.get("Calo", "--"))
+            if rec:
+                response_data["health_recommendation"] = rec
+
         return jsonify(response_data), 200
         
     except Exception as e:
@@ -359,6 +453,13 @@ def predict():
             insert_lich_su(int(user_id), "", food_name_vietnamese, confidence_pct)
         except Exception as e:
             print(f"Error saving history: {e}")
+
+        # Tính toán lời khuyên sức khỏe
+        if food_data and food_data.get("DinhDuong"):
+            calo = food_data["DinhDuong"].get("Calo", "--")
+            rec = get_recommendation(int(user_id), calo)
+            if rec:
+                response_data["health_recommendation"] = rec
 
     return jsonify(response_data)
 

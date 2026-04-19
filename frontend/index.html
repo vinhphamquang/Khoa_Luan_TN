@@ -351,22 +351,6 @@
                             <i class="fa-solid fa-folder-open"></i> Chọn Từ Thiết Bị
                         </button>
                         <span class="upload-hint">Hỗ trợ: JPG, PNG, WebP • Tối đa 10MB</span>
-                        
-                        <!-- Demo Mode -->
-                        <div class="demo-divider">
-                            <span>hoặc xem demo</span>
-                        </div>
-                        <div class="demo-foods">
-                            <button class="btn btn-outline btn-sm demo-food-btn" data-food="Pho">
-                                🍜 Phở
-                            </button>
-                            <button class="btn btn-outline btn-sm demo-food-btn" data-food="Banh mi">
-                                🥖 Bánh Mì
-                            </button>
-                            <button class="btn btn-outline btn-sm demo-food-btn" data-food="Bun cha">
-                                🍖 Bún Chả
-                            </button>
-                        </div>
                     </div>
                     
                     <!-- Image Preview -->
@@ -407,25 +391,16 @@
                     
                     <div class="system-msg" id="sys-msg"></div>
                     
-                    <!-- Feedback & Retry Section -->
-                    <div class="feedback-section" id="feedback-section" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; display: none;">
-                        <p style="margin-bottom: 10px; font-weight: 500;">
-                            <i class="fa-solid fa-star"></i> Kết quả có chính xác không?
-                        </p>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button id="btn-accurate" class="btn-feedback btn-success" style="flex: 1; min-width: 120px;">
-                                <i class="fa-solid fa-thumbs-up"></i> Chính xác
-                            </button>
-                            <button id="btn-inaccurate" class="btn-feedback btn-warning" style="flex: 1; min-width: 120px;">
-                                <i class="fa-solid fa-thumbs-down"></i> Không chính xác
-                            </button>
-                            <button id="btn-retry" class="btn-feedback btn-primary" style="flex: 1; min-width: 120px;">
-                                <i class="fa-solid fa-rotate"></i> Nhận diện lại
-                            </button>
-                        </div>
-                        <div id="feedback-message" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
+                    <!-- Health Recommendation Box -->
+                    <div id="health-recommendation-box" class="glass-card" style="margin-bottom: 20px; padding: 15px; border-left: 4px solid var(--primary); display: none;">
+                        <h3 style="font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-heart-circle-check" style="color: var(--primary);"></i> Khuyến Nghị Dinh Dưỡng
+                        </h3>
+                        <p style="margin-bottom: 5px;"><strong>Chỉ số BMI của bạn:</strong> <span id="rec-bmi"></span> (<span id="rec-bmi-cat"></span>)</p>
+                        <p style="margin-bottom: 5px;"><strong>Lời khuyên:</strong> <span id="rec-status" style="font-weight: bold; padding: 2px 8px; border-radius: 12px; background: rgba(0,0,0,0.05);"></span></p>
+                        <p style="color: var(--text-secondary); font-size: 14px;" id="rec-reason"></p>
                     </div>
-                    
+
                     <!-- Accordion Sections -->
                     <div class="result-accordion">
                         <!-- Dinh Dưỡng Accordion -->
@@ -542,6 +517,45 @@
 
                     <hr style="border-color: var(--glass-border); opacity: 0.5; margin: 24px 0;">
 
+                    <h4 style="margin-bottom: 16px; font-size: 16px;"><i class="fa-solid fa-heart-pulse"></i> Hồ Sơ Sức Khỏe</h4>
+                    <form id="health-profile-form">
+                        <div class="form-group" style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label>Tuổi</label>
+                                <input type="number" id="hp-age" class="form-input" style="padding: 8px 12px;" min="1" max="120">
+                            </div>
+                            <div style="flex: 1;">
+                                <label>Giới Tính</label>
+                                <select id="hp-gender" class="form-input" style="padding: 8px 12px;">
+                                    <option value="Nam">Nam</option>
+                                    <option value="Nữ">Nữ</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label>Chiều cao (cm)</label>
+                                <input type="number" id="hp-height" class="form-input" style="padding: 8px 12px;" min="50" max="250">
+                            </div>
+                            <div style="flex: 1;">
+                                <label>Cân nặng (kg)</label>
+                                <input type="number" id="hp-weight" class="form-input" style="padding: 8px 12px;" min="10" max="300" step="0.1">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Mục Tiêu</label>
+                            <select id="hp-goal" class="form-input" style="padding: 8px 12px;">
+                                <option value="giam_can">Giảm cân</option>
+                                <option value="tang_can">Tăng cân</option>
+                                <option value="giu_dang">Giữ dáng</option>
+                            </select>
+                        </div>
+                        <div id="hp-message" class="form-error hidden"></div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">Lưu Hồ Sơ Sức Khỏe</button>
+                    </form>
+
+                    <hr style="border-color: var(--glass-border); opacity: 0.5; margin: 24px 0;">
+
                     <button id="btn-page-logout" class="btn btn-outline" style="width: 100%; justify-content: center; border-color: var(--c-fat); color: var(--c-fat);">
                         <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
                     </button>
@@ -606,7 +620,10 @@
                 </div>
                 <div class="form-group">
                     <label>Mật Khẩu</label>
-                    <input type="password" id="login-password" required class="form-input">
+                    <div style="position: relative;">
+                        <input type="password" id="login-password" required class="form-input" style="padding-right: 40px;">
+                        <i class="fa-solid fa-eye-slash pw-toggle" onclick="togglePassword('login-password', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted);"></i>
+                    </div>
                 </div>
                 <div id="login-error" class="form-error hidden"></div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Đăng Nhập</button>
@@ -629,8 +646,52 @@
                 </div>
                 <div class="form-group">
                     <label>Mật Khẩu</label>
-                    <input type="password" id="reg-password" required class="form-input" minlength="4">
+                    <div style="position: relative;">
+                        <input type="password" id="reg-password" required class="form-input" minlength="4" style="padding-right: 40px;">
+                        <i class="fa-solid fa-eye-slash pw-toggle" onclick="togglePassword('reg-password', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted);"></i>
+                    </div>
                 </div>
+                
+                <h4 style="margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Hồ Sơ Sức Khỏe (Tùy chọn)</h4>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Tuổi</label>
+                        <input type="number" id="reg-age" class="form-input" style="padding: 8px 12px;" min="1" max="120" placeholder="VD: 20">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Giới Tính</label>
+                        <select id="reg-gender" class="form-input" style="padding: 8px 12px;">
+                            <option value="Nam">Nam</option>
+                            <option value="Nữ">Nữ</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Chiều cao (cm)</label>
+                        <input type="number" id="reg-height" class="form-input" style="padding: 8px 12px;" min="50" max="250" placeholder="VD: 170">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Cân nặng (kg)</label>
+                        <input type="number" id="reg-weight" class="form-input" style="padding: 8px 12px;" min="10" max="300" step="0.1" placeholder="VD: 60">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Mục Tiêu</label>
+                    <select id="reg-goal" class="form-input" style="padding: 8px 12px;">
+                        <option value="giam_can">Giảm cân</option>
+                        <option value="tang_can">Tăng cân</option>
+                        <option value="giu_dang" selected>Giữ dáng</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-top: 15px; margin-bottom: 5px;">
+                    <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: normal; cursor: pointer;">
+                        <input type="checkbox" id="reg-terms" required style="margin-top: 3px;">
+                        <span>Tôi đã đọc và đồng ý với <a href="#" onclick="alert('Điều khoản sử dụng: Hệ thống cung cấp thông tin tham khảo về dinh dưỡng. Chúng tôi không chịu trách nhiệm y tế. Mọi dữ liệu bạn cung cấp đều được bảo mật.')" style="color: var(--primary);">điều khoản sử dụng</a> và chính sách bảo mật của ứng dụng.</span>
+                    </label>
+                </div>
+
                 <div id="reg-error" class="form-error hidden"></div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Đăng Ký</button>
             </form>

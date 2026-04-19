@@ -228,12 +228,13 @@ def create_user(name: str, email: str, hashed_password: str):
             INSERT INTO NguoiDung (TenNguoiDung, Email, MatKhau, NgayDangKy, VaiTro)
             VALUES (?, ?, ?, date('now', 'localtime'), 'user')
         """, (name, email, hashed_password))
+        user_id = cursor.lastrowid
         conn.commit()
-        return True, "Đăng ký thành công"
+        return True, "Đăng ký thành công", user_id
     except sqlite3.IntegrityError:
-        return False, "Email đã được sử dụng"
+        return False, "Email đã được sử dụng", None
     except Exception as e:
-        return False, str(e)
+        return False, str(e), None
     finally:
         conn.close()
 
@@ -283,6 +284,60 @@ def get_user_history(ma_nguoi_dung: int):
     conn.close()
     return [dict(row) for row in rows]
 
+def create_health_profile_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS HoSoSucKhoe (
+            MaHoSo INTEGER PRIMARY KEY AUTOINCREMENT,
+            MaNguoiDung INTEGER UNIQUE,
+            Tuoi INTEGER,
+            ChieuCao REAL,
+            CanNang REAL,
+            GioiTinh TEXT,
+            MucTieu TEXT,
+            FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def get_health_profile(ma_nguoi_dung: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM HoSoSucKhoe WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+    profile = cursor.fetchone()
+    conn.close()
+    if profile:
+        return dict(profile)
+    return None
+
+def upsert_health_profile(ma_nguoi_dung: int, data: dict):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT MaHoSo FROM HoSoSucKhoe WHERE MaNguoiDung = ?", (ma_nguoi_dung,))
+        exists = cursor.fetchone()
+        
+        if exists:
+            cursor.execute("""
+                UPDATE HoSoSucKhoe 
+                SET Tuoi = ?, ChieuCao = ?, CanNang = ?, GioiTinh = ?, MucTieu = ?
+                WHERE MaNguoiDung = ?
+            """, (data.get('Tuoi'), data.get('ChieuCao'), data.get('CanNang'), data.get('GioiTinh'), data.get('MucTieu'), ma_nguoi_dung))
+        else:
+            cursor.execute("""
+                INSERT INTO HoSoSucKhoe (MaNguoiDung, Tuoi, ChieuCao, CanNang, GioiTinh, MucTieu)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (ma_nguoi_dung, data.get('Tuoi'), data.get('ChieuCao'), data.get('CanNang'), data.get('GioiTinh'), data.get('MucTieu')))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error upsert_health_profile: {e}")
+        return False
+    finally:
+        conn.close()
 
 
 import datetime
