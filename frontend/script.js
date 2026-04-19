@@ -202,8 +202,95 @@ function initAnalyzePage() {
     if (!dropZone) return;
 
     let currentFile = null;
+    let stream = null;
+    let currentMode = 'upload'; // 'upload' or 'camera'
 
+    const modeUploadBtn = document.getElementById('mode-upload-btn');
+    const modeCameraBtn = document.getElementById('mode-camera-btn');
+    const cameraSection = document.getElementById('camera-section');
+    const cameraVideo = document.getElementById('camera-video');
+    const cameraCanvas = document.getElementById('camera-canvas');
+    const captureBtn = document.getElementById('capture-btn');
 
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+    }
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            cameraVideo.srcObject = stream;
+        } catch (err) {
+            console.error("Camera error:", err);
+            alert("Không thể truy cập Camera. Vui lòng kiểm tra quyền truy cập.");
+            if (modeUploadBtn) modeUploadBtn.click();
+        }
+    }
+
+    modeUploadBtn?.addEventListener('click', () => {
+        currentMode = 'upload';
+        modeUploadBtn.classList.add('btn-primary');
+        modeUploadBtn.classList.remove('btn-outline');
+        modeUploadBtn.style.color = '';
+        modeUploadBtn.style.borderColor = '';
+
+        modeCameraBtn.classList.add('btn-outline');
+        modeCameraBtn.classList.remove('btn-primary');
+        modeCameraBtn.style.color = 'var(--text-main)';
+        modeCameraBtn.style.borderColor = 'var(--glass-border)';
+
+        cameraSection.classList.add('hidden');
+        if (!currentFile) {
+            uploadContent.classList.remove('hidden');
+        }
+        stopCamera();
+    });
+
+    modeCameraBtn?.addEventListener('click', () => {
+        currentMode = 'camera';
+        modeCameraBtn.classList.add('btn-primary');
+        modeCameraBtn.classList.remove('btn-outline');
+        modeCameraBtn.style.color = '';
+        modeCameraBtn.style.borderColor = '';
+
+        modeUploadBtn.classList.add('btn-outline');
+        modeUploadBtn.classList.remove('btn-primary');
+        modeUploadBtn.style.color = 'var(--text-main)';
+        modeUploadBtn.style.borderColor = 'var(--glass-border)';
+
+        uploadContent.classList.add('hidden');
+        previewContainer.classList.add('hidden');
+        resultSection.classList.add('hidden');
+        
+        currentFile = null;
+        fileInput.value = '';
+        previewImg.src = '';
+        
+        cameraSection.classList.remove('hidden');
+        startCamera();
+    });
+
+    captureBtn?.addEventListener('click', () => {
+        if (!stream) return;
+        
+        const context = cameraCanvas.getContext('2d');
+        cameraCanvas.width = cameraVideo.videoWidth;
+        cameraCanvas.height = cameraVideo.videoHeight;
+        
+        context.drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+        
+        cameraCanvas.toBlob((blob) => {
+            if (blob) {
+                const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+                handleFiles([file]);
+                stopCamera();
+                cameraSection.classList.add('hidden');
+            }
+        }, 'image/jpeg', 0.9);
+    });
 
     // Drag & Drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -246,9 +333,15 @@ function initAnalyzePage() {
         currentFile = null;
         fileInput.value = '';
         previewImg.src = '';
-        uploadContent.classList.remove('hidden');
         previewContainer.classList.add('hidden');
         resultSection.classList.add('hidden');
+        
+        if (currentMode === 'camera') {
+            cameraSection.classList.remove('hidden');
+            startCamera();
+        } else {
+            uploadContent.classList.remove('hidden');
+        }
     });
 
     analyzeBtn.addEventListener('click', async () => {

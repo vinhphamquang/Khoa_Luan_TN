@@ -336,6 +336,12 @@
             </div>
 
             <div class="analyze-main glass-card">
+                <!-- Input Mode Toggle -->
+                <div class="input-mode-toggle" style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">
+                    <button class="btn btn-primary" id="mode-upload-btn" style="flex: 1; justify-content: center;"><i class="fa-solid fa-upload"></i> Tải ảnh lên</button>
+                    <button class="btn btn-outline" id="mode-camera-btn" style="flex: 1; justify-content: center; color: var(--text-main); border-color: var(--glass-border);"><i class="fa-solid fa-camera"></i> Chụp ảnh</button>
+                </div>
+
                 <!-- Upload Zone -->
                 <div class="upload-zone" id="drop-zone">
                     <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" hidden>
@@ -351,6 +357,20 @@
                             <i class="fa-solid fa-folder-open"></i> Chọn Từ Thiết Bị
                         </button>
                         <span class="upload-hint">Hỗ trợ: JPG, PNG, WebP • Tối đa 10MB</span>
+                    </div>
+
+                    <!-- Camera Section -->
+                    <div id="camera-section" class="hidden" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                        <div style="position: relative; width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                            <video id="camera-video" autoplay playsinline style="width: 100%; display: block;"></video>
+                        </div>
+                        <canvas id="camera-canvas" hidden></canvas>
+                        <div class="camera-actions" style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" id="capture-btn">
+                                <i class="fa-solid fa-camera"></i> Chụp Ảnh
+                            </button>
+                        </div>
+                        <span class="upload-hint">Hãy đưa món ăn vào khung hình và bấm Chụp</span>
                     </div>
                     
                     <!-- Image Preview -->

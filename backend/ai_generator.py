@@ -18,7 +18,7 @@ def generate_food_data_vietnamese(food_name_english: str):
         print("[Lỗi] Chưa cấu hình GEMINI_API_KEY trong file .env")
         return None
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     Hệ thống AI nhận diện hình ảnh món ăn trả về tên tiếng Anh là: "{food_name_english}".
@@ -66,7 +66,15 @@ def generate_food_data_vietnamese(food_name_english: str):
         if response.status_code == 200:
             data = response.json()
             try:
-                text_response = data['candidates'][0]['content']['parts'][0]['text']
+                text_response = data['candidates'][0]['content']['parts'][0]['text'].strip()
+                
+                # Bỏ markdown block nếu AI trả về kèm theo ```json ... ```
+                if text_response.startswith("```"):
+                    text_response = text_response.split("```")[1]
+                    if text_response.startswith("json"):
+                        text_response = text_response[4:]
+                    text_response = text_response.strip()
+                    
                 data_dict = json.loads(text_response)
                 return data_dict
             except Exception as e:

@@ -216,7 +216,7 @@ def recognize_food_gemini(image_bytes: bytes):
     if not GEMINI_API_KEY:
         return None, 0.0, "Thiếu GEMINI_API_KEY"
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
     encoded_image = base64.b64encode(image_bytes).decode('utf-8')
     
     payload = {
@@ -476,7 +476,7 @@ def get_food_info_from_gemini(food_name: str):
     try:
         print(f"[INFO] Generating info for '{food_name}' from Gemini AI...")
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
         
         prompt = f"""Provide detailed information about the dish "{food_name}" in JSON format:
 {{
