@@ -6,11 +6,11 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from external_api import analyze_image
 from db_queries import (
-    search_food_by_name, insert_lich_su, get_db_connection, insert_generated_food_data, 
+    search_food_by_name, insert_lich_su, get_db_connection,
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
     get_all_users, delete_user, get_system_stats, get_all_history_admin, 
-    get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, delete_food_soft, restore_food_soft,
-    get_health_profile, upsert_health_profile
+    get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
+    delete_food_soft, restore_food_soft, get_health_profile, upsert_health_profile
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -26,6 +26,10 @@ def index():
 @app.route("/admin")
 def admin_page():
     return send_file(os.path.join(app.static_folder, "admin.html"))
+
+@app.route("/nutrition")
+def nutrition_page():
+    return send_file(os.path.join(app.static_folder, "nutrition.html"))
 
 @app.route("/static/<path:path>")
 def serve_static(path):
@@ -44,36 +48,39 @@ def catch_all(path):
 @app.route("/api/dishes")
 def get_dishes():
     """API trả về danh sách các món ăn được hỗ trợ (cho trang Giới Thiệu)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
-               d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
-        FROM MonAn m
-        LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
-        WHERE m.IsDeleted = 0
-        ORDER BY m.MaMonAn
-    """)
-    
-    rows = cursor.fetchall()
-    dishes = []
-    for row in rows:
-        row_dict = dict(row)
-        dishes.append({
-            "id": row_dict.get("MaMonAn"),
-            "name": row_dict.get("TenMonAn", ""),
-            "description": row_dict.get("MoTa", ""),
-            "category": row_dict.get("PhanLoai", ""),
-            "calories": row_dict.get("Calo", 0),
-            "protein": row_dict.get("Protein", 0),
-            "fats": row_dict.get("ChatBeo", 0),
-            "carbs": row_dict.get("Carbohydrate", 0),
-        })
-    
-    conn.close()
-    conn.close()
-    return jsonify({"dishes": dishes, "total": len(dishes)})
+    try:
+        conn = get_db_connection()
+        from psycopg2.extras import RealDictCursor
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                   d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+            FROM MonAn m
+            LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+            WHERE m.IsDeleted = 0
+            ORDER BY m.MaMonAn
+        """)
+        
+        rows = cursor.fetchall()
+        dishes = []
+        for row in rows:
+            dishes.append({
+                "id": row.get("mamonan"),
+                "name": row.get("tenmonan", ""),
+                "description": row.get("mota", ""),
+                "category": row.get("phanloai", ""),
+                "calories": float(row.get("calo", 0)) if row.get("calo") else 0,
+                "protein": float(row.get("protein", 0)) if row.get("protein") else 0,
+                "fats": float(row.get("chatbeo", 0)) if row.get("chatbeo") else 0,
+                "carbs": float(row.get("carbohydrate", 0)) if row.get("carbohydrate") else 0,
+            })
+        
+        conn.close()
+        return jsonify({"dishes": dishes, "total": len(dishes)})
+    except Exception as e:
+        print(f"[ERROR] get_dishes: {e}")
+        return jsonify({"dishes": [], "total": 0, "error": str(e)})
 
 @app.route("/api/register", methods=["POST"])
 def register():
@@ -161,6 +168,227 @@ def update_user_health_profile(user_id):
     if upsert_health_profile(user_id, data):
         return jsonify({"success": True, "message": "Cập nhật hồ sơ sức khỏe thành công"})
     return jsonify({"success": False, "message": "Lỗi khi cập nhật hồ sơ"}), 500
+
+@app.route("/api/meal-suggestions", methods=["GET"])
+def get_meal_suggestions():
+    """API đề xuất món ăn theo bữa và calo mục tiêu - lấy từ CSDL"""
+    meal_type = request.args.get('meal_type', 'breakfast')
+    target_calo = float(request.args.get('target_calo', 500))
+    
+    try:
+        conn = get_db_connection()
+        from psycopg2.extras import RealDictCursor
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Mapping bữa ăn -> categories thực tế trong CSDL
+        meal_categories = {
+            'breakfast': [
+                'Ăn sáng', 'Món ăn sáng', 'Món hấp', 'Ăn nhẹ', 
+                'Bánh', 'Khai vị', 'Breakfast'
+            ],
+            'lunch': [
+                'Món chính', 'Món cơm', 'Món nước', 'Món mặn', 'Món bún',
+                'Bún trộn', 'Cơm', 'Lunch', 'Canh'
+            ],
+            'dinner': [
+                'Món chính', 'Món cơm', 'Món mặn', 'Món nước', 'Món bún',
+                'Thức ăn nhanh', 'Ăn nhanh', 'Cơm', 'Canh'
+            ],
+            'snack': [
+                'Ăn nhẹ', 'Ăn chơi', 'Món ăn chơi', 'Khai vị', 
+                'Tráng miệng', 'Ăn nhanh', 'Antipasti', 'Snack'
+            ]
+        }
+        
+        categories = meal_categories.get(meal_type, [])
+        
+        # Khoảng calo phù hợp (mở rộng để có nhiều kết quả hơn)
+        min_calo = target_calo * 0.3
+        max_calo = target_calo * 2.0
+        
+        suggestions = []
+        seen_ids = set()
+        seen_names = set()
+        
+        # Bước 1: Tìm món ăn theo category phù hợp với bữa ăn
+        if categories:
+            category_conditions = ' OR '.join(['m.PhanLoai ILIKE %s' for _ in categories])
+            category_params = [f'%{cat}%' for cat in categories]
+            
+            query_category = f"""
+                SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                       d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                FROM MonAn m
+                JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                WHERE m.IsDeleted = 0
+                AND d.Calo IS NOT NULL
+                AND d.Calo BETWEEN %s AND %s
+                AND ({category_conditions})
+                ORDER BY ABS(d.Calo - %s)
+                LIMIT 12
+            """
+            
+            params = [min_calo, max_calo] + category_params + [target_calo]
+            cursor.execute(query_category, params)
+            
+            for food in cursor.fetchall():
+                food_id = food['mamonan']
+                food_name = food['tenmonan'].strip().lower()
+                if food_id not in seen_ids and food_name not in seen_names:
+                    seen_ids.add(food_id)
+                    seen_names.add(food_name)
+                    suggestions.append(_format_food_suggestion(food))
+        
+        # Bước 2: Nếu chưa đủ 6 món, bổ sung từ tất cả món ăn (sắp xếp theo calo gần nhất)
+        if len(suggestions) < 6:
+            remaining = 12 - len(suggestions)
+            exclude_clause = ""
+            exclude_params = []
+            
+            if seen_ids:
+                placeholders = ', '.join(['%s'] * len(seen_ids))
+                exclude_clause = f"AND m.MaMonAn NOT IN ({placeholders})"
+                exclude_params = list(seen_ids)
+            
+            query_fallback = f"""
+                SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                       d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                FROM MonAn m
+                JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                WHERE m.IsDeleted = 0
+                AND d.Calo IS NOT NULL
+                AND d.Calo > 0
+                {exclude_clause}
+                ORDER BY ABS(d.Calo - %s)
+                LIMIT %s
+            """
+            
+            params_fallback = exclude_params + [target_calo, remaining]
+            cursor.execute(query_fallback, params_fallback)
+            
+            for food in cursor.fetchall():
+                food_id = food['mamonan']
+                food_name = food['tenmonan'].strip().lower()
+                if food_id not in seen_ids and food_name not in seen_names:
+                    seen_ids.add(food_id)
+                    seen_names.add(food_name)
+                    suggestions.append(_format_food_suggestion(food))
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'suggestions': suggestions,
+            'meal_type': meal_type,
+            'target_calo': target_calo
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] get_meal_suggestions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+def _format_food_suggestion(food):
+    """Format một dòng dữ liệu món ăn thành dict cho API response"""
+    return {
+        'id': food['mamonan'],
+        'name': food['tenmonan'],
+        'description': food['mota'] or '',
+        'category': food['phanloai'] or '',
+        'calories': float(food['calo']) if food['calo'] else 0,
+        'protein': float(food['protein']) if food['protein'] else 0,
+        'carbs': float(food['carbohydrate']) if food['carbohydrate'] else 0,
+        'fats': float(food['chatbeo']) if food['chatbeo'] else 0
+    }
+
+# ============================================
+# MEAL PLAN SAVE & HISTORY
+# ============================================
+
+@app.route("/api/meal-plans/<int:user_id>", methods=["POST"])
+def save_meal_plan(user_id):
+    """Lưu kế hoạch dinh dưỡng trong ngày"""
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO KeHoachDinhDuong 
+            (MaNguoiDung, CaloDuKien, TongCaloChon, BuaSang, BuaSangCalo, BuaTrua, BuaTruaCalo, BuaToi, BuaToiCalo, BuaPhu, BuaPhuCalo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            user_id,
+            data.get('caloDuKien', 0),
+            data.get('tongCaloChon', 0),
+            data.get('buaSang', ''),
+            data.get('buaSangCalo', 0),
+            data.get('buaTrua', ''),
+            data.get('buaTruaCalo', 0),
+            data.get('buaToi', ''),
+            data.get('buaToiCalo', 0),
+            data.get('buaPhu', ''),
+            data.get('buaPhuCalo', 0)
+        ))
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Đã lưu kế hoạch dinh dưỡng!'})
+        
+    except Exception as e:
+        print(f"[ERROR] save_meal_plan: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route("/api/meal-plans/<int:user_id>", methods=["GET"])
+def get_meal_plans(user_id):
+    """Lấy lịch sử kế hoạch dinh dưỡng"""
+    try:
+        from psycopg2.extras import RealDictCursor
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT MaKeHoach, NgayLuu, CaloDuKien, TongCaloChon,
+                   BuaSang, BuaSangCalo, BuaTrua, BuaTruaCalo,
+                   BuaToi, BuaToiCalo, BuaPhu, BuaPhuCalo
+            FROM KeHoachDinhDuong
+            WHERE MaNguoiDung = %s
+            ORDER BY NgayLuu DESC
+            LIMIT 100
+        """, (user_id,))
+        
+        plans = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for p in plans:
+            result.append({
+                'id': p['makehoach'],
+                'date': p['ngayluu'].strftime('%Y-%m-%d %H:%M') if p['ngayluu'] else '',
+                'month': p['ngayluu'].strftime('%Y-%m') if p['ngayluu'] else '',
+                'caloDuKien': float(p['calodukien']) if p['calodukien'] else 0,
+                'tongCaloChon': float(p['tongcalochon']) if p['tongcalochon'] else 0,
+                'buaSang': p['buasang'] or '',
+                'buaSangCalo': float(p['buasangcalo']) if p['buasangcalo'] else 0,
+                'buaTrua': p['buatrua'] or '',
+                'buaTruaCalo': float(p['buatruacalo']) if p['buatruacalo'] else 0,
+                'buaToi': p['buatoi'] or '',
+                'buaToiCalo': float(p['buatoicalo']) if p['buatoicalo'] else 0,
+                'buaPhu': p['buaphu'] or '',
+                'buaPhuCalo': float(p['buaphucalo']) if p['buaphucalo'] else 0
+            })
+        
+        return jsonify({'success': True, 'plans': result})
+        
+    except Exception as e:
+        print(f"[ERROR] get_meal_plans: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route("/api/admin/users", methods=["GET"])
 def api_admin_get_users():
@@ -253,21 +481,27 @@ def get_recommendation(user_id, calories):
     recommendation = ""
     reason = ""
 
-    if muc_tieu == "giam_can":
+    # Normalize muc_tieu to lowercase for comparison
+    muc_tieu_lower = str(muc_tieu).lower()
+    
+    if 'giam' in muc_tieu_lower or 'giảm' in muc_tieu_lower:
+        # Giảm cân
         if calories > threshold:
             recommendation = "Hạn chế"
             reason = f"Món ăn có lượng calo ({calories} kcal) khá cao, không tốt cho mục tiêu giảm cân."
         else:
             recommendation = "Nên ăn"
             reason = f"Món ăn ít calo ({calories} kcal), phù hợp với mục tiêu giảm cân."
-    elif muc_tieu == "tang_can":
+    elif 'tang' in muc_tieu_lower or 'tăng' in muc_tieu_lower:
+        # Tăng cân
         if calories > threshold:
             recommendation = "Nên ăn"
             reason = f"Món ăn giàu năng lượng ({calories} kcal), rất tốt cho mục tiêu tăng cân."
         else:
             recommendation = "Ăn vừa phải"
             reason = f"Món ăn ít năng lượng ({calories} kcal), nên ăn kèm các món khác để đủ calo tăng cân."
-    else: # giu_dang
+    else:
+        # Duy trì / Giữ dáng
         recommendation = "Ăn cân đối"
         reason = f"Món ăn cung cấp {calories} kcal, ăn uống cân đối để duy trì vóc dáng."
 

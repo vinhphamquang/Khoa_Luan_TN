@@ -26,12 +26,31 @@
                 <i class="fa-solid fa-bowl-food"></i>
                 <span>SmartFood<strong>AI</strong></span>
             </a>
-            <nav class="nav-links open" id="nav-links">
-                <div class="nav-auth">
-                    <a href="/" class="nav-link"><i class="fa-solid fa-house"></i> Về Trang Chính</a>
-                    <button id="btn-admin-logout" class="btn btn-outline" style="padding: 8px 16px; font-size: 14px;"><i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất</button>
+            <nav class="nav-links" id="nav-links">
+                <a href="/" class="nav-link">
+                    <i class="fa-solid fa-house"></i> Trang Chủ
+                </a>
+                <a href="/#analyze" class="nav-link">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Phân Tích
+                </a>
+                <a href="/nutrition" class="nav-link" id="nav-nutrition-link" style="display: none;">
+                    <i class="fa-solid fa-heart-pulse"></i> Kế Hoạch Dinh Dưỡng
+                </a>
+                <a href="/admin" class="nav-link active">
+                    <i class="fa-solid fa-shield-halved"></i> Admin
+                </a>
+                <div class="nav-auth" id="user-section">
+                    <span class="nav-link" id="nav-user-name" style="cursor: default; opacity: 0.8;">
+                        <i class="fa-solid fa-user"></i> <span id="display-username">Admin</span>
+                    </span>
+                    <button id="btn-admin-logout" class="btn btn-outline" style="padding: 8px 16px; font-size: 14px;">
+                        <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
+                    </button>
                 </div>
             </nav>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
         </div>
     </header>
 

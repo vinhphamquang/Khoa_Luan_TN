@@ -590,6 +590,7 @@ function checkLoginState() {
     const userSection = document.getElementById('user-section');
     const userNameDisplay = document.getElementById('user-name-display');
     const navAdminLink = document.getElementById('nav-admin-link');
+    const navNutritionLink = document.getElementById('nav-nutrition-link');
     
     const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
     
@@ -604,10 +605,18 @@ function checkLoginState() {
             if(loggedUser.role === 'admin') navAdminLink.classList.remove('hidden');
             else navAdminLink.classList.add('hidden');
         }
+        // Show nutrition link for logged in users
+        if(navNutritionLink) {
+            navNutritionLink.style.display = 'flex';
+        }
     } else {
         if(authSection) authSection.classList.remove('hidden');
         if(userSection) userSection.classList.add('hidden');
         if(navAdminLink) navAdminLink.classList.add('hidden');
+        // Hide nutrition link for guests
+        if(navNutritionLink) {
+            navNutritionLink.style.display = 'none';
+        }
     }
 }
 

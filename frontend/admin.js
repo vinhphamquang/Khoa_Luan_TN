@@ -9,6 +9,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // --- Navbar Setup ---
+    // Show user name
+    const displayUsername = document.getElementById('display-username');
+    if (displayUsername) displayUsername.textContent = loggedUser.name;
+
+    // Show nutrition link (visible for logged-in users)
+    const nutritionLink = document.getElementById('nav-nutrition-link');
+    if (nutritionLink) nutritionLink.style.display = '';
+
+    // Mobile nav toggle
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+    if (navToggle && navLinks) {
+        navToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('show');
+        });
+    }
+
     // Logout logic
     const btnLogout = document.getElementById('btn-admin-logout');
     if (btnLogout) {
@@ -210,37 +228,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const responseData = await res.json();
             if(responseData.success) {
                 const f = responseData.food;
-                document.getElementById('fa-id').value = f.MaMonAn;
-                document.getElementById('fa-name').value = f.TenMonAn || '';
-                document.getElementById('fa-cate').value = f.PhanLoai || '';
-                document.getElementById('fa-desc').value = f.MoTa || '';
-                document.getElementById('fa-deleted').value = f.IsDeleted || 0;
                 
-                if(f.DinhDuong) {
-                    document.getElementById('fa-cal').value = f.DinhDuong.Calo || '';
-                    document.getElementById('fa-pro').value = f.DinhDuong.Protein || '';
-                    document.getElementById('fa-fat').value = f.DinhDuong.ChatBeo || '';
-                    document.getElementById('fa-car').value = f.DinhDuong.Carbohydrate || '';
-                } else {
-                    document.getElementById('fa-cal').value = '';
-                    document.getElementById('fa-pro').value = '';
-                    document.getElementById('fa-fat').value = '';
-                    document.getElementById('fa-car').value = '';
-                }
+                // Support both uppercase (backend format) and lowercase (PostgreSQL format)
+                document.getElementById('fa-id').value = f.MaMonAn || f.mamonan || id;
+                document.getElementById('fa-name').value = f.TenMonAn || f.tenmonan || '';
+                document.getElementById('fa-cate').value = f.PhanLoai || f.phanloai || '';
+                document.getElementById('fa-desc').value = f.MoTa || f.mota || '';
+                document.getElementById('fa-deleted').value = (f.IsDeleted !== undefined ? f.IsDeleted : (f.isdeleted !== undefined ? f.isdeleted : 0));
                 
-                if(f.CongThuc) {
-                    document.getElementById('fa-instruct').value = f.CongThuc.HuongDan || '';
-                    ingsContainer.innerHTML = '';
-                    if(f.CongThuc.NguyenLieu && f.CongThuc.NguyenLieu.length > 0) {
-                        f.CongThuc.NguyenLieu.forEach(nl => {
-                            addIngredientRow(`${nl.TenNguyenLieu} — ${nl.SoLuong}`);
-                        });
-                    } else {
-                        addIngredientRow('');
-                    }
+                const nutrition = f.DinhDuong || f.dinhduong || {};
+                document.getElementById('fa-cal').value = nutrition.Calo || nutrition.calo || '';
+                document.getElementById('fa-pro').value = nutrition.Protein || nutrition.protein || '';
+                document.getElementById('fa-fat').value = nutrition.ChatBeo || nutrition.chatbeo || '';
+                document.getElementById('fa-car').value = nutrition.Carbohydrate || nutrition.carbohydrate || '';
+                
+                const recipe = f.CongThuc || f.congthuc || {};
+                document.getElementById('fa-instruct').value = recipe.HuongDan || recipe.huongdan || '';
+                
+                ingsContainer.innerHTML = '';
+                const ingredients = recipe.NguyenLieu || recipe.nguyenlieu || [];
+                if(ingredients && ingredients.length > 0) {
+                    ingredients.forEach(nl => {
+                        const name = nl.TenNguyenLieu || nl.tennguyenlieu || '';
+                        const amount = nl.SoLuong || nl.soluong || '';
+                        addIngredientRow(`${name} — ${amount}`);
+                    });
                 } else {
-                    document.getElementById('fa-instruct').value = '';
-                    ingsContainer.innerHTML = '';
                     addIngredientRow('');
                 }
 
@@ -249,7 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert("Không tải được chi tiết món ăn!");
             }
-        } catch(e) { console.error(e); alert("Lỗi kết nối máy chủ."); }
+        } catch(e) { 
+            console.error('Edit food error:', e); 
+            alert("Lỗi kết nối máy chủ: " + e.message); 
+        }
     };
 
     window.deleteAdminFood = async (id) => {
@@ -307,17 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if(data.success) {
                 tb.innerHTML = '';
                 data.foods.forEach(f => {
-                    const status = f.IsDeleted ? '<span class="badge badge-danger">Đã khóa</span>' : '<span class="badge badge-success">Hiển thị</span>';
+                    const status = f.is_deleted ? '<span class="badge badge-danger">Đã khóa</span>' : '<span class="badge badge-success">Hiển thị</span>';
                     tb.innerHTML += `
                         <tr>
-                            <td>#${f.MaMonAn}</td>
-                            <td>${f.TenMonAn}</td>
-                            <td>${f.PhanLoai}</td>
+                            <td>#${f.id}</td>
+                            <td>${f.name}</td>
+                            <td>${f.category}</td>
                             <td>${status}</td>
                             <td>
                                 <div class="action-btns">
-                                    <button class="btn-icon" title="Sửa" onclick="editAdminFood(${f.MaMonAn})"><i class="fa-solid fa-pen"></i></button>
-                                    ${!f.IsDeleted ? `<button class="btn-icon delete" title="Khóa" onclick="deleteAdminFood(${f.MaMonAn})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.MaMonAn})"><i class="fa-solid fa-rotate-left"></i></button>`}
+                                    <button class="btn-icon" title="Sửa" onclick="editAdminFood(${f.id})"><i class="fa-solid fa-pen"></i></button>
+                                    ${!f.is_deleted ? `<button class="btn-icon delete" title="Khóa" onclick="deleteAdminFood(${f.id})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.id})"><i class="fa-solid fa-rotate-left"></i></button>`}
                                 </div>
                             </td>
                         </tr>
@@ -336,17 +352,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if(data.success) {
                 tb.innerHTML = '';
                 data.users.forEach(u => {
-                    const status = u.VaiTro === 'admin' ? '<span class="badge badge-warning"><i class="fa-solid fa-star"></i> Admin</span>' : '<span class="badge badge-info">User</span>';
+                    const status = u.role === 'admin' ? '<span class="badge badge-warning"><i class="fa-solid fa-star"></i> Admin</span>' : '<span class="badge badge-info">User</span>';
                     tb.innerHTML += `
                         <tr>
-                            <td>#${u.MaNguoiDung}</td>
-                            <td style="font-weight: 500">${u.TenNguoiDung}</td>
-                            <td>${u.Email}</td>
+                            <td>#${u.id}</td>
+                            <td style="font-weight: 500">${u.name}</td>
+                            <td>${u.email}</td>
                             <td>${status}</td>
-                            <td>${u.NgayDangKy}</td>
+                            <td>${u.created_at}</td>
                             <td>
                                 <div class="action-btns">
-                                    <button class="btn-icon delete" title="Xóa" onclick="deleteAdminUser(${u.MaNguoiDung})"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn-icon delete" title="Xóa" onclick="deleteAdminUser(${u.id})"><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -367,11 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.history.forEach(h => {
                     tb.innerHTML += `
                         <tr>
-                            <td>#${h.MaLichSu}</td>
-                            <td>${h.TenNguoiDung ? h.TenNguoiDung + ' <i>('+h.Email+')</i>' : 'Khách'}</td>
-                            <td style="font-weight:500; color:var(--primary-light)">${h.KetQuaNhanDien}</td>
-                            <td><span class="badge badge-success">${h.DoChinhXac}%</span></td>
-                            <td><span style="font-size: 13px; color: var(--text-muted);">${new Date(h.ThoiGianNhanDien).toLocaleString()}</span></td>
+                            <td>#${h.id}</td>
+                            <td>${h.user_name || 'Khách'}</td>
+                            <td style="font-weight:500; color:var(--primary-light)">${h.food_name}</td>
+                            <td><span class="badge badge-success">${h.accuracy}%</span></td>
+                            <td><span style="font-size: 13px; color: var(--text-muted);">${new Date(h.time).toLocaleString()}</span></td>
                         </tr>
                     `;
                 });
