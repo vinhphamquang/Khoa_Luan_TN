@@ -27,6 +27,7 @@ def get_db_cursor(conn):
 
 def create_user(name, email, hashed_password):
     """Tạo user mới"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
@@ -41,11 +42,17 @@ def create_user(name, email, hashed_password):
         conn.commit()
         conn.close()
         
-        return True, f"Đăng ký thành công! User ID: {user_id}"
+        return True, f"Đăng ký thành công! User ID: {user_id}", user_id
     except psycopg2.IntegrityError:
-        return False, "Email đã tồn tại"
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False, "Email đã tồn tại", None
     except Exception as e:
-        return False, f"Lỗi: {str(e)}"
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False, f"Lỗi: {str(e)}", None
 
 def get_user_by_email(email):
     """Lấy thông tin user theo email"""
