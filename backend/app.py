@@ -700,10 +700,6 @@ def predict():
 
     return jsonify(response_data)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
-
 @app.route("/api/feedback", methods=["POST"])
 def submit_feedback():
     """API để user đánh giá kết quả nhận diện"""
@@ -724,7 +720,7 @@ def submit_feedback():
         
         cursor.execute("""
             INSERT INTO FeedbackNhanDien (MaNguoiDung, TenMonNhanDien, DoChinhXac, DanhGia, TenMonDung)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (user_id, food_name, confidence, rating, correct_name))
         
         conn.commit()
@@ -851,3 +847,6 @@ def retry_recognition():
             print(f"Error saving history: {e}")
     
     return jsonify(response_data)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

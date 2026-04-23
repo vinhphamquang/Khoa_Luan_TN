@@ -409,6 +409,58 @@ function initAnalyzePage() {
             showError('Lỗi kết nối tới Server. Đảm bảo Backend đang chạy.');
         }
     });
+
+    // ---- RETRY RECOGNITION ----
+    const retryBtn = document.getElementById('retry-btn');
+    retryBtn?.addEventListener('click', async () => {
+        if (!currentFile) return;
+
+        const retrySection = document.getElementById('retry-section');
+        
+        // Show loading state on button
+        retryBtn.classList.add('loading');
+        const originalHTML = retryBtn.innerHTML;
+        retryBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Đang nhận diện lại...';
+
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        formData.append('skip_api', 'gemini'); // Skip primary API to get different result
+        
+        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+        if (loggedUser) {
+            formData.append('user_id', loggedUser.id);
+        }
+
+        try {
+            const response = await fetch('/api/retry-recognition', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            // Restore button
+            retryBtn.classList.remove('loading');
+            retryBtn.innerHTML = originalHTML;
+
+            if (data.success) {
+                showResult(data);
+                // Scroll to result
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                showError(
+                    data.message || 'Không thể nhận diện lại. Vui lòng thử ảnh khác.',
+                    null
+                );
+            }
+
+        } catch (err) {
+            console.error('Retry error:', err);
+            retryBtn.classList.remove('loading');
+            retryBtn.innerHTML = originalHTML;
+            showError('Lỗi kết nối tới Server khi nhận diện lại.');
+        }
+    });
 }
 
 function showResult(data) {

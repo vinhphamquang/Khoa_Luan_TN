@@ -1741,6 +1741,116 @@ img {
 }
 
 /* ============================================
+   RETRY RECOGNITION
+   ============================================ */
+.retry-recognition-section {
+    margin-top: 28px;
+    text-align: center;
+    padding: 24px 20px;
+    background: rgba(251, 146, 60, 0.05);
+    border-radius: var(--radius-md);
+    border: 1px dashed rgba(251, 146, 60, 0.25);
+    transition: var(--transition-base);
+}
+
+.retry-recognition-section:hover {
+    border-color: rgba(251, 146, 60, 0.4);
+    background: rgba(251, 146, 60, 0.08);
+}
+
+.retry-divider {
+    width: 50px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--c-cal), var(--c-fat));
+    border-radius: 3px;
+    margin: 0 auto 16px;
+}
+
+.retry-question {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.retry-question i {
+    color: var(--c-cal);
+    font-size: 18px;
+}
+
+.btn-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-retry::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-retry:hover::before {
+    left: 100%;
+}
+
+.btn-retry:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+.btn-retry:active {
+    transform: translateY(0);
+}
+
+.btn-retry i {
+    font-size: 16px;
+    transition: transform 0.3s ease;
+}
+
+.btn-retry:hover i {
+    transform: rotate(180deg);
+}
+
+.btn-retry.loading {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.btn-retry.loading i {
+    animation: spin 1s linear infinite;
+}
+
+.retry-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+/* ============================================
    FOOTER
    ============================================ */
 .site-footer {
