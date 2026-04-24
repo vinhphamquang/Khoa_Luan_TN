@@ -365,12 +365,19 @@ function initAnalyzePage() {
             loaderText.innerHTML = 'AI đang nhận diện hình ảnh<span class="dots"></span>';
         }
         
-        // Progressively update loading text if it takes longer than 3 seconds (AI Generation)
+        // Update loading text after 3 seconds
         let loadingTimer = setTimeout(() => {
             if (loaderText) {
-                loaderText.innerHTML = 'Nhận diện thấy món ăn mới. Đang nhờ AI phân tích công thức, vui lòng chờ...';
+                loaderText.innerHTML = 'Đang xử lý dữ liệu, vui lòng chờ<span class="dots"></span>';
             }
-        }, 4000);
+        }, 3000);
+        
+        // Update again after 6 seconds (for AI generation)
+        let loadingTimer2 = setTimeout(() => {
+            if (loaderText) {
+                loaderText.innerHTML = 'Đang phân tích món ăn bằng AI, có thể mất thêm vài giây<span class="dots"></span>';
+            }
+        }, 6000);
 
         const formData = new FormData();
         formData.append('file', currentFile);
@@ -389,10 +396,17 @@ function initAnalyzePage() {
             const data = await response.json();
 
             clearTimeout(loadingTimer);
+            clearTimeout(loadingTimer2);
             loading.classList.add('hidden');
             previewContainer.classList.remove('hidden');
 
             if (data.success) {
+                // Show appropriate message based on whether food was found in DB
+                if (data.found_in_db && !data.is_new) {
+                    console.log('✅ Món đã có trong CSDL');
+                } else if (data.is_new) {
+                    console.log('✨ Món mới vừa được thêm vào CSDL');
+                }
                 showResult(data);
             } else {
                 showError(
@@ -404,6 +418,7 @@ function initAnalyzePage() {
         } catch (err) {
             console.error('Fetch error:', err);
             clearTimeout(loadingTimer);
+            clearTimeout(loadingTimer2);
             loading.classList.add('hidden');
             previewContainer.classList.remove('hidden');
             showError('Lỗi kết nối tới Server. Đảm bảo Backend đang chạy.');

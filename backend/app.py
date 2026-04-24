@@ -598,6 +598,7 @@ def predict():
         food_data = search_food_by_name(food_name_english)
     
     is_newly_added = False
+    found_in_db = bool(food_data)  # Track if food was found in DB
     
     # 4. Nếu không có trong database, tự động lấy thông tin từ AI (Tiếng Việt) và thêm vào
     if not food_data:
@@ -654,7 +655,9 @@ def predict():
         "predicted_class_name": food_name_vietnamese,  # Trả về tên tiếng Việt
         "confidence": confidence_pct,
         "food_data": None,
-        "message": ""
+        "message": "",
+        "found_in_db": found_in_db,  # NEW: Cho frontend biết món có sẵn hay không
+        "is_new": is_newly_added  # NEW: Cho frontend biết món vừa được thêm
     }
     
     if food_data:
