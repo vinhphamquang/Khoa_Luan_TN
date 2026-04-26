@@ -813,6 +813,9 @@ function initAuth() {
     });}
 
 // ---- PROFILE LOGIC ----
+let dailyChart = null;
+let weeklyChart = null;
+
 async function initProfilePage() {
     const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
     if (!loggedUser) return;
@@ -878,41 +881,29 @@ async function initProfilePage() {
         });
     }
 
-    // Load History
-    const historyContainer = document.getElementById('history-container');
-    if(historyContainer) {
-        try {
-            historyContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px 0;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top: 10px;">Đang tải lịch sử...</p></div>';
-            
-            const res = await fetch('/api/history/' + loggedUser.id);
-            const data = await res.json();
-            
-            if (data.success && data.history && data.history.length > 0) {
-                historyContainer.innerHTML = '';
-                data.history.forEach(item => {
-                    const el = document.createElement('div');
-                    el.style.cssText = "background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;";
-                    
-                    const date = item.ThoiGianNhanDien ? new Date(item.ThoiGianNhanDien).toLocaleString() : '';
-                    
-                    el.innerHTML = `
-                        <div>
-                            <h4 style="font-size: 16px; margin-bottom: 4px; font-weight: 600; color: var(--primary-light);">${item.KetQuaNhanDien}</h4>
-                            <p style="font-size: 12px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> ${date}</p>
-                        </div>
-                        <div style="background: rgba(163, 230, 53, 0.15); color: var(--c-carb); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;">
-                            ${item.DoChinhXac}%
-                        </div>
-                    `;
-                    historyContainer.appendChild(el);
-                });
-            } else {
-                historyContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 20px;">Chưa có lịch sử tra cứu nào.</p>';
-            }
-        } catch (e) {
-            historyContainer.innerHTML = '<p style="text-align: center; color: var(--c-fat); margin-top: 20px;">Lỗi tải dữ liệu.</p>';
-        }
+    // ---- TAB SWITCHING ----
+    const profileTabs = document.querySelectorAll('.profile-tab');
+    if (profileTabs.length > 0 && !profileTabs[0].dataset.initialized) {
+        profileTabs.forEach(tab => {
+            tab.dataset.initialized = 'true';
+            tab.addEventListener('click', () => {
+                profileTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.profile-tab-content').forEach(c => c.classList.remove('active'));
+                const targetId = tab.getAttribute('data-tab');
+                document.getElementById(targetId)?.classList.add('active');
+
+                // Load stats when switching to stats tab
+                if (targetId === 'tab-stats') {
+                    loadFoodStats(loggedUser.id);
+                }
+            });
+        });
     }
+
+    // ---- LOAD HISTORY (with images) ----
+    await loadFoodHistory(loggedUser.id);
 
     // Handlers (only attach once)
     const pwForm = document.getElementById('change-pw-form');
@@ -960,6 +951,238 @@ async function initProfilePage() {
             window.location.hash = 'intro';
         });
     }
+}
+
+// ---- LOAD FOOD HISTORY ----
+async function loadFoodHistory(userId) {
+    const historyContainer = document.getElementById('history-container');
+    const historyCount = document.getElementById('history-count');
+    if (!historyContainer) return;
+
+    try {
+        historyContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px 0; grid-column: 1 / -1;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top: 10px;">Đang tải lịch sử...</p></div>';
+        
+        const res = await fetch('/api/history/' + userId);
+        const data = await res.json();
+        
+        if (data.success && data.history && data.history.length > 0) {
+            historyContainer.innerHTML = '';
+            if (historyCount) historyCount.textContent = data.history.length + ' món';
+            
+            data.history.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                
+                const timeStr = item.time ? new Date(item.time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const calStr = item.calories > 0 ? Math.round(item.calories) + ' kcal' : '--';
+                
+                // Image section
+                let imgHTML = '';
+                if (item.image && item.image.startsWith('data:')) {
+                    imgHTML = `<div class="history-card-img"><img src="${item.image}" alt="${item.food_name}" loading="lazy"></div>`;
+                } else {
+                    imgHTML = `<div class="history-card-img"><div class="no-img"><i class="fa-solid fa-bowl-food"></i></div></div>`;
+                }
+                
+                card.innerHTML = `
+                    ${imgHTML}
+                    <div class="history-card-body">
+                        <div class="history-card-name" title="${item.food_name}">${item.food_name}</div>
+                        <div class="history-card-meta">
+                            <span class="history-card-cal"><i class="fa-solid fa-fire"></i> ${calStr}</span>
+                            <span class="history-card-acc">${item.accuracy}%</span>
+                        </div>
+                        <div class="history-card-time"><i class="fa-regular fa-clock"></i> ${timeStr}</div>
+                    </div>
+                `;
+                historyContainer.appendChild(card);
+            });
+        } else {
+            historyContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px 0; grid-column: 1 / -1;">Chưa có lịch sử tra cứu nào. Hãy bắt đầu nhận diện món ăn!</p>';
+            if (historyCount) historyCount.textContent = '0 món';
+        }
+    } catch (e) {
+        historyContainer.innerHTML = '<p style="text-align: center; color: var(--c-fat); padding: 40px 0; grid-column: 1 / -1;">Lỗi tải dữ liệu.</p>';
+    }
+}
+
+// ---- LOAD FOOD STATS ----
+async function loadFoodStats(userId) {
+    try {
+        const res = await fetch('/api/food-stats/' + userId);
+        const data = await res.json();
+        
+        if (!data.success) return;
+        const stats = data.stats;
+
+        // Update summary cards
+        document.getElementById('stats-today-cal').textContent = Math.round(stats.today_calories);
+        document.getElementById('stats-today-count').textContent = stats.today_count;
+        document.getElementById('stats-total-foods').textContent = stats.total_foods;
+        document.getElementById('stats-total-cal').textContent = Math.round(stats.total_calories);
+
+        // ---- DAILY CHART ----
+        renderDailyChart(stats.daily);
+
+        // ---- WEEKLY CHART ----
+        renderWeeklyChart(stats.weekly);
+
+        // ---- TOP FOODS ----
+        renderTopFoods(stats.top_foods);
+
+    } catch (e) {
+        console.error('Lỗi tải thống kê:', e);
+    }
+}
+
+function renderDailyChart(dailyData) {
+    const ctx = document.getElementById('chart-daily-calories');
+    if (!ctx) return;
+
+    // Prepare last 7 days data
+    const labels = [];
+    const values = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayLabel = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        labels.push(dayLabel);
+        
+        const found = dailyData.find(item => item.date === dateStr);
+        values.push(found ? Math.round(found.total_calories) : 0);
+    }
+
+    if (dailyChart) dailyChart.destroy();
+
+    dailyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Calo',
+                data: values,
+                backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                borderColor: 'rgba(34, 197, 94, 1)',
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 12,
+                    titleFont: { size: 13, weight: '600' },
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                        label: ctx => ctx.parsed.y + ' kcal'
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.06)' },
+                    ticks: { font: { size: 12 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+function renderWeeklyChart(weeklyData) {
+    const ctx = document.getElementById('chart-weekly-calories');
+    if (!ctx) return;
+
+    const labels = weeklyData.map(w => {
+        const d = new Date(w.week_start);
+        return 'Tuần ' + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    }).reverse();
+    
+    const values = weeklyData.map(w => Math.round(w.total_calories)).reverse();
+    const counts = weeklyData.map(w => w.food_count).reverse();
+
+    if (weeklyChart) weeklyChart.destroy();
+
+    weeklyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.length > 0 ? labels : ['Tuần này'],
+            datasets: [{
+                label: 'Tổng Calo',
+                data: values.length > 0 ? values : [0],
+                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 12,
+                    callbacks: {
+                        afterLabel: (ctx) => {
+                            const idx = ctx.dataIndex;
+                            return counts[idx] ? counts[idx] + ' món' : '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.06)' },
+                    ticks: { font: { size: 12 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+function renderTopFoods(topFoods) {
+    const container = document.getElementById('top-foods-container');
+    if (!container) return;
+
+    if (!topFoods || topFoods.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có dữ liệu thống kê</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    topFoods.forEach((food, idx) => {
+        const item = document.createElement('div');
+        item.className = 'top-food-item';
+        item.innerHTML = `
+            <div class="top-food-rank">${idx + 1}</div>
+            <div class="top-food-info">
+                <div class="top-food-name">${food.name}</div>
+                <div class="top-food-detail">${food.count} lần nhận diện</div>
+            </div>
+            <div class="top-food-cal">~${food.avg_calories} kcal</div>
+        `;
+        container.appendChild(item);
+    });
 }
 
 

@@ -1,5 +1,6 @@
 import sys
 import os
+import base64
 sys.path.append(os.path.dirname(__file__))
 
 from flask import Flask, request, jsonify, send_from_directory, send_file
@@ -10,7 +11,8 @@ from db_queries import (
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
     get_all_users, delete_user, get_system_stats, get_all_history_admin, 
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
-    delete_food_soft, restore_food_soft, get_health_profile, upsert_health_profile
+    delete_food_soft, restore_food_soft, get_health_profile, upsert_health_profile,
+    get_user_food_stats
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -18,6 +20,25 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, static_folder="../frontend")
 CORS(app)
+
+# ============================================
+# DATABASE MIGRATION - Thêm cột Calo vào LichSu
+# ============================================
+def run_migrations():
+    """Chạy migration để thêm cột mới vào DB nếu chưa có"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            ALTER TABLE LichSu ADD COLUMN IF NOT EXISTS Calo REAL DEFAULT 0
+        """)
+        conn.commit()
+        conn.close()
+        print("[MIGRATION] Đã kiểm tra/thêm cột Calo vào bảng LichSu")
+    except Exception as e:
+        print(f"[MIGRATION WARNING] {e}")
+
+run_migrations()
 
 @app.route("/")
 def index():
@@ -135,6 +156,12 @@ def login():
 def get_user_history_api(user_id):
     history = get_user_history(user_id)
     return jsonify({"success": True, "history": history})
+
+@app.route("/api/food-stats/<int:user_id>")
+def get_food_stats_api(user_id):
+    """API thống kê calories theo ngày/tuần"""
+    stats = get_user_food_stats(user_id)
+    return jsonify({"success": True, "stats": stats})
 
 @app.route("/api/change-password", methods=["POST"])
 def change_password():
@@ -686,11 +713,34 @@ def predict():
         response_data["message"] = f"⚠️ Nhận diện được '{food_name_vietnamese}' nhưng chưa có đầy đủ thông tin. Vui lòng thử lại sau."
 
 
+    # Tạo base64 image để lưu lịch sử
+    image_base64 = ""
+    try:
+        file.seek(0)  # Reset file pointer
+        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        # Detect mime type
+        mime = 'image/jpeg'
+        if file.filename and file.filename.lower().endswith('.png'):
+            mime = 'image/png'
+        elif file.filename and file.filename.lower().endswith('.webp'):
+            mime = 'image/webp'
+        image_base64 = f"data:{mime};base64,{img_b64}"
+    except Exception as e:
+        print(f"[WARNING] Không thể encode ảnh base64: {e}")
+
+    # Lấy calories từ food_data
+    food_calories = 0
+    if food_data and food_data.get("DinhDuong"):
+        try:
+            food_calories = float(food_data["DinhDuong"].get("Calo", 0))
+        except:
+            food_calories = 0
+
     user_id = request.form.get("user_id")
     if user_id and str(user_id).isdigit():
         try:
-            # Lưu lịch sử với tên tiếng Việt
-            insert_lich_su(int(user_id), "", food_name_vietnamese, confidence_pct)
+            # Lưu lịch sử với ảnh base64 và calories
+            insert_lich_su(int(user_id), image_base64, food_name_vietnamese, confidence_pct, food_calories)
         except Exception as e:
             print(f"Error saving history: {e}")
 
@@ -841,11 +891,30 @@ def retry_recognition():
         else:
             response_data["message"] = f"✅ Nhận diện lại thành công: '{food_name_vietnamese}'"
     
+    # Tạo base64 image để lưu lịch sử
+    image_base64_retry = ""
+    try:
+        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        mime = 'image/jpeg'
+        if file.filename and file.filename.lower().endswith('.png'):
+            mime = 'image/png'
+        image_base64_retry = f"data:{mime};base64,{img_b64}"
+    except Exception as e:
+        print(f"[WARNING] Không thể encode ảnh base64: {e}")
+
+    # Lấy calories
+    retry_calories = 0
+    if food_data and food_data.get("DinhDuong"):
+        try:
+            retry_calories = float(food_data["DinhDuong"].get("Calo", 0))
+        except:
+            retry_calories = 0
+
     # Lưu lịch sử
     user_id = request.form.get("user_id")
     if user_id and str(user_id).isdigit():
         try:
-            insert_lich_su(int(user_id), "", food_name_vietnamese, confidence_pct)
+            insert_lich_su(int(user_id), image_base64_retry, food_name_vietnamese, confidence_pct, retry_calories)
         except Exception as e:
             print(f"Error saving history: {e}")
     

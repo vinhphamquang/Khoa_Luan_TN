@@ -349,16 +349,16 @@ def insert_food_full(food_data):
 # HISTORY
 # ============================================
 
-def insert_lich_su(user_id, image_path, food_name, accuracy):
-    """Lưu lịch sử nhận diện"""
+def insert_lich_su(user_id, image_path, food_name, accuracy, calories=0):
+    """Lưu lịch sử nhận diện (có ảnh base64 và calories)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
-            INSERT INTO LichSu (MaNguoiDung, DuongDanAnh, TenMonAn, DoChinhXac)
-            VALUES (%s, %s, %s, %s)
-        """, (user_id, image_path, food_name, accuracy))
+            INSERT INTO LichSu (MaNguoiDung, DuongDanAnh, TenMonAn, DoChinhXac, Calo)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, image_path, food_name, accuracy, calories))
         
         conn.commit()
         conn.close()
@@ -368,13 +368,13 @@ def insert_lich_su(user_id, image_path, food_name, accuracy):
         return False
 
 def get_user_history(user_id):
-    """Lấy lịch sử nhận diện của user"""
+    """Lấy lịch sử nhận diện của user (bao gồm ảnh và calories)"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian
+            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo
             FROM LichSu
             WHERE MaNguoiDung = %s
             ORDER BY ThoiGian DESC
@@ -389,7 +389,9 @@ def get_user_history(user_id):
                 'id': h['malichsu'],
                 'food_name': h['tenmonan'],
                 'accuracy': float(h['dochinhxac']) if h['dochinhxac'] else 0,
-                'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else ''
+                'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
+                'image': h.get('duongdananh', '') or '',
+                'calories': float(h['calo']) if h.get('calo') else 0
             }
             for h in history
         ]
@@ -398,6 +400,119 @@ def get_user_history(user_id):
         import traceback
         traceback.print_exc()
         return []
+
+def get_user_food_stats(user_id):
+    """Thống kê calories theo ngày/tuần cho user"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        # 1. Calories theo từng ngày (30 ngày gần nhất)
+        cursor.execute("""
+            SELECT DATE(ThoiGian) as ngay,
+                   SUM(Calo) as tong_calo,
+                   COUNT(*) as so_mon
+            FROM LichSu
+            WHERE MaNguoiDung = %s 
+              AND ThoiGian >= CURRENT_DATE - INTERVAL '30 days'
+              AND Calo > 0
+            GROUP BY DATE(ThoiGian)
+            ORDER BY ngay DESC
+        """, (user_id,))
+        
+        daily_stats = []
+        for row in cursor.fetchall():
+            daily_stats.append({
+                'date': row['ngay'].strftime('%Y-%m-%d') if row['ngay'] else '',
+                'total_calories': float(row['tong_calo']) if row['tong_calo'] else 0,
+                'food_count': row['so_mon'] or 0
+            })
+        
+        # 2. Calories theo tuần (4 tuần gần nhất)
+        cursor.execute("""
+            SELECT DATE_TRUNC('week', ThoiGian)::date as tuan,
+                   SUM(Calo) as tong_calo,
+                   COUNT(*) as so_mon
+            FROM LichSu
+            WHERE MaNguoiDung = %s 
+              AND ThoiGian >= CURRENT_DATE - INTERVAL '28 days'
+              AND Calo > 0
+            GROUP BY DATE_TRUNC('week', ThoiGian)
+            ORDER BY tuan DESC
+        """, (user_id,))
+        
+        weekly_stats = []
+        for row in cursor.fetchall():
+            weekly_stats.append({
+                'week_start': row['tuan'].strftime('%Y-%m-%d') if row['tuan'] else '',
+                'total_calories': float(row['tong_calo']) if row['tong_calo'] else 0,
+                'food_count': row['so_mon'] or 0
+            })
+        
+        # 3. Tổng calories hôm nay
+        cursor.execute("""
+            SELECT SUM(Calo) as tong_calo, COUNT(*) as so_mon
+            FROM LichSu
+            WHERE MaNguoiDung = %s 
+              AND DATE(ThoiGian) = CURRENT_DATE
+              AND Calo > 0
+        """, (user_id,))
+        
+        today = cursor.fetchone()
+        today_calories = float(today['tong_calo']) if today and today['tong_calo'] else 0
+        today_count = today['so_mon'] if today else 0
+        
+        # 4. Top món ăn thường xuyên nhất
+        cursor.execute("""
+            SELECT TenMonAn, COUNT(*) as so_lan, AVG(Calo) as calo_tb
+            FROM LichSu
+            WHERE MaNguoiDung = %s AND Calo > 0
+            GROUP BY TenMonAn
+            ORDER BY so_lan DESC
+            LIMIT 5
+        """, (user_id,))
+        
+        top_foods = []
+        for row in cursor.fetchall():
+            top_foods.append({
+                'name': row['tenmonan'],
+                'count': row['so_lan'] or 0,
+                'avg_calories': round(float(row['calo_tb']), 1) if row['calo_tb'] else 0
+            })
+        
+        # 5. Tổng tất cả
+        cursor.execute("""
+            SELECT COUNT(*) as tong_mon, SUM(Calo) as tong_calo
+            FROM LichSu
+            WHERE MaNguoiDung = %s
+        """, (user_id,))
+        
+        total = cursor.fetchone()
+        
+        conn.close()
+        
+        return {
+            'today_calories': today_calories,
+            'today_count': today_count,
+            'daily': daily_stats,
+            'weekly': weekly_stats,
+            'top_foods': top_foods,
+            'total_foods': total['tong_mon'] if total else 0,
+            'total_calories': float(total['tong_calo']) if total and total['tong_calo'] else 0
+        }
+    except Exception as e:
+        print(f"Error getting food stats: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'today_calories': 0,
+            'today_count': 0,
+            'daily': [],
+            'weekly': [],
+            'top_foods': [],
+            'total_foods': 0,
+            'total_calories': 0
+        }
 
 # ============================================
 # ADMIN FUNCTIONS

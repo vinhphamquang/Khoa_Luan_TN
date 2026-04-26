@@ -521,94 +521,173 @@
 
     <!-- ========== PAGE: HỒ SƠ ========== -->
     <section class="page" id="page-profile">
-        <div class="analyze-container" style="max-width: 900px;">
+        <div class="analyze-container" style="max-width: 1100px;">
             <div class="analyze-header reveal">
                 <span class="section-tag"><i class="fa-solid fa-user-circle"></i> Tài Khoản</span>
                 <h2 class="section-title">Hồ Sơ <span class="gradient-text">Cá Nhân</span></h2>
             </div>
 
-            <div class="profile-grid-layout" style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px; margin-bottom: 40px;">
-                <!-- Cột trái: Đổi Mật Khẩu & Đăng Xuất -->
-                <div class="glass-card" style="padding: 30px; height: fit-content;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <div style="width: 80px; height: 80px; background: var(--gradient-main); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 10px;">
-                            <i class="fa-solid fa-user"></i>
-                        </div>
-                        <h3 id="profile-page-name" style="font-size: 20px; font-weight: 700;">Tên Người Dùng</h3>
-                        <p id="profile-page-email" style="color: var(--text-secondary); font-size: 15px;">email@example.com</p>
-                    </div>
-
-                    <hr style="border-color: var(--glass-border); opacity: 0.5; margin: 24px 0;">
-
-                    <h4 style="margin-bottom: 16px; font-size: 16px;"><i class="fa-solid fa-key"></i> Đổi Mật Khẩu</h4>
-                    <form id="change-pw-form">
-                        <div class="form-group">
-                            <label>Mật Khẩu Cũ</label>
-                            <input type="password" id="pw-old" required class="form-input" style="padding: 8px 12px;">
-                        </div>
-                        <div class="form-group">
-                            <label>Mật Khẩu Mới</label>
-                            <input type="password" id="pw-new" required class="form-input" style="padding: 8px 12px;" minlength="4">
-                        </div>
-                        <div id="pw-error" class="form-error hidden"></div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">Thay Đổi</button>
-                    </form>
-
-                    <hr style="border-color: var(--glass-border); opacity: 0.5; margin: 24px 0;">
-
-                    <h4 style="margin-bottom: 16px; font-size: 16px;"><i class="fa-solid fa-heart-pulse"></i> Hồ Sơ Sức Khỏe</h4>
-                    <form id="health-profile-form">
-                        <div class="form-group" style="display: flex; gap: 10px;">
-                            <div style="flex: 1;">
-                                <label>Tuổi</label>
-                                <input type="number" id="hp-age" class="form-input" style="padding: 8px 12px;" min="1" max="120">
+            <div class="profile-layout">
+                <!-- Sidebar trái -->
+                <div class="profile-sidebar">
+                    <div class="glass-card profile-info-card">
+                        <div class="profile-avatar">
+                            <div class="avatar-circle">
+                                <i class="fa-solid fa-user"></i>
                             </div>
-                            <div style="flex: 1;">
-                                <label>Giới Tính</label>
-                                <select id="hp-gender" class="form-input" style="padding: 8px 12px;">
-                                    <option value="Nam">Nam</option>
-                                    <option value="Nữ">Nữ</option>
+                            <h3 id="profile-page-name">Tên Người Dùng</h3>
+                            <p id="profile-page-email">email@example.com</p>
+                        </div>
+
+                        <hr class="profile-divider">
+
+                        <h4 class="profile-section-title"><i class="fa-solid fa-key"></i> Đổi Mật Khẩu</h4>
+                        <form id="change-pw-form">
+                            <div class="form-group">
+                                <label>Mật Khẩu Cũ</label>
+                                <input type="password" id="pw-old" required class="form-input" style="padding: 8px 12px;">
+                            </div>
+                            <div class="form-group">
+                                <label>Mật Khẩu Mới</label>
+                                <input type="password" id="pw-new" required class="form-input" style="padding: 8px 12px;" minlength="4">
+                            </div>
+                            <div id="pw-error" class="form-error hidden"></div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">Thay Đổi</button>
+                        </form>
+
+                        <hr class="profile-divider">
+
+                        <h4 class="profile-section-title"><i class="fa-solid fa-heart-pulse"></i> Hồ Sơ Sức Khỏe</h4>
+                        <form id="health-profile-form">
+                            <div class="form-group" style="display: flex; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <label>Tuổi</label>
+                                    <input type="number" id="hp-age" class="form-input" style="padding: 8px 12px;" min="1" max="120">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label>Giới Tính</label>
+                                    <select id="hp-gender" class="form-input" style="padding: 8px 12px;">
+                                        <option value="Nam">Nam</option>
+                                        <option value="Nữ">Nữ</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group" style="display: flex; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <label>Chiều cao (cm)</label>
+                                    <input type="number" id="hp-height" class="form-input" style="padding: 8px 12px;" min="50" max="250">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label>Cân nặng (kg)</label>
+                                    <input type="number" id="hp-weight" class="form-input" style="padding: 8px 12px;" min="10" max="300" step="0.1">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Mục Tiêu</label>
+                                <select id="hp-goal" class="form-input" style="padding: 8px 12px;">
+                                    <option value="giam_can">Giảm cân</option>
+                                    <option value="tang_can">Tăng cân</option>
+                                    <option value="giu_dang">Giữ dáng</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="form-group" style="display: flex; gap: 10px;">
-                            <div style="flex: 1;">
-                                <label>Chiều cao (cm)</label>
-                                <input type="number" id="hp-height" class="form-input" style="padding: 8px 12px;" min="50" max="250">
-                            </div>
-                            <div style="flex: 1;">
-                                <label>Cân nặng (kg)</label>
-                                <input type="number" id="hp-weight" class="form-input" style="padding: 8px 12px;" min="10" max="300" step="0.1">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Mục Tiêu</label>
-                            <select id="hp-goal" class="form-input" style="padding: 8px 12px;">
-                                <option value="giam_can">Giảm cân</option>
-                                <option value="tang_can">Tăng cân</option>
-                                <option value="giu_dang">Giữ dáng</option>
-                            </select>
-                        </div>
-                        <div id="hp-message" class="form-error hidden"></div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">Lưu Hồ Sơ Sức Khỏe</button>
-                    </form>
+                            <div id="hp-message" class="form-error hidden"></div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">Lưu Hồ Sơ Sức Khỏe</button>
+                        </form>
 
-                    <hr style="border-color: var(--glass-border); opacity: 0.5; margin: 24px 0;">
+                        <hr class="profile-divider">
 
-                    <button id="btn-page-logout" class="btn btn-outline" style="width: 100%; justify-content: center; border-color: var(--c-fat); color: var(--c-fat);">
-                        <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
-                    </button>
+                        <button id="btn-page-logout" class="btn btn-outline" style="width: 100%; justify-content: center; border-color: var(--c-fat); color: var(--c-fat);">
+                            <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Cột phải: Lịch Sử Tra Cứu -->
-                <div class="glass-card" style="padding: 30px;">
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Tra Cứu</h3>
-                    
-                    <div id="history-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 500px; overflow-y: auto; padding-right: 10px;">
-                        <!-- JS Render -->
-                        <div style="text-align: center; color: var(--text-secondary); padding: 40px 0;">
-                            <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
-                            <p style="margin-top: 10px;">Đang tải lịch sử...</p>
+                <!-- Nội dung chính -->
+                <div class="profile-main">
+                    <!-- Tabs -->
+                    <div class="profile-tabs">
+                        <button class="profile-tab active" data-tab="tab-history">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Ăn Uống
+                        </button>
+                        <button class="profile-tab" data-tab="tab-stats">
+                            <i class="fa-solid fa-chart-line"></i> Thống Kê Dinh Dưỡng
+                        </button>
+                    </div>
+
+                    <!-- Tab 1: Lịch sử ăn uống -->
+                    <div class="profile-tab-content active" id="tab-history">
+                        <div class="glass-card" style="padding: 24px;">
+                            <div class="history-header">
+                                <h3><i class="fa-solid fa-utensils"></i> Món Ăn Đã Nhận Diện</h3>
+                                <span class="history-count" id="history-count">0 món</span>
+                            </div>
+                            <div id="history-container" class="history-grid">
+                                <div style="text-align: center; color: var(--text-secondary); padding: 40px 0; grid-column: 1 / -1;">
+                                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+                                    <p style="margin-top: 10px;">Đang tải lịch sử...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Thống kê -->
+                    <div class="profile-tab-content" id="tab-stats">
+                        <!-- Summary cards -->
+                        <div class="stats-summary-grid">
+                            <div class="glass-card stats-summary-card">
+                                <div class="stats-summary-icon cal-bg"><i class="fa-solid fa-fire"></i></div>
+                                <div class="stats-summary-info">
+                                    <span class="stats-summary-value" id="stats-today-cal">0</span>
+                                    <span class="stats-summary-label">Calo hôm nay</span>
+                                </div>
+                            </div>
+                            <div class="glass-card stats-summary-card">
+                                <div class="stats-summary-icon prot-bg"><i class="fa-solid fa-bowl-food"></i></div>
+                                <div class="stats-summary-info">
+                                    <span class="stats-summary-value" id="stats-today-count">0</span>
+                                    <span class="stats-summary-label">Món hôm nay</span>
+                                </div>
+                            </div>
+                            <div class="glass-card stats-summary-card">
+                                <div class="stats-summary-icon carb-bg"><i class="fa-solid fa-utensils"></i></div>
+                                <div class="stats-summary-info">
+                                    <span class="stats-summary-value" id="stats-total-foods">0</span>
+                                    <span class="stats-summary-label">Tổng món đã quét</span>
+                                </div>
+                            </div>
+                            <div class="glass-card stats-summary-card">
+                                <div class="stats-summary-icon fat-bg"><i class="fa-solid fa-calculator"></i></div>
+                                <div class="stats-summary-info">
+                                    <span class="stats-summary-value" id="stats-total-cal">0</span>
+                                    <span class="stats-summary-label">Tổng Calo</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts -->
+                        <div class="charts-grid">
+                            <div class="glass-card chart-card">
+                                <h4><i class="fa-solid fa-chart-column"></i> Calo Theo Ngày (7 ngày)</h4>
+                                <div class="chart-wrapper">
+                                    <canvas id="chart-daily-calories"></canvas>
+                                </div>
+                            </div>
+                            <div class="glass-card chart-card">
+                                <h4><i class="fa-solid fa-chart-bar"></i> Calo Theo Tuần</h4>
+                                <div class="chart-wrapper">
+                                    <canvas id="chart-weekly-calories"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top foods -->
+                        <div class="glass-card" style="padding: 24px;">
+                            <h4 style="margin-bottom: 16px; font-size: 18px; font-weight: 700;">
+                                <i class="fa-solid fa-ranking-star"></i> Món Ăn Thường Xuyên
+                            </h4>
+                            <div id="top-foods-container">
+                                <p style="text-align: center; color: var(--text-muted);">Chưa có dữ liệu</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -739,6 +818,7 @@
     </div>
 
 
-    <script src="/static/script.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="/static/script.js?v=3"></script>
 </body>
 </html>
