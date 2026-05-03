@@ -898,6 +898,10 @@ async function initProfilePage() {
                 if (targetId === 'tab-stats') {
                     loadFoodStats(loggedUser.id);
                 }
+                // Load nutrition plans when switching to plans tab
+                if (targetId === 'tab-nutrition-plans') {
+                    loadProfilePlanHistory(loggedUser.id);
+                }
             });
         });
     }
@@ -1185,6 +1189,106 @@ function renderTopFoods(topFoods) {
     });
 }
 
+// ---- PROFILE: NUTRITION PLAN HISTORY ----
+async function loadProfilePlanHistory(userId) {
+    const container = document.getElementById('profile-plan-history');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Đang tải...</p></div>';
+    
+    try {
+        const res = await fetch(`/api/meal-plans/${userId}`);
+        const data = await res.json();
+        
+        if (data.success && data.plans && data.plans.length > 0) {
+            renderProfilePlans(container, data.plans);
+        } else {
+            container.innerHTML = `
+                <div style="text-align:center;padding:50px 20px;color:var(--text-muted);">
+                    <i class="fa-solid fa-calendar-xmark" style="font-size:48px;margin-bottom:16px;opacity:0.4;display:block;"></i>
+                    <p style="font-size:15px;font-weight:500;">Chưa có kế hoạch dinh dưỡng nào được lưu</p>
+                    <p style="font-size:13px;margin-top:8px;">Hãy vào trang <a href="/nutrition" style="color:var(--primary);font-weight:600;">Kế Hoạch Dinh Dưỡng</a> để tạo kế hoạch</p>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('Error loading plan history:', err);
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--c-fat);"><i class="fa-solid fa-exclamation-triangle"></i> Lỗi tải lịch sử kế hoạch</div>';
+    }
+}
+
+function renderProfilePlans(container, plans) {
+    // Group by month
+    const months = {};
+    plans.forEach(plan => {
+        const key = plan.month;
+        if (!months[key]) months[key] = [];
+        months[key].push(plan);
+    });
+    
+    let html = '';
+    for (const [month, monthPlans] of Object.entries(months)) {
+        const [year, mon] = month.split('-');
+        const monthName = `Tháng ${parseInt(mon)}/${year}`;
+        
+        // Monthly stats
+        const avgTarget = monthPlans.reduce((s, p) => s + p.caloDuKien, 0) / monthPlans.length;
+        const avgActual = monthPlans.reduce((s, p) => s + p.tongCaloChon, 0) / monthPlans.length;
+        const totalDays = monthPlans.length;
+        const goodDays = monthPlans.filter(p => Math.abs(p.tongCaloChon - p.caloDuKien) <= p.caloDuKien * 0.1).length;
+        const pct = totalDays > 0 ? Math.round((goodDays / totalDays) * 100) : 0;
+        
+        html += `
+            <div style="margin-bottom: 24px; border: 1px solid var(--glass-border); border-radius: var(--radius-md); overflow: hidden;">
+                <div style="padding: 16px 20px; background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(99,102,241,0.05)); border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <i class="fa-solid fa-calendar" style="color:#8b5cf6;font-size:18px;"></i>
+                        <span style="font-weight:700;font-size:17px;">${monthName}</span>
+                        <span style="background:rgba(139,92,246,0.15);color:#8b5cf6;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;">${totalDays} ngày</span>
+                    </div>
+                    <div style="display:flex;gap:20px;font-size:13px;color:var(--text-muted);">
+                        <span>TB Mục tiêu: <strong style="color:var(--text-main);">${Math.round(avgTarget)}</strong> kcal</span>
+                        <span>TB Thực tế: <strong style="color:var(--text-main);">${Math.round(avgActual)}</strong> kcal</span>
+                        <span>Đạt: <strong style="color:${pct >= 70 ? '#22c55e' : '#f59e0b'};">${goodDays}/${totalDays}</strong></span>
+                    </div>
+                </div>
+                <div style="max-height: 400px; overflow-y: auto;">
+        `;
+        
+        monthPlans.forEach(plan => {
+            const diff = plan.tongCaloChon - plan.caloDuKien;
+            const isGood = Math.abs(diff) <= plan.caloDuKien * 0.1;
+            const diffText = diff > 0 ? `+${Math.round(diff)}` : `${Math.round(diff)}`;
+            const date = plan.date.split(' ')[0];
+            const statusColor = isGood ? '#22c55e' : (diff > 0 ? '#ef4444' : '#f59e0b');
+            const statusIcon = isGood ? 'fa-check-circle' : (diff > 0 ? 'fa-arrow-up' : 'fa-arrow-down');
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px 20px;border-bottom:1px solid rgba(0,0,0,0.04);gap:16px;transition:background 0.2s;" onmouseenter="this.style.background='rgba(139,92,246,0.03)'" onmouseleave="this.style.background='transparent'">
+                    <div style="min-width:90px;font-weight:600;font-size:14px;color:var(--text-main);">${date}</div>
+                    <div style="flex:1;display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);">
+                        <span title="Bữa sáng">🌅 ${plan.buaSang || '—'} <span style="color:var(--text-muted);font-size:11px;">(${plan.buaSangCalo})</span></span>
+                        <span>|</span>
+                        <span title="Bữa trưa">☀️ ${plan.buaTrua || '—'} <span style="color:var(--text-muted);font-size:11px;">(${plan.buaTruaCalo})</span></span>
+                        <span>|</span>
+                        <span title="Bữa tối">🌙 ${plan.buaToi || '—'} <span style="color:var(--text-muted);font-size:11px;">(${plan.buaToiCalo})</span></span>
+                        <span>|</span>
+                        <span title="Bữa phụ">🍎 ${plan.buaPhu || '—'} <span style="color:var(--text-muted);font-size:11px;">(${plan.buaPhuCalo})</span></span>
+                    </div>
+                    <div style="min-width:130px;text-align:right;">
+                        <span style="font-weight:700;font-size:15px;">${Math.round(plan.tongCaloChon)}</span>
+                        <span style="color:var(--text-muted);font-size:13px;">/ ${Math.round(plan.caloDuKien)}</span>
+                        <span style="color:${statusColor};font-size:12px;font-weight:600;margin-left:4px;"><i class="fa-solid ${statusIcon}"></i> ${diffText}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+    }
+    
+    container.innerHTML = html;
+}
 
 
 // ---- INIT ----

@@ -219,53 +219,113 @@ function renderFoodCards(container, suggestions, targetCalo, mealType) {
     
     // Auto-select the best match
     selectedFoods[mealType] = suggestions[bestIndex];
+    const bestFood = suggestions[bestIndex];
+    const otherFoods = suggestions.filter((_, i) => i !== bestIndex);
     
-    let html = '';
-    suggestions.forEach((food, index) => {
-        const isBest = index === bestIndex;
-        const isSelected = selectedFoods[mealType] && selectedFoods[mealType].id === food.id;
-        const caloriesDiff = Math.abs(food.calories - targetCalo);
-        const isGoodMatch = caloriesDiff <= targetCalo * 0.2;
-        
-        html += `
-            <div class="np-food-card ${isSelected ? 'selected' : ''} ${isBest ? 'recommended' : ''} ${isGoodMatch ? 'good-match' : ''}" 
-                 data-meal="${mealType}" data-food-id="${food.id}"
-                 onclick="selectFood('${mealType}', ${JSON.stringify(food).replace(/"/g, '&quot;')})"
-                 style="animation: pageFadeIn 0.4s ${index * 0.05}s ease both; cursor: pointer;">
-                ${isBest ? '<div class="np-recommended-badge"><i class="fa-solid fa-star"></i> Đề xuất</div>' : ''}
-                <div class="np-food-header">
-                    <div class="np-food-name">${food.name}</div>
-                    <div class="np-food-calo-badge">${food.calories} kcal</div>
+    // Build main recommended card (always visible)
+    let html = `
+        <div class="np-food-card selected recommended good-match" 
+             data-meal="${mealType}" data-food-id="${bestFood.id}"
+             onclick="selectFood('${mealType}', ${JSON.stringify(bestFood).replace(/"/g, '&quot;')})"
+             style="animation: pageFadeIn 0.4s ease both; cursor: pointer;">
+            <div class="np-recommended-badge"><i class="fa-solid fa-star"></i> Đề xuất tốt nhất</div>
+            <div class="np-food-header">
+                <div class="np-food-name">${bestFood.name}</div>
+                <div class="np-food-calo-badge">${bestFood.calories} kcal</div>
+            </div>
+            <div class="np-food-category"><i class="fa-solid fa-tag"></i> ${bestFood.category}</div>
+            ${bestFood.description ? `<p class="np-food-desc">${bestFood.description}</p>` : ''}
+            <div class="np-food-nutrition">
+                <div class="np-nutrition-item">
+                    <div class="np-nutrition-label">Protein</div>
+                    <div class="np-nutrition-value" style="color: var(--c-prot);">${bestFood.protein}g</div>
                 </div>
-                <div class="np-food-category"><i class="fa-solid fa-tag"></i> ${food.category}</div>
-                ${food.description ? `<p class="np-food-desc">${food.description}</p>` : ''}
-                <div class="np-food-nutrition">
-                    <div class="np-nutrition-item">
-                        <div class="np-nutrition-label">Protein</div>
-                        <div class="np-nutrition-value" style="color: var(--c-prot);">${food.protein}g</div>
-                    </div>
-                    <div class="np-nutrition-item">
-                        <div class="np-nutrition-label">Carbs</div>
-                        <div class="np-nutrition-value" style="color: var(--c-carb);">${food.carbs}g</div>
-                    </div>
-                    <div class="np-nutrition-item">
-                        <div class="np-nutrition-label">Chất béo</div>
-                        <div class="np-nutrition-value" style="color: var(--c-fat);">${food.fats}g</div>
-                    </div>
+                <div class="np-nutrition-item">
+                    <div class="np-nutrition-label">Carbs</div>
+                    <div class="np-nutrition-value" style="color: var(--c-carb);">${bestFood.carbs}g</div>
                 </div>
-                <div class="np-select-indicator">
-                    <i class="fa-solid ${isSelected ? 'fa-check-circle' : 'fa-circle-plus'}"></i>
-                    <span>${isSelected ? 'Đã chọn' : 'Nhấn để chọn'}</span>
+                <div class="np-nutrition-item">
+                    <div class="np-nutrition-label">Chất béo</div>
+                    <div class="np-nutrition-value" style="color: var(--c-fat);">${bestFood.fats}g</div>
                 </div>
             </div>
+            <div class="np-select-indicator">
+                <i class="fa-solid fa-check-circle"></i>
+                <span>Đã chọn</span>
+            </div>
+        </div>
+    `;
+    
+    // "Xem thêm" button + collapsible list
+    if (otherFoods.length > 0) {
+        html += `
+            <div class="np-more-section">
+                <button class="np-more-btn" onclick="toggleMoreFoods('${mealType}', this)">
+                    <i class="fa-solid fa-chevron-down"></i>
+                    <span>Xem thêm ${otherFoods.length} món khác</span>
+                </button>
+                <div class="np-more-list" id="more-${mealType}" style="display:none;">
         `;
-    });
+        otherFoods.forEach((food, index) => {
+            const isSelected = selectedFoods[mealType] && selectedFoods[mealType].id === food.id;
+            const caloriesDiff = Math.abs(food.calories - targetCalo);
+            const isGoodMatch = caloriesDiff <= targetCalo * 0.2;
+            
+            html += `
+                <div class="np-food-card ${isSelected ? 'selected' : ''} ${isGoodMatch ? 'good-match' : ''}" 
+                     data-meal="${mealType}" data-food-id="${food.id}"
+                     onclick="selectFood('${mealType}', ${JSON.stringify(food).replace(/"/g, '&quot;')})"
+                     style="animation: pageFadeIn 0.3s ${index * 0.04}s ease both; cursor: pointer;">
+                    <div class="np-food-header">
+                        <div class="np-food-name">${food.name}</div>
+                        <div class="np-food-calo-badge">${food.calories} kcal</div>
+                    </div>
+                    <div class="np-food-category"><i class="fa-solid fa-tag"></i> ${food.category}</div>
+                    ${food.description ? `<p class="np-food-desc">${food.description}</p>` : ''}
+                    <div class="np-food-nutrition">
+                        <div class="np-nutrition-item">
+                            <div class="np-nutrition-label">Protein</div>
+                            <div class="np-nutrition-value" style="color: var(--c-prot);">${food.protein}g</div>
+                        </div>
+                        <div class="np-nutrition-item">
+                            <div class="np-nutrition-label">Carbs</div>
+                            <div class="np-nutrition-value" style="color: var(--c-carb);">${food.carbs}g</div>
+                        </div>
+                        <div class="np-nutrition-item">
+                            <div class="np-nutrition-label">Chất béo</div>
+                            <div class="np-nutrition-value" style="color: var(--c-fat);">${food.fats}g</div>
+                        </div>
+                    </div>
+                    <div class="np-select-indicator">
+                        <i class="fa-solid ${isSelected ? 'fa-check-circle' : 'fa-circle-plus'}"></i>
+                        <span>${isSelected ? 'Đã chọn' : 'Nhấn để chọn'}</span>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+    }
     
     container.innerHTML = html;
     
     // Update daily summary after rendering
     updateDailySummary();
 }
+
+// Toggle "Xem thêm" section
+window.toggleMoreFoods = function(mealType, btn) {
+    const list = document.getElementById(`more-${mealType}`);
+    const icon = btn.querySelector('i');
+    const text = btn.querySelector('span');
+    const isHidden = list.style.display === 'none';
+    
+    list.style.display = isHidden ? 'grid' : 'none';
+    icon.className = isHidden ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+    text.textContent = isHidden 
+        ? 'Ẩn bớt' 
+        : `Xem thêm ${list.querySelectorAll('.np-food-card').length} món khác`;
+    btn.classList.toggle('expanded', isHidden);
+};
 
 // Global function for selecting a food from a meal
 window.selectFood = function(mealType, food) {

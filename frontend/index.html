@@ -609,6 +609,9 @@
                         <button class="profile-tab active" data-tab="tab-history">
                             <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Ăn Uống
                         </button>
+                        <button class="profile-tab" data-tab="tab-nutrition-plans">
+                            <i class="fa-solid fa-calendar-days"></i> Lịch Sử Kế Hoạch
+                        </button>
                         <button class="profile-tab" data-tab="tab-stats">
                             <i class="fa-solid fa-chart-line"></i> Thống Kê Dinh Dưỡng
                         </button>
@@ -630,7 +633,22 @@
                         </div>
                     </div>
 
-                    <!-- Tab 2: Thống kê -->
+                    <!-- Tab 2: Lịch sử Kế Hoạch Dinh Dưỡng -->
+                    <div class="profile-tab-content" id="tab-nutrition-plans">
+                        <div class="glass-card" style="padding: 24px;">
+                            <div class="history-header" style="margin-bottom: 20px;">
+                                <h3><i class="fa-solid fa-calendar-days" style="color: #8b5cf6;"></i> Kế Hoạch Dinh Dưỡng Đã Lưu</h3>
+                            </div>
+                            <div id="profile-plan-history">
+                                <div style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+                                    <p style="margin-top: 10px;">Đang tải lịch sử kế hoạch...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Thống kê -->
                     <div class="profile-tab-content" id="tab-stats">
                         <!-- Summary cards -->
                         <div class="stats-summary-grid">

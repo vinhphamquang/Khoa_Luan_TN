@@ -11,7 +11,7 @@ from db_queries import (
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
     get_all_users, delete_user, get_system_stats, get_all_history_admin, 
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
-    delete_food_soft, restore_food_soft, get_health_profile, upsert_health_profile,
+    delete_food_soft, restore_food_soft, delete_food_hard, get_health_profile, upsert_health_profile,
     get_user_food_stats
 )
 from ai_generator import generate_food_data_vietnamese
@@ -207,40 +207,98 @@ def get_meal_suggestions():
         from psycopg2.extras import RealDictCursor
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Mapping bữa ăn -> categories thực tế trong CSDL
+        # ===== PHÂN LOẠI THEO BỮA ĂN =====
+        # Bữa sáng: nhẹ nhàng, nhanh, dễ tiêu hóa
+        # Bữa trưa: no bụng, đầy đủ dinh dưỡng, có cơm/bún/mì
+        # Bữa tối: vừa phải, không quá nặng nhưng đủ no
+        # Bữa phụ: nhẹ, ăn vặt, tráng miệng
+        
+        # Categories phù hợp theo từng bữa
         meal_categories = {
             'breakfast': [
-                'Ăn sáng', 'Món ăn sáng', 'Món hấp', 'Ăn nhẹ', 
-                'Bánh', 'Khai vị', 'Breakfast'
+                'Ăn sáng', 'Món ăn sáng', 'Món hấp', 'Món cháo', 'Món bánh',
+                'Món xôi', 'Món nước', 'Ăn nhẹ', 'Breakfast'
             ],
             'lunch': [
                 'Món chính', 'Món cơm', 'Món nước', 'Món mặn', 'Món bún',
-                'Bún trộn', 'Cơm', 'Lunch', 'Canh'
+                'Món kho', 'Món xào', 'Món chiên', 'Món canh', 'Món lẩu',
+                'Món nướng', 'Món hầm', 'Món cá', 'Món trộn', 'Món luộc',
+                'Món quay', 'Món um', 'Món rang', 'Bún trộn', 'Cơm', 'Lunch',
+                'Canh', 'Main dish', 'Món chay'
             ],
             'dinner': [
                 'Món chính', 'Món cơm', 'Món mặn', 'Món nước', 'Món bún',
-                'Thức ăn nhanh', 'Ăn nhanh', 'Cơm', 'Canh'
+                'Món kho', 'Món xào', 'Món canh', 'Món hấp', 'Món nướng',
+                'Món hầm', 'Món cá', 'Món luộc', 'Món um', 'Cơm', 'Canh',
+                'Món chay', 'Main dish'
             ],
             'snack': [
-                'Ăn nhẹ', 'Ăn chơi', 'Món ăn chơi', 'Khai vị', 
-                'Tráng miệng', 'Ăn nhanh', 'Antipasti', 'Snack'
+                'Ăn nhẹ', 'Ăn chơi', 'Món ăn chơi', 'Khai vị', 'Món chè',
+                'Tráng miệng', 'Ăn nhanh', 'Món ăn vặt', 'Món gỏi',
+                'Antipasti', 'Fingerfood', 'Snack', 'Món bánh'
             ]
         }
         
-        categories = meal_categories.get(meal_type, [])
+        # Keywords trong TÊN MÓN phù hợp theo bữa
+        meal_name_keywords = {
+            'breakfast': [
+                'Phở', 'Bún', 'Cháo', 'Bánh', 'Xôi', 'Hủ Tiếu', 'Mì ',
+                'Bánh Canh', 'Bánh Bao', 'Bánh Mì', 'Bánh Cuốn', 'Bún Mọc',
+                'Bún Ốc', 'Bún Riêu', 'Bún Bò'
+            ],
+            'lunch': [
+                'Cơm', 'Kho', 'Xào', 'Chiên', 'Nướng', 'Lẩu', 'Canh',
+                'Sườn', 'Thịt', 'Cá', 'Tôm', 'Gà', 'Bò', 'Vịt',
+                'Heo', 'Ếch', 'Lươn', 'Rắn'
+            ],
+            'dinner': [
+                'Cơm', 'Kho', 'Xào', 'Hấp', 'Canh', 'Nấu', 'Luộc',
+                'Thịt', 'Cá', 'Tôm', 'Gà', 'Bò', 'Vịt', 'Um',
+                'Bún', 'Phở'
+            ],
+            'snack': [
+                'Chè', 'Gỏi', 'Bánh Tráng', 'Kẹo', 'Ốc', 'Bông',
+                'Rau', 'Khô', 'Nem', 'Bánh Khọt', 'Bánh Căn'
+            ]
+        }
         
-        # Khoảng calo phù hợp (mở rộng để có nhiều kết quả hơn)
-        min_calo = target_calo * 0.3
-        max_calo = target_calo * 2.0
+        # Giới hạn calo hợp lý theo bữa
+        meal_calo_limits = {
+            'breakfast': (80, 500),    # Sáng: nhẹ
+            'lunch': (200, 600),       # Trưa: no
+            'dinner': (150, 520),      # Tối: vừa phải
+            'snack': (50, 350)         # Phụ: nhẹ nhàng
+        }
+        
+        # Loại trừ các PhanLoai KHÔNG phù hợp
+        meal_exclude_categories = {
+            'breakfast': ['Món lẩu', 'Món quay', 'Món hầm'],
+            'lunch': ['Món chè', 'Ăn nhẹ', 'Tráng miệng', 'Món ăn vặt'],
+            'dinner': ['Món lẩu', 'Món chè', 'Ăn nhẹ', 'Tráng miệng', 'Thức ăn nhanh'],
+            'snack': ['Món lẩu', 'Món hầm', 'Món quay', 'Món kho', 'Món cơm']
+        }
+        
+        categories = meal_categories.get(meal_type, [])
+        name_keywords = meal_name_keywords.get(meal_type, [])
+        calo_min, calo_max = meal_calo_limits.get(meal_type, (50, 600))
+        exclude_cats = meal_exclude_categories.get(meal_type, [])
         
         suggestions = []
         seen_ids = set()
         seen_names = set()
         
-        # Bước 1: Tìm món ăn theo category phù hợp với bữa ăn
+        # ===== BƯỚC 1: Tìm theo PhanLoai phù hợp =====
         if categories:
             category_conditions = ' OR '.join(['m.PhanLoai ILIKE %s' for _ in categories])
             category_params = [f'%{cat}%' for cat in categories]
+            
+            # Exclude conditions
+            exclude_conditions = ""
+            exclude_params_list = []
+            if exclude_cats:
+                exclude_conditions = ' AND '.join(['m.PhanLoai NOT ILIKE %s' for _ in exclude_cats])
+                exclude_params_list = [f'%{ex}%' for ex in exclude_cats]
+                exclude_conditions = "AND " + exclude_conditions
             
             query_category = f"""
                 SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
@@ -251,11 +309,12 @@ def get_meal_suggestions():
                 AND d.Calo IS NOT NULL
                 AND d.Calo BETWEEN %s AND %s
                 AND ({category_conditions})
-                ORDER BY ABS(d.Calo - %s)
-                LIMIT 12
+                {exclude_conditions}
+                ORDER BY ABS(d.Calo - %s), RANDOM()
+                LIMIT 15
             """
             
-            params = [min_calo, max_calo] + category_params + [target_calo]
+            params = [calo_min, calo_max] + category_params + exclude_params_list + [target_calo]
             cursor.execute(query_category, params)
             
             for food in cursor.fetchall():
@@ -266,16 +325,72 @@ def get_meal_suggestions():
                     seen_names.add(food_name)
                     suggestions.append(_format_food_suggestion(food))
         
-        # Bước 2: Nếu chưa đủ 6 món, bổ sung từ tất cả món ăn (sắp xếp theo calo gần nhất)
+        # ===== BƯỚC 2: Tìm theo tên món ăn (keyword) =====
+        if len(suggestions) < 8 and name_keywords:
+            keyword_conditions = ' OR '.join(['m.TenMonAn ILIKE %s' for _ in name_keywords])
+            keyword_params = [f'%{kw}%' for kw in name_keywords]
+            
+            exclude_clause = ""
+            exclude_id_params = []
+            if seen_ids:
+                placeholders = ', '.join(['%s'] * len(seen_ids))
+                exclude_clause = f"AND m.MaMonAn NOT IN ({placeholders})"
+                exclude_id_params = list(seen_ids)
+            
+            # Exclude categories
+            exclude_conditions2 = ""
+            exclude_params_list2 = []
+            if exclude_cats:
+                exclude_conditions2 = ' AND '.join(['m.PhanLoai NOT ILIKE %s' for _ in exclude_cats])
+                exclude_params_list2 = [f'%{ex}%' for ex in exclude_cats]
+                exclude_conditions2 = "AND " + exclude_conditions2
+            
+            remaining = 12 - len(suggestions)
+            
+            query_keywords = f"""
+                SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                       d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                FROM MonAn m
+                JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                WHERE m.IsDeleted = 0
+                AND d.Calo IS NOT NULL
+                AND d.Calo BETWEEN %s AND %s
+                AND ({keyword_conditions})
+                {exclude_clause}
+                {exclude_conditions2}
+                ORDER BY ABS(d.Calo - %s), RANDOM()
+                LIMIT %s
+            """
+            
+            params_kw = [calo_min, calo_max] + keyword_params + exclude_id_params + exclude_params_list2 + [target_calo, remaining]
+            cursor.execute(query_keywords, params_kw)
+            
+            for food in cursor.fetchall():
+                food_id = food['mamonan']
+                food_name = food['tenmonan'].strip().lower()
+                if food_id not in seen_ids and food_name not in seen_names:
+                    seen_ids.add(food_id)
+                    seen_names.add(food_name)
+                    suggestions.append(_format_food_suggestion(food))
+        
+        # ===== BƯỚC 3: Fallback - bổ sung nếu vẫn chưa đủ =====
         if len(suggestions) < 6:
             remaining = 12 - len(suggestions)
             exclude_clause = ""
-            exclude_params = []
+            exclude_params_fb = []
             
             if seen_ids:
                 placeholders = ', '.join(['%s'] * len(seen_ids))
                 exclude_clause = f"AND m.MaMonAn NOT IN ({placeholders})"
-                exclude_params = list(seen_ids)
+                exclude_params_fb = list(seen_ids)
+            
+            # Exclude categories
+            exclude_conditions3 = ""
+            exclude_params_list3 = []
+            if exclude_cats:
+                exclude_conditions3 = ' AND '.join(['m.PhanLoai NOT ILIKE %s' for _ in exclude_cats])
+                exclude_params_list3 = [f'%{ex}%' for ex in exclude_cats]
+                exclude_conditions3 = "AND " + exclude_conditions3
             
             query_fallback = f"""
                 SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
@@ -284,13 +399,14 @@ def get_meal_suggestions():
                 JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
                 WHERE m.IsDeleted = 0
                 AND d.Calo IS NOT NULL
-                AND d.Calo > 0
+                AND d.Calo BETWEEN %s AND %s
                 {exclude_clause}
-                ORDER BY ABS(d.Calo - %s)
+                {exclude_conditions3}
+                ORDER BY ABS(d.Calo - %s), RANDOM()
                 LIMIT %s
             """
             
-            params_fallback = exclude_params + [target_calo, remaining]
+            params_fallback = [calo_min, calo_max] + exclude_params_fb + exclude_params_list3 + [target_calo, remaining]
             cursor.execute(query_fallback, params_fallback)
             
             for food in cursor.fetchall():
@@ -473,6 +589,12 @@ def api_admin_restore_food(food_id):
     if restore_food_soft(food_id):
         return jsonify({"success": True, "message": "Đã khôi phục món ăn từ thùng rác thành công"})
     return jsonify({"success": False, "message": "Lỗi khi khôi phục món ăn"}), 500
+
+@app.route("/api/admin/foods/<int:food_id>/hard-delete", methods=["DELETE"])
+def api_admin_hard_delete_food(food_id):
+    if delete_food_hard(food_id):
+        return jsonify({"success": True, "message": "Đã xóa vĩnh viễn món ăn khỏi cơ sở dữ liệu"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa vĩnh viễn món ăn"}), 500
 
 def get_recommendation(user_id, calories):
     if not user_id or str(calories) == '--':

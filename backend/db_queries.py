@@ -837,6 +837,39 @@ def restore_food_soft(food_id):
         traceback.print_exc()
         return False
 
+def delete_food_hard(food_id):
+    """Xóa vĩnh viễn món ăn và tất cả dữ liệu liên quan"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Xóa ChiTietNguyenLieu (qua CongThuc)
+        cursor.execute("""
+            DELETE FROM ChiTietNguyenLieu
+            WHERE MaCongThuc IN (
+                SELECT MaCongThuc FROM CongThuc WHERE MaMonAn = %s
+            )
+        """, (food_id,))
+        
+        # 2. Xóa CongThuc
+        cursor.execute("DELETE FROM CongThuc WHERE MaMonAn = %s", (food_id,))
+        
+        # 3. Xóa DinhDuong
+        cursor.execute("DELETE FROM DinhDuong WHERE MaMonAn = %s", (food_id,))
+        
+        # 4. Xóa MonAn
+        cursor.execute("DELETE FROM MonAn WHERE MaMonAn = %s", (food_id,))
+        
+        conn.commit()
+        conn.close()
+        print(f"[SUCCESS] Đã xóa vĩnh viễn món ăn ID={food_id}")
+        return True
+    except Exception as e:
+        print(f"Error hard-deleting food: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 # ============================================
 # HEALTH PROFILE MANAGEMENT
 # ============================================

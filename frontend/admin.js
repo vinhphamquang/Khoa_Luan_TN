@@ -42,6 +42,133 @@ document.addEventListener('DOMContentLoaded', () => {
         reveals.forEach(el => el.classList.add('visible'));
     }, 100);
 
+    // ============================================
+    // BULK SELECT STATE
+    // ============================================
+    let selectedFoodIds = new Set();
+
+    function updateBulkUI() {
+        const bar = document.getElementById('bulk-action-bar');
+        const countEl = document.getElementById('bulk-count');
+        const listEl = document.getElementById('bulk-selected-list');
+        const count = selectedFoodIds.size;
+        
+        if (count > 0) {
+            bar.classList.remove('hidden');
+            countEl.textContent = `${count} món đã chọn`;
+
+            // Build tags showing selected food names
+            let tagsHtml = '';
+            document.querySelectorAll('#tb-foods tr').forEach(row => {
+                const id = parseInt(row.dataset.foodId);
+                if (selectedFoodIds.has(id)) {
+                    const name = row.querySelectorAll('td')[1]?.textContent || '';
+                    tagsHtml += `<span class="bulk-tag" data-id="${id}">
+                        <strong>#${id}</strong> ${name}
+                        <i class="fa-solid fa-xmark bulk-tag-remove" onclick="window._removeBulkItem(${id})"></i>
+                    </span>`;
+                }
+            });
+            listEl.innerHTML = tagsHtml;
+        } else {
+            bar.classList.add('hidden');
+            listEl.innerHTML = '';
+        }
+
+        // Sync select-all checkbox in bulk bar
+        const allCheckboxes = document.querySelectorAll('.food-row-checkbox');
+        const bulkSelectAll = document.getElementById('bulk-select-all');
+        const allChecked = allCheckboxes.length > 0 && selectedFoodIds.size === allCheckboxes.length;
+        if (bulkSelectAll) bulkSelectAll.checked = allChecked;
+
+        // Highlight rows
+        document.querySelectorAll('#tb-foods tr').forEach(row => {
+            const id = parseInt(row.dataset.foodId);
+            if (selectedFoodIds.has(id)) {
+                row.classList.add('row-selected');
+            } else {
+                row.classList.remove('row-selected');
+            }
+        });
+    }
+
+    // Remove single item from bulk selection
+    window._removeBulkItem = function(id) {
+        selectedFoodIds.delete(id);
+        const cb = document.querySelector(`.food-row-checkbox[data-food-id="${id}"]`);
+        if (cb) cb.checked = false;
+        updateBulkUI();
+    };
+
+    function toggleFoodSelect(id, checked) {
+        if (checked) selectedFoodIds.add(id);
+        else selectedFoodIds.delete(id);
+        updateBulkUI();
+    }
+
+    function toggleSelectAll(checked) {
+        const allCheckboxes = document.querySelectorAll('.food-row-checkbox');
+        allCheckboxes.forEach(cb => {
+            cb.checked = checked;
+            const id = parseInt(cb.dataset.foodId);
+            if (checked) selectedFoodIds.add(id);
+            else selectedFoodIds.delete(id);
+        });
+        updateBulkUI();
+    }
+
+    // Select-all from bulk bar
+    document.getElementById('bulk-select-all')?.addEventListener('change', (e) => {
+        toggleSelectAll(e.target.checked);
+    });
+    // Cancel bulk selection
+    document.getElementById('btn-bulk-cancel')?.addEventListener('click', () => {
+        toggleSelectAll(false);
+    });
+
+    // Bulk Soft Delete
+    document.getElementById('btn-bulk-soft-delete')?.addEventListener('click', async () => {
+        const ids = Array.from(selectedFoodIds);
+        if (ids.length === 0) return;
+        if (!confirm(`Bạn có chắc muốn KHÓA (soft delete) ${ids.length} món ăn đã chọn?`)) return;
+
+        let success = 0, fail = 0;
+        for (const id of ids) {
+            try {
+                const res = await fetch(`/api/admin/foods/${id}`, { method: 'DELETE' });
+                const r = await res.json();
+                if (r.success) success++;
+                else fail++;
+            } catch { fail++; }
+        }
+        alert(`Đã khóa ${success} món.${fail > 0 ? ` Lỗi: ${fail} món.` : ''}`);
+        selectedFoodIds.clear();
+        updateBulkUI();
+        fetchAdminFoods();
+    });
+
+    // Bulk Hard Delete
+    document.getElementById('btn-bulk-hard-delete')?.addEventListener('click', async () => {
+        const ids = Array.from(selectedFoodIds);
+        if (ids.length === 0) return;
+        if (!confirm(`⚠️ BẠN CÓ CHẮC MUỐN XÓA VĨNH VIỄN ${ids.length} MÓN ĂN?\n\nHành động này KHÔNG THỂ HOÀN TÁC!`)) return;
+        if (!confirm(`Xác nhận lần cuối: XÓA VĨNH VIỄN ${ids.length} món ăn đã chọn?`)) return;
+
+        let success = 0, fail = 0;
+        for (const id of ids) {
+            try {
+                const res = await fetch(`/api/admin/foods/${id}/hard-delete`, { method: 'DELETE' });
+                const r = await res.json();
+                if (r.success) success++;
+                else fail++;
+            } catch { fail++; }
+        }
+        alert(`✅ Đã xóa vĩnh viễn ${success} món.${fail > 0 ? ` Lỗi: ${fail} món.` : ''}`);
+        selectedFoodIds.clear();
+        updateBulkUI();
+        fetchAdminFoods();
+    });
+
     // Tabs logic
     const tabs = document.querySelectorAll('.admin-tab');
     const contents = document.querySelectorAll('.admin-tab-content');
@@ -288,6 +415,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { console.error(e); }
     };
 
+    window.hardDeleteAdminFood = async (id) => {
+        if(!confirm('⚠️ BẠN CÓ CHẮC MUỐN XÓA VĨNH VIỄN MÓN ĂN NÀY?\n\nHành động này KHÔNG THỂ HOÀN TÁC!\nTất cả dữ liệu dinh dưỡng, công thức, nguyên liệu liên quan sẽ bị xóa hoàn toàn.')) return;
+        if(!confirm('Xác nhận lần cuối: XÓA VĨNH VIỄN món ăn ID #' + id + '?')) return;
+        try {
+            const res = await fetch(`/api/admin/foods/${id}/hard-delete`, { method: 'DELETE' });
+            const r = await res.json();
+            if(r.success) {
+                alert('✅ ' + r.message);
+                fetchAdminFoods();
+            }
+            else alert(r.message);
+        } catch(e) { console.error(e); }
+    };
+
     window.deleteAdminUser = async (id) => {
         if(!confirm('Bạn có chắc chắn muốn XÓA VĨNH VIỄN người dùng này?')) return;
         try {
@@ -317,6 +458,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAdminFoods() {
         const tb = document.getElementById('tb-foods');
         tb.innerHTML = '<tr><td colspan="5" style="text-align:center"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+        selectedFoodIds.clear();
+        updateBulkUI();
         try {
             const res = await fetch('/api/admin/foods');
             const data = await res.json();
@@ -324,8 +467,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 tb.innerHTML = '';
                 data.foods.forEach(f => {
                     const status = f.is_deleted ? '<span class="badge badge-danger">Đã khóa</span>' : '<span class="badge badge-success">Hiển thị</span>';
-                    tb.innerHTML += `
-                        <tr>
+                    const tr = document.createElement('tr');
+                    tr.dataset.foodId = f.id;
+                    tr.innerHTML = `
                             <td>#${f.id}</td>
                             <td>${f.name}</td>
                             <td>${f.category}</td>
@@ -333,11 +477,22 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>
                                 <div class="action-btns">
                                     <button class="btn-icon" title="Sửa" onclick="editAdminFood(${f.id})"><i class="fa-solid fa-pen"></i></button>
-                                    ${!f.is_deleted ? `<button class="btn-icon delete" title="Khóa" onclick="deleteAdminFood(${f.id})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.id})"><i class="fa-solid fa-rotate-left"></i></button>`}
+                                    ${!f.is_deleted ? `<button class="btn-icon delete" title="Khóa (Soft Delete)" onclick="deleteAdminFood(${f.id})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.id})"><i class="fa-solid fa-rotate-left"></i></button>`}
+                                    <button class="btn-icon delete" title="Xóa vĩnh viễn" onclick="hardDeleteAdminFood(${f.id})" style="color: #ef4444;"><i class="fa-solid fa-trash"></i></button>
+                                    <label class="bulk-select-label" title="Chọn để xóa nhiều">
+                                        <input type="checkbox" class="food-row-checkbox" data-food-id="${f.id}">
+                                        <span class="bulk-select-box"><i class="fa-solid fa-check"></i></span>
+                                    </label>
                                 </div>
                             </td>
-                        </tr>
                     `;
+                    tb.appendChild(tr);
+                });
+                // Attach checkbox listeners
+                document.querySelectorAll('.food-row-checkbox').forEach(cb => {
+                    cb.addEventListener('change', (e) => {
+                        toggleFoodSelect(parseInt(e.target.dataset.foodId), e.target.checked);
+                    });
                 });
             }
         } catch(e) { console.error(e); tb.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }

@@ -40,9 +40,9 @@
                     <i class="fa-solid fa-shield-halved"></i> Admin
                 </a>
                 <div class="nav-auth" id="user-section">
-                    <span class="nav-link" id="nav-user-name" style="cursor: default; opacity: 0.8;">
+                    <a href="/#profile" class="nav-link" id="nav-user-name" style="cursor: pointer;">
                         <i class="fa-solid fa-user"></i> <span id="display-username">Admin</span>
-                    </span>
+                    </a>
                     <button id="btn-admin-logout" class="btn btn-outline" style="padding: 8px 16px; font-size: 14px;">
                         <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
                     </button>
@@ -125,6 +125,30 @@
                             <p>Thêm, sửa, xóa mềm các món ăn trong hệ thống</p>
                         </div>
                         <button class="btn btn-primary" id="btn-admin-add-food"><i class="fa-solid fa-plus"></i> Thêm Món</button>
+                    </div>
+                    <!-- Bulk Action Bar -->
+                    <div id="bulk-action-bar" class="bulk-action-bar hidden">
+                        <div class="bulk-top-row">
+                            <div class="bulk-action-left">
+                                <label class="bulk-checkbox-wrapper">
+                                    <input type="checkbox" id="bulk-select-all" title="Chọn / Bỏ chọn tất cả">
+                                    <span class="bulk-checkmark"></span>
+                                </label>
+                                <span class="bulk-count" id="bulk-count">0 món đã chọn</span>
+                            </div>
+                            <div class="bulk-action-right">
+                                <button class="btn btn-outline bulk-btn" id="btn-bulk-soft-delete">
+                                    <i class="fa-solid fa-ban"></i> Khóa tất cả
+                                </button>
+                                <button class="btn btn-outline bulk-btn bulk-btn-danger" id="btn-bulk-hard-delete">
+                                    <i class="fa-solid fa-trash"></i> Xóa vĩnh viễn tất cả
+                                </button>
+                                <button class="btn btn-outline bulk-btn" id="btn-bulk-cancel">
+                                    <i class="fa-solid fa-xmark"></i> Bỏ chọn
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bulk-selected-list" id="bulk-selected-list"></div>
                     </div>
                     <div class="table-responsive">
                         <table class="admin-table">
