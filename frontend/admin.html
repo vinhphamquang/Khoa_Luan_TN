@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/admin_append.css">
+    <link rel="stylesheet" href="/static/admin_append.css?v=7">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
@@ -186,9 +186,41 @@
                             <p>Theo dõi toàn bộ hoạt động nhận diện của người dùng trên hệ thống</p>
                         </div>
                     </div>
-                    <div class="table-responsive">
+
+                    <!-- Filter / Search Bar -->
+                    <div class="history-filter-bar" id="history-filter-bar">
+                        <div class="history-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="history-search-input" class="form-input" placeholder="Tìm theo tên món, người dùng...">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button class="btn-bulk-delete" id="bulk-delete-btn" disabled style="opacity: 0.4; pointer-events: none;">
+                                <i class="fa-solid fa-trash-can"></i>
+                                Xóa (<span id="bulk-count">0</span>)
+                            </button>
+                            <div class="history-view-toggle">
+                                <button class="view-btn active" data-view="grid" title="Dạng lưới">
+                                    <i class="fa-solid fa-grid-2"></i>
+                                </button>
+                                <button class="view-btn" data-view="table" title="Dạng bảng">
+                                    <i class="fa-solid fa-table-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grid View (default) -->
+                    <div id="history-grid-view" class="history-grid">
+                        <div class="history-loading">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Đang tải dữ liệu...</span>
+                        </div>
+                    </div>
+
+                    <!-- Table View (hidden by default) -->
+                    <div id="history-table-view" class="table-responsive" style="display: none;">
                         <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Chính Xác</th><th>Thời Gian</th></tr></thead>
+                            <thead><tr><th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th><th>ID</th><th>Ảnh</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Calo</th><th>Đánh Giá</th><th>Thời Gian</th><th>Thao Tác</th></tr></thead>
                             <tbody id="tb-history"></tbody>
                         </table>
                     </div>
@@ -240,7 +272,20 @@
         </div>
     </div>
 
+    <!-- ========== HISTORY DETAIL MODAL ========== -->
+    <div id="history-detail-overlay" class="modal-overlay hidden">
+        <div id="history-detail-modal" class="glass-card modal-box" style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
+            <button class="modal-close" onclick="document.getElementById('history-detail-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+            <div id="history-detail-content">
+                <div class="history-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Đang tải chi tiết...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="/static/admin.js?v=3"></script>
+    <script src="/static/admin.js?v=8"></script>
 </body>
 </html>

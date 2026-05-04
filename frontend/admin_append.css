@@ -404,3 +404,913 @@
     50% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
+
+/* ============================================
+   HISTORY: FILTER BAR
+   ============================================ */
+.history-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.history-search-wrap {
+    flex: 1;
+    min-width: 220px;
+    position: relative;
+}
+
+.history-search-wrap i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+}
+
+.history-search-wrap .form-input {
+    padding-left: 40px;
+    width: 100%;
+}
+
+.history-view-toggle {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 4px;
+    border: 1px solid var(--glass-border);
+}
+
+.view-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.view-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.view-btn.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+/* ============================================
+   HISTORY: GRID / CARD VIEW
+   ============================================ */
+.history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.history-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.history-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(76, 175, 80, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(76, 175, 80, 0.15);
+}
+
+.history-card-img {
+    width: 100%;
+    height: 180px;
+    position: relative;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.history-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.history-card:hover .history-card-img img {
+    transform: scale(1.08);
+}
+
+.history-card-no-img {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(30, 30, 50, 0.6), rgba(20, 20, 40, 0.8));
+    color: var(--text-muted);
+    font-size: 40px;
+}
+
+.history-card-accuracy {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
+}
+
+.history-card-accuracy.high {
+    background: rgba(76, 175, 80, 0.85);
+    color: white;
+}
+
+.history-card-accuracy.mid {
+    background: rgba(245, 158, 11, 0.85);
+    color: white;
+}
+
+.history-card-accuracy.low {
+    background: rgba(239, 68, 68, 0.85);
+    color: white;
+}
+
+.history-card-body {
+    padding: 14px 16px;
+}
+
+.history-card-food {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0 0 8px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.history-card-user i,
+.history-card-cal i {
+    margin-right: 4px;
+    font-size: 11px;
+}
+
+.history-card-cal {
+    color: var(--c-cal);
+}
+
+.history-card-time {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.history-card-time i {
+    margin-right: 4px;
+}
+
+.history-card-hover-hint {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: 10px;
+    background: linear-gradient(to top, rgba(76, 175, 80, 0.9), rgba(76, 175, 80, 0.4), transparent);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+}
+
+.history-card:hover .history-card-hover-hint {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ============================================
+   HISTORY: TABLE VIEW extras
+   ============================================ */
+.history-table-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.history-table-thumb:hover {
+    transform: scale(1.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    position: relative;
+}
+
+.history-table-no-img {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+/* ============================================
+   HISTORY: LOADING & EMPTY STATES
+   ============================================ */
+.history-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 15px;
+}
+
+.history-loading i {
+    font-size: 28px;
+    color: var(--primary);
+}
+
+.history-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    grid-column: 1 / -1;
+}
+
+.history-empty i {
+    font-size: 40px;
+    opacity: 0.5;
+}
+
+.history-empty p {
+    font-size: 15px;
+}
+
+/* ============================================
+   HISTORY DETAIL MODAL
+   ============================================ */
+.hd-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.hd-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gradient-btn);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.hd-time {
+    font-size: 14px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hd-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 768px) {
+    .hd-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Image Section */
+.hd-image-section {
+    display: flex;
+    align-items: flex-start;
+}
+
+.hd-image-wrap {
+    width: 100%;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.hd-image {
+    width: 100%;
+    max-height: 450px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.2);
+    display: block;
+}
+
+.hd-image-placeholder {
+    width: 100%;
+    height: 300px;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: linear-gradient(135deg, rgba(30, 30, 50, 0.6), rgba(20, 20, 40, 0.8));
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+.hd-image-placeholder i {
+    font-size: 48px;
+    opacity: 0.4;
+}
+
+/* Info Section */
+.hd-info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.hd-food-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+.hd-food-name i {
+    color: var(--primary);
+    font-size: 20px;
+}
+
+/* Accuracy Bar */
+.hd-accuracy-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.hd-accuracy-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.hd-accuracy-track {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.hd-accuracy-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+
+.hd-accuracy-fill.high {
+    background: linear-gradient(90deg, #4CAF50, #66BB6A);
+}
+
+.hd-accuracy-fill.mid {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.hd-accuracy-fill.low {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.hd-accuracy-value {
+    font-weight: 700;
+    font-size: 16px;
+    min-width: 48px;
+    text-align: right;
+}
+
+.hd-accuracy-value.high { color: #66BB6A; }
+.hd-accuracy-value.mid { color: #fbbf24; }
+.hd-accuracy-value.low { color: #f87171; }
+
+/* Info Cards */
+.hd-info-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.hd-info-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-light);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hd-info-card-title i {
+    font-size: 15px;
+}
+
+.hd-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    gap: 12px;
+}
+
+.hd-info-row:last-child {
+    border-bottom: none;
+}
+
+.hd-info-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.hd-info-value {
+    font-size: 14px;
+    color: var(--text-main);
+    font-weight: 500;
+    text-align: right;
+}
+
+.hd-info-value.hd-desc {
+    text-align: left;
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.hd-cal-big {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--c-cal);
+    text-align: center;
+    padding: 8px 0;
+}
+
+.hd-cal-big small {
+    font-size: 16px;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+/* Nutrition Grid */
+.hd-nutrition-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+    .hd-nutrition-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.hd-nutr-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: transform 0.2s ease;
+}
+
+.hd-nutr-item:hover {
+    transform: translateY(-2px);
+}
+
+.hd-nutr-item i {
+    font-size: 18px;
+}
+
+.hd-nutr-val {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.hd-nutr-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hd-nutr-cal i { color: var(--c-cal); }
+.hd-nutr-cal .hd-nutr-val { color: var(--c-cal); }
+
+.hd-nutr-pro i { color: var(--c-prot); }
+.hd-nutr-pro .hd-nutr-val { color: var(--c-prot); }
+
+.hd-nutr-fat i { color: var(--c-fat); }
+.hd-nutr-fat .hd-nutr-val { color: var(--c-fat); }
+
+.hd-nutr-carb i { color: var(--c-carb); }
+.hd-nutr-carb .hd-nutr-val { color: var(--c-carb); }
+
+/* Responsive for history grid */
+@media (max-width: 600px) {
+    .history-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+    }
+    
+    .history-card-img {
+        height: 140px;
+    }
+    
+    .history-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* ============================================
+   RATING BADGES (Admin History)
+   ============================================ */
+.rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.rating-green {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.rating-yellow {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.rating-red {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.rating-none {
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+    border: 1px solid rgba(156, 163, 175, 0.2);
+    font-weight: 400;
+}
+
+.history-card-rating {
+    margin-top: 6px;
+}
+
+/* ============================================
+   USER RATING IN DETAIL MODAL
+   ============================================ */
+.hd-user-rating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hd-user-rating .hd-info-label {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.hd-user-rating .rating-badge {
+    font-size: 13px;
+    padding: 5px 12px;
+}
+
+/* ============================================
+   ADMIN EDIT FORM IN DETAIL MODAL
+   ============================================ */
+.hd-edit-card {
+    border: 1px solid rgba(34, 197, 94, 0.2) !important;
+    background: rgba(34, 197, 94, 0.03) !important;
+}
+
+.hd-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.hd-edit-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hd-edit-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hd-edit-input {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.hd-edit-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-admin-save {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 20px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.btn-admin-save:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+}
+
+.btn-admin-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.hd-edit-msg {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    animation: fadeInUp 0.3s ease;
+}
+
+.hd-edit-success {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.hd-edit-error {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ============================================
+   HISTORY CARD DELETE BUTTON
+   ============================================ */
+.history-card-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.85);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+}
+
+.history-card:hover .history-card-delete {
+    opacity: 1;
+}
+
+.history-card-delete:hover {
+    background: #ef4444;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.history-card {
+    position: relative;
+}
+
+/* Table danger button */
+.btn-icon-danger {
+    color: #ef4444 !important;
+}
+
+.btn-icon-danger:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+}
+
+/* Delete button in modal header */
+.btn-admin-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.btn-admin-delete:hover {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================
+   BULK SELECT & DELETE
+   ============================================ */
+.bulk-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    margin-bottom: 16px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    animation: fadeInUp 0.2s ease;
+}
+
+.bulk-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.bulk-info span {
+    color: #ef4444;
+    font-size: 16px;
+}
+
+.btn-bulk-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 10px;
+    background: #ef4444;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-bulk-delete:hover:not(:disabled) {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+}
+
+.btn-bulk-delete:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Checkbox on cards */
+.history-card .history-check {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.history-card:hover .history-check,
+.history-card .history-check:checked {
+    opacity: 1;
+}
+
+/* Checkbox styling */
+.bulk-checkbox,
+.history-check {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.bulk-action-bar.hidden {
+    display: none;
+}

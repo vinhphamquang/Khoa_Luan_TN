@@ -42,6 +42,26 @@
                 </div>
                 <div id="user-section" class="nav-auth hidden">
                     <a href="/admin" id="nav-admin-link" class="nav-link hidden"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+                    
+                    <!-- Notification Bell -->
+                    <div class="notif-bell-wrap" id="notif-bell-wrap" style="display: none;">
+                        <button class="notif-bell-btn" id="notif-bell-btn" title="Thông báo">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="notif-badge" id="notif-badge" style="display: none;">0</span>
+                        </button>
+                        <div class="notif-dropdown hidden" id="notif-dropdown">
+                            <div class="notif-dropdown-header">
+                                <span><i class="fa-solid fa-bell"></i> Thông Báo</span>
+                                <button class="notif-read-all" id="notif-read-all" title="Đánh dấu tất cả đã đọc">
+                                    <i class="fa-solid fa-check-double"></i>
+                                </button>
+                            </div>
+                            <div class="notif-dropdown-body" id="notif-dropdown-body">
+                                <div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <a href="#profile" id="user-name-display" class="nav-link" data-page="profile"><i class="fa-solid fa-user"></i> User</a>
                     <button id="btn-logout" class="btn btn-outline" style="padding: 8px 16px; font-size: 14px;">
                         <i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất
@@ -409,10 +429,6 @@
                             <h2 id="food-name">Tên Món Ăn</h2>
                             <p id="food-desc" class="food-desc">Mô tả về món ăn.</p>
                         </div>
-                        <div class="confidence-badge" id="confidence-badge">
-                            <i class="fa-solid fa-check-circle"></i>
-                            <span><span id="confidence-score">0</span>%</span>
-                        </div>
                     </div>
                     
                     <div class="system-msg" id="sys-msg"></div>
@@ -513,6 +529,29 @@
                             <i class="fa-solid fa-rotate-right"></i> Nhận Diện Lại
                         </button>
                         <p class="retry-hint">AI sẽ sử dụng thuật toán khác để phân tích lại ảnh của bạn</p>
+                    </div>
+
+                    <!-- User Rating Section -->
+                    <div class="user-rating-section" id="user-rating-section" style="display: none;">
+                        <div class="retry-divider"></div>
+                        <p class="rating-question">
+                            <i class="fa-solid fa-star"></i>
+                            Bạn đánh giá kết quả nhận diện này thế nào?
+                        </p>
+                        <div class="rating-buttons" id="rating-buttons">
+                            <button class="rating-btn rating-good" data-rating="chinh_xac">
+                                <i class="fa-solid fa-circle-check"></i> Chính xác
+                            </button>
+                            <button class="rating-btn rating-mid" data-rating="trung_binh">
+                                <i class="fa-solid fa-minus-circle"></i> Trung bình
+                            </button>
+                            <button class="rating-btn rating-bad" data-rating="sai">
+                                <i class="fa-solid fa-circle-xmark"></i> Sai kết quả
+                            </button>
+                        </div>
+                        <div class="rating-done hidden" id="rating-done">
+                            <i class="fa-solid fa-check"></i> Cảm ơn bạn đã đánh giá!
+                        </div>
                     </div>
                 </div>
             </div>

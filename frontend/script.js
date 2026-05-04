@@ -578,6 +578,26 @@ function showResult(data) {
     // Initialize accordion functionality
     initAccordion();
 
+    // Show user rating section if logged in
+    const ratingSection = document.getElementById('user-rating-section');
+    const ratingBtns = document.getElementById('rating-buttons');
+    const ratingDone = document.getElementById('rating-done');
+    const loggedForRating = JSON.parse(localStorage.getItem('smartfood_user'));
+    
+    if (ratingSection && loggedForRating && data.history_id) {
+        window._currentHistoryId = data.history_id;
+        ratingSection.style.display = '';
+        ratingBtns.classList.remove('hidden');
+        ratingDone.classList.add('hidden');
+        // Reset button states
+        ratingSection.querySelectorAll('.rating-btn').forEach(b => {
+            b.classList.remove('selected');
+            b.disabled = false;
+        });
+    } else if (ratingSection) {
+        ratingSection.style.display = 'none';
+    }
+
     // Scroll result into view
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -676,6 +696,8 @@ function checkLoginState() {
         if(navNutritionLink) {
             navNutritionLink.style.display = 'flex';
         }
+        // Init notifications
+        initNotifications(loggedUser.id);
     } else {
         if(authSection) authSection.classList.remove('hidden');
         if(userSection) userSection.classList.add('hidden');
@@ -1297,8 +1319,136 @@ document.addEventListener('DOMContentLoaded', () => {
     checkLoginState();
     initAnalyzePage();
     initRevealAnimations();
-    initFoodSlider(); // Initialize food banner slider
+    initFoodSlider();
+    initRatingButtons();
 });
 
+// ============================================
+// USER RATING BUTTONS
+// ============================================
+function initRatingButtons() {
+    const btns = document.querySelectorAll('.rating-btn');
+    btns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const rating = btn.dataset.rating;
+            const historyId = window._currentHistoryId;
+            if (!historyId) return;
 
+            // Disable all buttons
+            btns.forEach(b => { b.disabled = true; });
+            btn.classList.add('selected');
 
+            try {
+                await fetch('/api/user-rating', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history_id: historyId, rating })
+                });
+            } catch (e) {
+                console.error('Rating error:', e);
+            }
+
+            // Show thank you
+            const ratingBtns = document.getElementById('rating-buttons');
+            const ratingDone = document.getElementById('rating-done');
+            if (ratingBtns) ratingBtns.classList.add('hidden');
+            if (ratingDone) ratingDone.classList.remove('hidden');
+        });
+    });
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+let notifPollTimer = null;
+
+function initNotifications(userId) {
+    const bellWrap = document.getElementById('notif-bell-wrap');
+    const bellBtn = document.getElementById('notif-bell-btn');
+    const dropdown = document.getElementById('notif-dropdown');
+    const readAllBtn = document.getElementById('notif-read-all');
+
+    if (!bellWrap) return;
+    bellWrap.style.display = '';
+
+    // Toggle dropdown
+    bellBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+        if (!bellWrap.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    // Mark all read
+    readAllBtn?.addEventListener('click', async () => {
+        try {
+            await fetch(`/api/notifications/${userId}/read-all`, { method: 'PUT' });
+            fetchNotifications(userId);
+        } catch (e) { console.error(e); }
+    });
+
+    // Initial fetch + polling every 30s
+    fetchNotifications(userId);
+    if (notifPollTimer) clearInterval(notifPollTimer);
+    notifPollTimer = setInterval(() => fetchNotifications(userId), 30000);
+}
+
+async function fetchNotifications(userId) {
+    try {
+        const res = await fetch(`/api/notifications/${userId}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const badge = document.getElementById('notif-badge');
+        const body = document.getElementById('notif-dropdown-body');
+
+        // Update badge
+        if (data.unread_count > 0) {
+            badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+
+        // Render notifications
+        if (data.notifications.length === 0) {
+            body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>';
+            return;
+        }
+
+        body.innerHTML = data.notifications.map(n => {
+            const timeStr = n.time ? new Date(n.time).toLocaleString('vi-VN') : '';
+            const unreadClass = n.is_read ? '' : 'notif-unread';
+            return `
+                <div class="notif-item ${unreadClass}" data-id="${n.id}" onclick="markNotifRead(${n.id}, ${userId})">
+                    <div class="notif-item-icon">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                    <div class="notif-item-body">
+                        <p class="notif-item-text">${n.content}</p>
+                        ${n.old_name && n.new_name ? `
+                            <div class="notif-item-change">
+                                <span class="notif-old">${n.old_name}</span>
+                                <i class="fa-solid fa-arrow-right"></i>
+                                <span class="notif-new">${n.new_name}</span>
+                            </div>` : ''}
+                        <span class="notif-item-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Notification fetch error:', e);
+    }
+}
+
+window.markNotifRead = async (notifId, userId) => {
+    try {
+        await fetch(`/api/notifications/${notifId}/read`, { method: 'PUT' });
+        fetchNotifications(userId);
+    } catch (e) { console.error(e); }
+};

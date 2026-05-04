@@ -350,22 +350,27 @@ def insert_food_full(food_data):
 # ============================================
 
 def insert_lich_su(user_id, image_path, food_name, accuracy, calories=0):
-    """Lưu lịch sử nhận diện (có ảnh base64 và calories)"""
+    """Lưu lịch sử nhận diện - trả về MaLichSu ID"""
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = get_db_cursor(conn)
         
         cursor.execute("""
             INSERT INTO LichSu (MaNguoiDung, DuongDanAnh, TenMonAn, DoChinhXac, Calo)
             VALUES (%s, %s, %s, %s, %s)
+            RETURNING MaLichSu
         """, (user_id, image_path, food_name, accuracy, calories))
         
+        result = cursor.fetchone()
+        history_id = result['malichsu'] if result else None
         conn.commit()
         conn.close()
-        return True
+        return history_id
     except Exception as e:
-        print(f"Error: {e}")
-        return False
+        print(f"Error inserting history: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def get_user_history(user_id):
     """Lấy lịch sử nhận diện của user (bao gồm ảnh và calories)"""
@@ -374,7 +379,7 @@ def get_user_history(user_id):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo
+            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo, DanhGiaNguoiDung
             FROM LichSu
             WHERE MaNguoiDung = %s
             ORDER BY ThoiGian DESC
@@ -391,7 +396,8 @@ def get_user_history(user_id):
                 'accuracy': float(h['dochinhxac']) if h['dochinhxac'] else 0,
                 'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
                 'image': h.get('duongdananh', '') or '',
-                'calories': float(h['calo']) if h.get('calo') else 0
+                'calories': float(h['calo']) if h.get('calo') else 0,
+                'user_rating': h.get('danhgianguoidung') or None
             }
             for h in history
         ]
@@ -594,17 +600,19 @@ def get_system_stats():
         return {'total_users': 0, 'total_foods': 0, 'total_scans': 0}
 
 def get_all_history_admin():
-    """Lấy tất cả lịch sử (admin)"""
+    """Lấy tất cả lịch sử (admin) - bao gồm ảnh và calo"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT l.MaLichSu, n.TenNguoiDung, l.TenMonAn, l.DoChinhXac, l.ThoiGian
+            SELECT l.MaLichSu, n.TenNguoiDung, n.Email, l.TenMonAn, 
+                   l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo,
+                   l.DanhGiaNguoiDung
             FROM LichSu l
             LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
             ORDER BY l.ThoiGian DESC
-            LIMIT 100
+            LIMIT 200
         """)
         
         history = cursor.fetchall()
@@ -613,10 +621,14 @@ def get_all_history_admin():
         return [
             {
                 'id': h['malichsu'],
-                'user_name': h['tennguoidung'] or 'Guest',
+                'user_name': h['tennguoidung'] or 'Khách',
+                'user_email': h.get('email', ''),
                 'food_name': h['tenmonan'],
                 'accuracy': float(h['dochinhxac']) if h['dochinhxac'] else 0,
-                'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else ''
+                'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
+                'image': h.get('duongdananh', '') or '',
+                'calories': float(h['calo']) if h.get('calo') else 0,
+                'user_rating': h.get('danhgianguoidung') or None
             }
             for h in history
         ]
@@ -625,6 +637,110 @@ def get_all_history_admin():
         import traceback
         traceback.print_exc()
         return []
+
+def get_history_detail_admin(history_id):
+    """Lấy chi tiết một bản ghi lịch sử (admin)"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT l.MaLichSu, l.MaNguoiDung, n.TenNguoiDung, n.Email,
+                   l.TenMonAn, l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo,
+                   l.DanhGiaNguoiDung
+            FROM LichSu l
+            LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
+            WHERE l.MaLichSu = %s
+        """, (history_id,))
+        
+        h = cursor.fetchone()
+        
+        if not h:
+            conn.close()
+            return None
+        
+        # Tìm thông tin dinh dưỡng từ bảng MonAn nếu có
+        food_info = None
+        if h['tenmonan']:
+            food_name = h['tenmonan'].strip()
+            food_row = None
+            
+            # Bước 1: Exact match
+            cursor.execute("""
+                SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                       d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                FROM MonAn m
+                LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                WHERE LOWER(m.TenMonAn) = LOWER(%s) AND m.IsDeleted = 0
+                LIMIT 1
+            """, (food_name,))
+            food_row = cursor.fetchone()
+            
+            # Bước 2: Partial match - tên trong lịch sử chứa trong tên MonAn hoặc ngược lại
+            if not food_row:
+                cursor.execute("""
+                    SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                           d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                    FROM MonAn m
+                    LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                    WHERE m.IsDeleted = 0
+                      AND (LOWER(m.TenMonAn) LIKE LOWER(%s) OR LOWER(%s) LIKE '%%' || LOWER(m.TenMonAn) || '%%')
+                    ORDER BY LENGTH(m.TenMonAn) ASC
+                    LIMIT 1
+                """, (f'%{food_name}%', food_name))
+                food_row = cursor.fetchone()
+            
+            # Bước 3: Match từng từ trong tên món
+            if not food_row and len(food_name) >= 2:
+                words = food_name.split()
+                for word in words:
+                    if len(word) >= 2:
+                        cursor.execute("""
+                            SELECT m.MaMonAn, m.TenMonAn, m.MoTa, m.PhanLoai,
+                                   d.Calo, d.Protein, d.ChatBeo, d.Carbohydrate
+                            FROM MonAn m
+                            LEFT JOIN DinhDuong d ON m.MaMonAn = d.MaMonAn
+                            WHERE m.IsDeleted = 0
+                              AND LOWER(m.TenMonAn) LIKE LOWER(%s)
+                            ORDER BY LENGTH(m.TenMonAn) ASC
+                            LIMIT 1
+                        """, (f'%{word}%',))
+                        food_row = cursor.fetchone()
+                        if food_row:
+                            break
+            
+            if food_row:
+                food_info = {
+                    'id': food_row['mamonan'],
+                    'name': food_row['tenmonan'],
+                    'description': food_row.get('mota', '') or '',
+                    'category': food_row.get('phanloai', '') or '',
+                    'calories': float(food_row['calo']) if food_row.get('calo') else 0,
+                    'protein': float(food_row['protein']) if food_row.get('protein') else 0,
+                    'fat': float(food_row['chatbeo']) if food_row.get('chatbeo') else 0,
+                    'carbs': float(food_row['carbohydrate']) if food_row.get('carbohydrate') else 0,
+                }
+        
+        conn.close()
+        
+        return {
+            'id': h['malichsu'],
+            'user_id': h.get('manguoidung'),
+            'user_name': h['tennguoidung'] or 'Khách',
+            'user_email': h.get('email', '') or '',
+            'food_name': h['tenmonan'],
+            'accuracy': float(h['dochinhxac']) if h['dochinhxac'] else 0,
+            'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
+            'image': h.get('duongdananh', '') or '',
+            'calories': float(h['calo']) if h.get('calo') else 0,
+            'user_rating': h.get('danhgianguoidung') or None,
+            'food_info': food_info
+        }
+    except Exception as e:
+        print(f"Error getting history detail: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def get_all_foods_admin():
     """Lấy tất cả món ăn (admin)"""
@@ -983,3 +1099,193 @@ def upsert_health_profile(user_id, data):
         import traceback
         traceback.print_exc()
         return False
+
+# ============================================
+# USER RATING & ADMIN EDIT & NOTIFICATIONS
+# ============================================
+
+def update_user_rating(history_id, rating):
+    """Cập nhật đánh giá của user cho bản ghi lịch sử"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE LichSu
+            SET DanhGiaNguoiDung = %s
+            WHERE MaLichSu = %s
+        """, (rating, history_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error updating user rating: {e}")
+        return False
+
+def update_history_record(history_id, new_food_name, new_calories=None):
+    """Admin cập nhật tên món và calo trong bản ghi lịch sử"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        # Lấy thông tin cũ trước
+        cursor.execute("""
+            SELECT MaNguoiDung, TenMonAn, Calo FROM LichSu WHERE MaLichSu = %s
+        """, (history_id,))
+        old = cursor.fetchone()
+        if not old:
+            conn.close()
+            return None
+        
+        old_name = old['tenmonan']
+        user_id = old['manguoidung']
+        
+        # Cập nhật
+        if new_calories is not None:
+            cursor.execute("""
+                UPDATE LichSu SET TenMonAn = %s, Calo = %s WHERE MaLichSu = %s
+            """, (new_food_name, new_calories, history_id))
+        else:
+            cursor.execute("""
+                UPDATE LichSu SET TenMonAn = %s WHERE MaLichSu = %s
+            """, (new_food_name, history_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            'user_id': user_id,
+            'old_name': old_name,
+            'new_name': new_food_name
+        }
+    except Exception as e:
+        print(f"Error updating history record: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def create_notification(user_id, history_id, content, old_name='', new_name=''):
+    """Tạo thông báo cho user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO ThongBao (MaNguoiDung, MaLichSu, NoiDung, TenCu, TenMoi)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, history_id, content, old_name, new_name))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error creating notification: {e}")
+        return False
+
+def get_user_notifications(user_id):
+    """Lấy danh sách thông báo của user"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT MaThongBao, MaLichSu, NoiDung, TenCu, TenMoi, DaDoc, ThoiGian
+            FROM ThongBao
+            WHERE MaNguoiDung = %s
+            ORDER BY ThoiGian DESC
+            LIMIT 50
+        """, (user_id,))
+        
+        notifs = cursor.fetchall()
+        conn.close()
+        
+        return [
+            {
+                'id': n['mathongbao'],
+                'history_id': n.get('malichsu'),
+                'content': n['noidung'],
+                'old_name': n.get('tencu', ''),
+                'new_name': n.get('tenmoi', ''),
+                'is_read': n['dadoc'],
+                'time': n['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if n['thoigian'] else ''
+            }
+            for n in notifs
+        ]
+    except Exception as e:
+        print(f"Error getting notifications: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def mark_notification_read(notification_id):
+    """Đánh dấu thông báo đã đọc"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE ThongBao SET DaDoc = TRUE WHERE MaThongBao = %s
+        """, (notification_id,))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error marking notification read: {e}")
+        return False
+
+def mark_all_notifications_read(user_id):
+    """Đánh dấu tất cả thông báo đã đọc"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE ThongBao SET DaDoc = TRUE WHERE MaNguoiDung = %s AND DaDoc = FALSE
+        """, (user_id,))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error marking all notifications read: {e}")
+        return False
+
+def delete_history_record(history_id):
+    """Xóa bản ghi lịch sử"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Xóa thông báo liên quan trước
+        cursor.execute("DELETE FROM ThongBao WHERE MaLichSu = %s", (history_id,))
+        # Xóa bản ghi lịch sử
+        cursor.execute("DELETE FROM LichSu WHERE MaLichSu = %s", (history_id,))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error deleting history: {e}")
+        return False
+
+def bulk_delete_history(history_ids):
+    """Xóa nhiều bản ghi lịch sử cùng lúc"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        ids_tuple = tuple(history_ids)
+        placeholders = ','.join(['%s'] * len(ids_tuple))
+        
+        cursor.execute(f"DELETE FROM ThongBao WHERE MaLichSu IN ({placeholders})", ids_tuple)
+        cursor.execute(f"DELETE FROM LichSu WHERE MaLichSu IN ({placeholders})", ids_tuple)
+        
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception as e:
+        print(f"Error bulk deleting history: {e}")
+        return 0

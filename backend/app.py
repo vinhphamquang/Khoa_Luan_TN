@@ -9,10 +9,12 @@ from external_api import analyze_image
 from db_queries import (
     search_food_by_name, insert_lich_su, get_db_connection,
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
-    get_all_users, delete_user, get_system_stats, get_all_history_admin, 
+    get_all_users, delete_user, get_system_stats, get_all_history_admin, get_history_detail_admin,
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
     delete_food_soft, restore_food_soft, delete_food_hard, get_health_profile, upsert_health_profile,
-    get_user_food_stats
+    get_user_food_stats, update_user_rating, update_history_record,
+    create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
+    delete_history_record, bulk_delete_history
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -22,19 +24,41 @@ app = Flask(__name__, static_folder="../frontend")
 CORS(app)
 
 # ============================================
-# DATABASE MIGRATION - Thêm cột Calo vào LichSu
+# DATABASE MIGRATION
 # ============================================
 def run_migrations():
     """Chạy migration để thêm cột mới vào DB nếu chưa có"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # 1. Thêm cột Calo vào LichSu
         cursor.execute("""
             ALTER TABLE LichSu ADD COLUMN IF NOT EXISTS Calo REAL DEFAULT 0
         """)
+        
+        # 2. Thêm cột DanhGiaNguoiDung vào LichSu (đánh giá từ user)
+        cursor.execute("""
+            ALTER TABLE LichSu ADD COLUMN IF NOT EXISTS DanhGiaNguoiDung TEXT DEFAULT NULL
+        """)
+        
+        # 3. Tạo bảng ThongBao (thông báo cho user)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ThongBao (
+                MaThongBao SERIAL PRIMARY KEY,
+                MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+                MaLichSu INTEGER,
+                NoiDung TEXT NOT NULL,
+                TenCu TEXT,
+                TenMoi TEXT,
+                DaDoc BOOLEAN DEFAULT FALSE,
+                ThoiGian TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã kiểm tra/thêm cột Calo vào bảng LichSu")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
@@ -550,6 +574,91 @@ def api_admin_get_stats():
 def api_admin_get_history():
     return jsonify({"success": True, "history": get_all_history_admin()})
 
+@app.route("/api/admin/history/<int:history_id>", methods=["GET"])
+def api_admin_get_history_detail(history_id):
+    data = get_history_detail_admin(history_id)
+    if data:
+        return jsonify({"success": True, "detail": data})
+    return jsonify({"success": False, "message": "Không tìm thấy bản ghi lịch sử"}), 404
+
+@app.route("/api/admin/history/<int:history_id>", methods=["PUT"])
+def api_admin_update_history(history_id):
+    """Admin chỉnh sửa tên món + calo trong lịch sử → tạo thông báo cho user"""
+    data = request.json
+    new_name = data.get("food_name", "").strip()
+    new_calories = data.get("calories")
+    
+    if not new_name:
+        return jsonify({"success": False, "message": "Tên món ăn không được để trống"}), 400
+    
+    try:
+        new_cal = float(new_calories) if new_calories is not None and str(new_calories).strip() != '' else None
+    except:
+        new_cal = None
+    
+    result = update_history_record(history_id, new_name, new_cal)
+    if not result:
+        return jsonify({"success": False, "message": "Không tìm thấy bản ghi"}), 404
+    
+    # Tạo thông báo cho user nếu tên thay đổi
+    if result['user_id'] and result['old_name'] != new_name:
+        content = f"Admin đã cập nhật kết quả nhận diện: '{result['old_name']}' → '{new_name}'"
+        create_notification(
+            result['user_id'], history_id, content,
+            result['old_name'], new_name
+        )
+    
+    return jsonify({"success": True, "message": "Đã cập nhật và thông báo cho người dùng"})
+
+@app.route("/api/user-rating", methods=["POST"])
+def api_user_rating():
+    """User đánh giá kết quả nhận diện (chinh_xac / trung_binh / sai)"""
+    data = request.json
+    history_id = data.get("history_id")
+    rating = data.get("rating")
+    
+    if not history_id or rating not in ('chinh_xac', 'trung_binh', 'sai'):
+        return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
+    
+    if update_user_rating(history_id, rating):
+        return jsonify({"success": True, "message": "Đã lưu đánh giá"})
+    return jsonify({"success": False, "message": "Lỗi khi lưu đánh giá"}), 500
+
+@app.route("/api/notifications/<int:user_id>", methods=["GET"])
+def api_get_notifications(user_id):
+    notifs = get_user_notifications(user_id)
+    unread = sum(1 for n in notifs if not n['is_read'])
+    return jsonify({"success": True, "notifications": notifs, "unread_count": unread})
+
+@app.route("/api/notifications/<int:notification_id>/read", methods=["PUT"])
+def api_mark_notification_read(notification_id):
+    if mark_notification_read(notification_id):
+        return jsonify({"success": True})
+    return jsonify({"success": False}), 500
+
+@app.route("/api/notifications/<int:user_id>/read-all", methods=["PUT"])
+def api_mark_all_notifications_read(user_id):
+    if mark_all_notifications_read(user_id):
+        return jsonify({"success": True})
+    return jsonify({"success": False}), 500
+
+@app.route("/api/admin/history/<int:history_id>", methods=["DELETE"])
+def api_admin_delete_history(history_id):
+    if delete_history_record(history_id):
+        return jsonify({"success": True, "message": "Đã xóa bản ghi lịch sử"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa"}), 500
+
+@app.route("/api/admin/history/bulk-delete", methods=["POST"])
+def api_admin_bulk_delete_history():
+    data = request.get_json()
+    ids = data.get("ids", [])
+    if not ids:
+        return jsonify({"success": False, "message": "Chưa chọn bản ghi nào"})
+    deleted = bulk_delete_history(ids)
+    if deleted > 0:
+        return jsonify({"success": True, "message": f"Đã xóa {deleted} bản ghi"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa"}), 500
+
 @app.route("/api/admin/foods", methods=["GET"])
 def api_admin_get_foods():
     return jsonify({"success": True, "foods": get_all_foods_admin()})
@@ -861,8 +970,10 @@ def predict():
     user_id = request.form.get("user_id")
     if user_id and str(user_id).isdigit():
         try:
-            # Lưu lịch sử với ảnh base64 và calories
-            insert_lich_su(int(user_id), image_base64, food_name_vietnamese, confidence_pct, food_calories)
+            # Lưu lịch sử với ảnh base64 và calories - trả về history_id
+            history_id = insert_lich_su(int(user_id), image_base64, food_name_vietnamese, confidence_pct, food_calories)
+            if history_id:
+                response_data["history_id"] = history_id
         except Exception as e:
             print(f"Error saving history: {e}")
 
