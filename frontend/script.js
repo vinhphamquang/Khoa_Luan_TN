@@ -393,6 +393,12 @@ function initAnalyzePage() {
                 body: formData
             });
 
+            // Kiểm tra nếu server trả về lỗi (HTML thay vì JSON)
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                throw new Error(`Server trả về lỗi ${response.status}. Kiểm tra console Backend.`);
+            }
+
             const data = await response.json();
 
             clearTimeout(loadingTimer);
@@ -421,7 +427,7 @@ function initAnalyzePage() {
             clearTimeout(loadingTimer2);
             loading.classList.add('hidden');
             previewContainer.classList.remove('hidden');
-            showError('Lỗi kết nối tới Server. Đảm bảo Backend đang chạy.');
+            showError('Lỗi kết nối tới Server: ' + err.message);
         }
     });
 
@@ -478,6 +484,16 @@ function initAnalyzePage() {
     });
 }
 
+// Helper: safely set textContent (prevents crash if element missing)
+function _setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+function _setStyle(id, prop, value) {
+    const el = document.getElementById(id);
+    if (el) el.style[prop] = value;
+}
+
 function showResult(data) {
     const resultSection = document.getElementById('result-section');
     const sysMsg = document.getElementById('sys-msg');
@@ -486,7 +502,7 @@ function showResult(data) {
     sysMsg.textContent = '';
     sysMsg.classList.remove('visible');
 
-    document.getElementById('confidence-score').textContent = data.confidence;
+    _setText('confidence-score', data.confidence);
 
     if (data.food_data) {
         document.getElementById('food-name').textContent = data.food_data.name;
@@ -632,27 +648,29 @@ function showError(message, suggestion = null) {
     const sysMsg = document.getElementById('sys-msg');
     const resultSection = document.getElementById('result-section');
 
-    resultSection.classList.remove('hidden');
-    document.getElementById('food-name').textContent = 'Lỗi Phân Tích';
+    if (resultSection) resultSection.classList.remove('hidden');
+    _setText('food-name', 'Lỗi Phân Tích');
     
     let fullMessage = message;
     if (suggestion) {
         fullMessage += `\n\n💡 ${suggestion}`;
     }
     
-    document.getElementById('food-desc').textContent = fullMessage;
-    document.getElementById('confidence-score').textContent = '0';
+    _setText('food-desc', fullMessage);
+    _setText('confidence-score', '0');
 
-    sysMsg.textContent = fullMessage;
-    sysMsg.classList.add('visible');
+    if (sysMsg) {
+        sysMsg.textContent = fullMessage;
+        sysMsg.classList.add('visible');
+    }
 
     ['val-cal', 'val-prot', 'val-carb', 'val-fat'].forEach(id => {
-        document.getElementById(id).textContent = '--';
+        _setText(id, '--');
     });
     
     // Hide recipe and ingredients accordions
-    document.getElementById('ingredients-accordion').style.display = 'none';
-    document.getElementById('recipe-accordion').style.display = 'none';
+    _setStyle('ingredients-accordion', 'display', 'none');
+    _setStyle('recipe-accordion', 'display', 'none');
     
     // Initialize accordion (for nutrition section)
     initAccordion();
