@@ -129,6 +129,83 @@ def update_password(user_id, new_hashed_password):
         print(f"Error: {e}")
         return False
 
+def create_google_user(name, email, google_id):
+    """Tạo user mới đăng ký bằng Google (không cần mật khẩu)"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            INSERT INTO NguoiDung (TenNguoiDung, Email, MatKhau, VaiTro, GoogleId)
+            VALUES (%s, %s, %s, 'user', %s)
+            RETURNING MaNguoiDung
+        """, (name, email, 'GOOGLE_AUTH', google_id))
+        
+        user_id = cursor.fetchone()['manguoidung']
+        conn.commit()
+        conn.close()
+        
+        return True, f"Đăng ký Google thành công! User ID: {user_id}", user_id
+    except psycopg2.IntegrityError:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False, "Email đã tồn tại", None
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False, f"Lỗi: {str(e)}", None
+
+def get_user_by_google_id(google_id):
+    """Lấy thông tin user theo Google ID"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, GoogleId
+            FROM NguoiDung
+            WHERE GoogleId = %s
+        """, (google_id,))
+        
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return {
+                'MaNguoiDung': user['manguoidung'],
+                'TenNguoiDung': user['tennguoidung'],
+                'Email': user['email'],
+                'MatKhau': user['matkhau'],
+                'VaiTro': user['vaitro'],
+                'GoogleId': user.get('googleid')
+            }
+        return None
+    except Exception as e:
+        print(f"Error get_user_by_google_id: {e}")
+        return None
+
+def update_user_google_id(user_id, google_id):
+    """Cập nhật GoogleId cho user đã có (liên kết tài khoản Google)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE NguoiDung
+            SET GoogleId = %s
+            WHERE MaNguoiDung = %s
+        """, (google_id, user_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error update_user_google_id: {e}")
+        return False
+
 # ============================================
 # FOOD MANAGEMENT
 # ============================================

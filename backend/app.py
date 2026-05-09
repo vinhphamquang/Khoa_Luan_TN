@@ -14,11 +14,20 @@ from db_queries import (
     delete_food_soft, restore_food_soft, delete_food_hard, get_health_profile, upsert_health_profile,
     get_user_food_stats, update_user_rating, update_history_record,
     create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
-    delete_history_record, bulk_delete_history
+    delete_history_record, bulk_delete_history,
+    create_google_user, get_user_by_google_id, update_user_google_id
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
+
+# Google OAuth
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+load_dotenv()
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 
 app = Flask(__name__, static_folder="../frontend")
 CORS(app)
@@ -56,13 +65,23 @@ def run_migrations():
             )
         """)
         
+        # 4. Thêm cột GoogleId vào NguoiDung
+        cursor.execute("""
+            ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS GoogleId TEXT DEFAULT NULL
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao)")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
 run_migrations()
+
+@app.route("/api/google-client-id")
+def get_google_client_id():
+    """Trả về Google Client ID cho frontend"""
+    return jsonify({"client_id": GOOGLE_CLIENT_ID})
 
 @app.route("/")
 def index():
@@ -175,6 +194,95 @@ def login():
             "role": user["VaiTro"]
         }
     })
+
+@app.route("/api/google-login", methods=["POST"])
+def google_login():
+    """Đăng nhập / Đăng ký bằng tài khoản Google"""
+    data = request.json
+    token = data.get("id_token")
+    
+    if not token:
+        return jsonify({"success": False, "message": "Thiếu token Google"}), 400
+    
+    try:
+        # Verify Google ID token
+        idinfo = id_token.verify_oauth2_token(
+            token, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+        
+        # Lấy thông tin user từ token
+        google_id = idinfo['sub']
+        email = idinfo.get('email', '')
+        name = idinfo.get('name', email.split('@')[0])
+        picture = idinfo.get('picture', '')
+        
+        if not email:
+            return jsonify({"success": False, "message": "Không lấy được email từ Google"}), 400
+        
+        # Tìm user theo GoogleId
+        user = get_user_by_google_id(google_id)
+        
+        if user:
+            # User đã đăng ký bằng Google trước đó → đăng nhập
+            return jsonify({
+                "success": True,
+                "message": "Đăng nhập Google thành công",
+                "user": {
+                    "id": user["MaNguoiDung"],
+                    "name": user["TenNguoiDung"],
+                    "email": user["Email"],
+                    "role": user["VaiTro"],
+                    "auth_provider": "google",
+                    "picture": picture
+                }
+            })
+        
+        # Tìm user theo email (đã đăng ký truyền thống)
+        existing_user = get_user_by_email(email)
+        
+        if existing_user:
+            # Liên kết tài khoản Google với user đã có
+            update_user_google_id(existing_user["MaNguoiDung"], google_id)
+            return jsonify({
+                "success": True,
+                "message": "Đã liên kết tài khoản Google thành công",
+                "user": {
+                    "id": existing_user["MaNguoiDung"],
+                    "name": existing_user["TenNguoiDung"],
+                    "email": existing_user["Email"],
+                    "role": existing_user["VaiTro"],
+                    "auth_provider": "google",
+                    "picture": picture
+                }
+            })
+        
+        # Tạo user mới bằng Google
+        success, message, user_id = create_google_user(name, email, google_id)
+        
+        if success and user_id:
+            return jsonify({
+                "success": True,
+                "message": "Đăng ký tài khoản Google thành công",
+                "user": {
+                    "id": user_id,
+                    "name": name,
+                    "email": email,
+                    "role": "user",
+                    "auth_provider": "google",
+                    "picture": picture
+                }
+            })
+        else:
+            return jsonify({"success": False, "message": message}), 400
+            
+    except ValueError as e:
+        print(f"[GOOGLE LOGIN] Token không hợp lệ: {e}")
+        return jsonify({"success": False, "message": "Token Google không hợp lệ"}), 401
+    except Exception as e:
+        print(f"[GOOGLE LOGIN ERROR] {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": f"Lỗi xác thực Google: {str(e)}"}), 500
 
 @app.route("/api/history/<int:user_id>")
 def get_user_history_api(user_id):

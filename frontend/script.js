@@ -850,7 +850,124 @@ function initAuth() {
     document.getElementById('btn-logout')?.addEventListener('click', () => {
         localStorage.removeItem('smartfood_user');
         checkLoginState();
-    });}
+    });
+    
+    // Google Sign-In
+    initGoogleSignIn();
+}
+
+// ---- GOOGLE SIGN-IN ----
+function initGoogleSignIn() {
+    // Callback xử lý khi Google trả về credential
+    window.handleGoogleCredentialResponse = async function(response) {
+        const modalOverlay = document.getElementById('auth-modal');
+        const loginErrDiv = document.getElementById('login-error');
+        const regErrDiv = document.getElementById('reg-error');
+        
+        try {
+            const res = await fetch('/api/google-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_token: response.credential })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                localStorage.setItem('smartfood_user', JSON.stringify(data.user));
+                if (modalOverlay) modalOverlay.classList.add('hidden');
+                checkLoginState();
+            } else {
+                const errMsg = data.message || 'Lỗi đăng nhập Google';
+                if (loginErrDiv && !loginErrDiv.closest('.hidden')) {
+                    loginErrDiv.textContent = errMsg;
+                    loginErrDiv.classList.remove('hidden', 'success');
+                } else if (regErrDiv) {
+                    regErrDiv.textContent = errMsg;
+                    regErrDiv.classList.remove('hidden', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Google login error:', error);
+            if (loginErrDiv) {
+                loginErrDiv.textContent = 'Lỗi kết nối máy chủ khi đăng nhập Google';
+                loginErrDiv.classList.remove('hidden', 'success');
+            }
+        }
+    };
+    
+    // Khởi tạo Google Identity Services khi thư viện đã load
+    function tryInitGSI() {
+        if (typeof google !== 'undefined' && google.accounts) {
+            google.accounts.id.initialize({
+                client_id: window._GOOGLE_CLIENT_ID || '',
+                callback: handleGoogleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+            
+            // Gắn sự kiện cho nút Google login
+            document.getElementById('btn-google-login')?.addEventListener('click', () => {
+                google.accounts.id.prompt((notification) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        // Fallback: dùng popup nếu One Tap không hiện
+                        google.accounts.oauth2.initCodeClient({
+                            client_id: window._GOOGLE_CLIENT_ID || '',
+                            scope: 'email profile',
+                            callback: () => {}
+                        });
+                        // Dùng renderButton fallback
+                        const tmpDiv = document.createElement('div');
+                        tmpDiv.style.display = 'none';
+                        document.body.appendChild(tmpDiv);
+                        google.accounts.id.renderButton(tmpDiv, {
+                            type: 'standard',
+                            size: 'large'
+                        });
+                        tmpDiv.querySelector('div[role=button]')?.click();
+                        setTimeout(() => tmpDiv.remove(), 1000);
+                    }
+                });
+            });
+            
+            // Gắn sự kiện cho nút Google register (cùng flow)
+            document.getElementById('btn-google-register')?.addEventListener('click', () => {
+                google.accounts.id.prompt((notification) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        const tmpDiv = document.createElement('div');
+                        tmpDiv.style.display = 'none';
+                        document.body.appendChild(tmpDiv);
+                        google.accounts.id.renderButton(tmpDiv, {
+                            type: 'standard',
+                            size: 'large'
+                        });
+                        tmpDiv.querySelector('div[role=button]')?.click();
+                        setTimeout(() => tmpDiv.remove(), 1000);
+                    }
+                });
+            });
+            
+            console.log('[Google Sign-In] Initialized successfully');
+        } else {
+            // Thư viện chưa load, thử lại sau
+            setTimeout(tryInitGSI, 500);
+        }
+    }
+    
+    // Fetch Google Client ID từ server
+    fetch('/api/google-client-id')
+        .then(r => r.json())
+        .then(data => {
+            if (data.client_id) {
+                window._GOOGLE_CLIENT_ID = data.client_id;
+                tryInitGSI();
+            } else {
+                console.warn('[Google Sign-In] No client ID configured');
+            }
+        })
+        .catch(() => {
+            console.warn('[Google Sign-In] Failed to fetch client ID');
+        });
+}
 
 // ---- PROFILE LOGIC ----
 let dailyChart = null;
@@ -865,6 +982,28 @@ async function initProfilePage() {
     const emailEl = document.getElementById('profile-page-email');
     if (nameEl) nameEl.textContent = loggedUser.name;
     if (emailEl) emailEl.textContent = loggedUser.email;
+
+    // Ẩn phần đổi mật khẩu nếu user đăng nhập bằng Google
+    const pwSection = document.getElementById('change-pw-form');
+    const pwTitle = pwSection?.previousElementSibling; // h4 title
+    const pwDivider = pwTitle?.previousElementSibling; // hr divider
+    if (loggedUser.auth_provider === 'google') {
+        if (pwSection) pwSection.style.display = 'none';
+        if (pwTitle && pwTitle.tagName === 'H4') pwTitle.style.display = 'none';
+        if (pwDivider && pwDivider.tagName === 'HR') pwDivider.style.display = 'none';
+    } else {
+        if (pwSection) pwSection.style.display = '';
+        if (pwTitle && pwTitle.tagName === 'H4') pwTitle.style.display = '';
+        if (pwDivider && pwDivider.tagName === 'HR') pwDivider.style.display = '';
+    }
+
+    // Hiển thị avatar Google nếu có
+    const avatarCircle = document.querySelector('.avatar-circle');
+    if (avatarCircle && loggedUser.picture) {
+        avatarCircle.innerHTML = `<img src="${loggedUser.picture}" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+    } else if (avatarCircle) {
+        avatarCircle.innerHTML = '<i class="fa-solid fa-user"></i>';
+    }
 
     // Load Health Profile
     try {
