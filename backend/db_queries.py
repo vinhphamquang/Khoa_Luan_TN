@@ -602,15 +602,19 @@ def get_user_food_stats(user_id):
 # ============================================
 
 def get_all_users():
-    """Lấy danh sách tất cả users"""
+    """Lấy danh sách tất cả users kèm thống kê"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, VaiTro, NgayDangKy
-            FROM NguoiDung
-            ORDER BY NgayDangKy DESC
+            SELECT n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy,
+                   n.GoogleId, n.LastActive,
+                   COUNT(l.MaLichSu) as analysis_count
+            FROM NguoiDung n
+            LEFT JOIN LichSu l ON n.MaNguoiDung = l.MaNguoiDung
+            GROUP BY n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy, n.GoogleId, n.LastActive
+            ORDER BY n.NgayDangKy DESC
         """)
         
         users = cursor.fetchall()
@@ -622,7 +626,11 @@ def get_all_users():
                 'name': u['tennguoidung'],
                 'email': u['email'],
                 'role': u['vaitro'],
-                'created_at': u['ngaydangky'].strftime('%Y-%m-%d') if u['ngaydangky'] else ''
+                'created_at': u['ngaydangky'].strftime('%Y-%m-%d') if u['ngaydangky'] else '',
+                'google_id': u.get('googleid') or None,
+                'auth_provider': 'google' if u.get('googleid') else 'local',
+                'last_active': u['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if u.get('lastactive') else None,
+                'analysis_count': u.get('analysis_count', 0) or 0
             }
             for u in users
         ]
@@ -631,6 +639,131 @@ def get_all_users():
         import traceback
         traceback.print_exc()
         return []
+
+def get_user_detail_admin(user_id):
+    """Lấy chi tiết user cho admin: thông tin + health profile + lịch sử gần đây"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        # 1. Thông tin user
+        cursor.execute("""
+            SELECT MaNguoiDung, TenNguoiDung, Email, VaiTro, NgayDangKy, GoogleId, LastActive
+            FROM NguoiDung
+            WHERE MaNguoiDung = %s
+        """, (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            return None
+        
+        # 2. Thống kê phân tích
+        cursor.execute("""
+            SELECT COUNT(*) as total_analyses,
+                   COALESCE(AVG(Calo), 0) as avg_calories,
+                   MIN(ThoiGian) as first_analysis,
+                   MAX(ThoiGian) as last_analysis
+            FROM LichSu
+            WHERE MaNguoiDung = %s
+        """, (user_id,))
+        stats = cursor.fetchone()
+        
+        # 3. Health Profile (BMI/BMR)
+        cursor.execute("""
+            SELECT CanNang, ChieuCao, Tuoi, GioiTinh, MucDoVanDong, MucTieu, BMR, TDEE, CaloDuKien
+            FROM HoSoSucKhoe
+            WHERE MaNguoiDung = %s
+            ORDER BY NgayCapNhat DESC
+            LIMIT 1
+        """, (user_id,))
+        health = cursor.fetchone()
+        
+        # 4. Lịch sử hoạt động gần đây (10 records)
+        cursor.execute("""
+            SELECT MaLichSu, TenMonAn, Calo, ThoiGian, DanhGiaNguoiDung
+            FROM LichSu
+            WHERE MaNguoiDung = %s
+            ORDER BY ThoiGian DESC
+            LIMIT 10
+        """, (user_id,))
+        recent_history = cursor.fetchall()
+        
+        conn.close()
+        
+        # Build BMI
+        bmi = None
+        bmi_status = ''
+        if health and health.get('cannang') and health.get('chieucao'):
+            h_m = float(health['chieucao']) / 100
+            if h_m > 0:
+                bmi = round(float(health['cannang']) / (h_m * h_m), 1)
+                if bmi < 18.5: bmi_status = 'Thiếu cân'
+                elif bmi < 25: bmi_status = 'Bình thường'
+                elif bmi < 30: bmi_status = 'Thừa cân'
+                else: bmi_status = 'Béo phì'
+        
+        result = {
+            'id': user['manguoidung'],
+            'name': user['tennguoidung'],
+            'email': user['email'],
+            'role': user['vaitro'],
+            'created_at': user['ngaydangky'].strftime('%Y-%m-%d %H:%M:%S') if user['ngaydangky'] else '',
+            'auth_provider': 'google' if user.get('googleid') else 'local',
+            'last_active': user['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if user.get('lastactive') else None,
+            'stats': {
+                'total_analyses': stats['total_analyses'] if stats else 0,
+                'avg_calories': round(float(stats['avg_calories']), 1) if stats and stats['avg_calories'] else 0,
+                'first_analysis': stats['first_analysis'].strftime('%Y-%m-%d') if stats and stats.get('first_analysis') else None,
+                'last_analysis': stats['last_analysis'].strftime('%Y-%m-%d %H:%M') if stats and stats.get('last_analysis') else None
+            },
+            'health': None,
+            'recent_history': []
+        }
+        
+        if health:
+            result['health'] = {
+                'weight': float(health['cannang']) if health.get('cannang') else 0,
+                'height': float(health['chieucao']) if health.get('chieucao') else 0,
+                'age': health.get('tuoi'),
+                'gender': health.get('gioitinh'),
+                'activity': health.get('mucdovandong'),
+                'goal': health.get('muctieu'),
+                'bmr': round(float(health['bmr']), 1) if health.get('bmr') else 0,
+                'tdee': round(float(health['tdee']), 1) if health.get('tdee') else 0,
+                'target_cal': round(float(health['calodukien']), 1) if health.get('calodukien') else 0,
+                'bmi': bmi,
+                'bmi_status': bmi_status
+            }
+        
+        for h in recent_history:
+            result['recent_history'].append({
+                'id': h['malichsu'],
+                'food_name': h['tenmonan'],
+                'calories': float(h['calo']) if h.get('calo') else 0,
+                'time': h['thoigian'].strftime('%Y-%m-%d %H:%M') if h.get('thoigian') else '',
+                'rating': h.get('danhgianguoidung')
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error get_user_detail_admin: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def update_last_active(user_id):
+    """Cập nhật thời gian hoạt động cuối cùng"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE NguoiDung SET LastActive = CURRENT_TIMESTAMP WHERE MaNguoiDung = %s
+        """, (user_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error update_last_active: {e}")
 
 def delete_user(user_id):
     """Xóa user"""

@@ -498,34 +498,306 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { console.error(e); tb.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
     }
 
+    let allUsersData = [];
+
     async function fetchAdminUsers() {
         const tb = document.getElementById('tb-users');
-        tb.innerHTML = '<tr><td colspan="6" style="text-align:center"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+        tb.innerHTML = '<tr><td colspan="8" style="text-align:center"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
         try {
             const res = await fetch('/api/admin/users');
             const data = await res.json();
             if(data.success) {
-                tb.innerHTML = '';
-                data.users.forEach(u => {
-                    const status = u.role === 'admin' ? '<span class="badge badge-warning"><i class="fa-solid fa-star"></i> Admin</span>' : '<span class="badge badge-info">User</span>';
-                    tb.innerHTML += `
-                        <tr>
-                            <td>#${u.id}</td>
-                            <td style="font-weight: 500">${u.name}</td>
-                            <td>${u.email}</td>
-                            <td>${status}</td>
-                            <td>${u.created_at}</td>
-                            <td>
-                                <div class="action-btns">
-                                    <button class="btn-icon delete" title="Xóa" onclick="deleteAdminUser(${u.id})"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                });
+                allUsersData = data.users;
+                renderUsersTable();
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error(e); tb.innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
     }
+
+    function getOnlineStatus(lastActive) {
+        if (!lastActive) return { cls: 'status-offline', text: 'Chưa hoạt động', dot: '⚪' };
+        const now = new Date();
+        const last = new Date(lastActive);
+        const diffMin = (now - last) / 60000;
+        if (diffMin < 5) return { cls: 'status-online', text: 'Đang online', dot: '🟢' };
+        if (diffMin < 30) return { cls: 'status-away', text: 'Vừa hoạt động', dot: '🟡' };
+        if (diffMin < 1440) return { cls: 'status-offline', text: formatTimeAgo(last), dot: '⚪' };
+        return { cls: 'status-offline', text: last.toLocaleDateString('vi-VN'), dot: '⚪' };
+    }
+
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMin = Math.floor((now - date) / 60000);
+        if (diffMin < 60) return `${diffMin} phút trước`;
+        const diffHours = Math.floor(diffMin / 60);
+        if (diffHours < 24) return `${diffHours} giờ trước`;
+        return date.toLocaleDateString('vi-VN');
+    }
+
+    function getFilteredSortedUsers() {
+        const searchVal = (document.getElementById('user-search-input')?.value || '').trim().toLowerCase();
+        const roleFilter = document.getElementById('user-role-filter')?.value || 'all';
+        const sortVal = document.getElementById('user-sort-select')?.value || 'newest';
+
+        let filtered = [...allUsersData];
+
+        // Filter by search
+        if (searchVal) {
+            filtered = filtered.filter(u =>
+                (u.name || '').toLowerCase().includes(searchVal) ||
+                (u.email || '').toLowerCase().includes(searchVal)
+            );
+        }
+
+        // Filter by role
+        if (roleFilter === 'admin') filtered = filtered.filter(u => u.role === 'admin');
+        else if (roleFilter === 'user') filtered = filtered.filter(u => u.role === 'user' && u.auth_provider !== 'google');
+        else if (roleFilter === 'google') filtered = filtered.filter(u => u.auth_provider === 'google');
+
+        // Sort
+        switch (sortVal) {
+            case 'newest':
+                filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                break;
+            case 'oldest':
+                filtered.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+                break;
+            case 'name_az':
+                filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+                break;
+            case 'most_active':
+                filtered.sort((a, b) => (b.analysis_count || 0) - (a.analysis_count || 0));
+                break;
+        }
+
+        return filtered;
+    }
+
+    function renderUsersTable() {
+        const tb = document.getElementById('tb-users');
+        const filtered = getFilteredSortedUsers();
+
+        // Update total badge
+        const badge = document.getElementById('user-total-badge');
+        if (badge) badge.textContent = `${filtered.length} / ${allUsersData.length} người dùng`;
+
+        if (filtered.length === 0) {
+            tb.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: var(--text-muted);">Không tìm thấy người dùng</td></tr>';
+            return;
+        }
+
+        tb.innerHTML = '';
+        filtered.forEach(u => {
+            const status = getOnlineStatus(u.last_active);
+            const roleBadge = u.role === 'admin'
+                ? '<span class="badge badge-warning"><i class="fa-solid fa-star"></i> Admin</span>'
+                : u.auth_provider === 'google'
+                    ? '<span class="badge badge-info"><i class="fa-brands fa-google"></i> Google</span>'
+                    : '<span class="badge badge-info">User</span>';
+
+            const initial = (u.name || 'U').charAt(0).toUpperCase();
+            const avatarColors = ['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+            const colorIdx = (u.id || 0) % avatarColors.length;
+
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => viewUserDetail(u.id);
+            tr.innerHTML = `
+                <td style="width: 50px;">
+                    <div class="user-avatar-sm" style="background: ${avatarColors[colorIdx]};">${initial}</div>
+                </td>
+                <td style="font-weight: 600">${u.name}</td>
+                <td><span style="font-size: 13px; color: var(--text-secondary)">${u.email}</span></td>
+                <td>${roleBadge}</td>
+                <td>
+                    <span class="user-status-badge ${status.cls}">
+                        <span class="status-dot"></span> ${status.text}
+                    </span>
+                </td>
+                <td>
+                    <span class="analysis-count-badge">${u.analysis_count || 0} <i class="fa-solid fa-camera-retro"></i></span>
+                </td>
+                <td><span style="font-size: 13px; color: var(--text-muted)">${u.created_at}</span></td>
+                <td>
+                    <div class="action-btns" onclick="event.stopPropagation()">
+                        <button class="btn-icon" title="Xem chi tiết" onclick="viewUserDetail(${u.id})"><i class="fa-solid fa-eye"></i></button>
+                        ${u.role !== 'admin' ? `<button class="btn-icon delete" title="Xóa" onclick="deleteAdminUser(${u.id})"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    </div>
+                </td>
+            `;
+            tb.appendChild(tr);
+        });
+    }
+
+    // Search, Filter, Sort event listeners
+    const userSearchInput = document.getElementById('user-search-input');
+    if (userSearchInput) {
+        let searchTimeout;
+        userSearchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(renderUsersTable, 300);
+        });
+    }
+    document.getElementById('user-role-filter')?.addEventListener('change', renderUsersTable);
+    document.getElementById('user-sort-select')?.addEventListener('change', renderUsersTable);
+
+    // View User Detail Modal
+    window.viewUserDetail = async (userId) => {
+        const overlay = document.getElementById('user-detail-overlay');
+        const content = document.getElementById('user-detail-content');
+        overlay.classList.remove('hidden');
+        content.innerHTML = '<div class="history-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải chi tiết...</span></div>';
+
+        try {
+            const res = await fetch(`/api/admin/users/${userId}/detail`);
+            const data = await res.json();
+            if (!data.success) {
+                content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Không tìm thấy người dùng</p></div>';
+                return;
+            }
+
+            const d = data.detail;
+            const status = getOnlineStatus(d.last_active);
+            const initial = (d.name || 'U').charAt(0).toUpperCase();
+            const avatarColors = ['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+            const colorIdx = (d.id || 0) % avatarColors.length;
+
+            const authBadge = d.auth_provider === 'google'
+                ? '<span class="badge badge-info" style="font-size: 11px;"><i class="fa-brands fa-google"></i> Google</span>'
+                : '<span class="badge badge-success" style="font-size: 11px;"><i class="fa-solid fa-envelope"></i> Email</span>';
+
+            // Health section
+            let healthHTML = '';
+            if (d.health) {
+                const h = d.health;
+                const bmiColor = h.bmi < 18.5 ? '#3b82f6' : h.bmi < 25 ? '#22c55e' : h.bmi < 30 ? '#f59e0b' : '#ef4444';
+                healthHTML = `
+                    <div class="ud-section">
+                        <div class="ud-section-title"><i class="fa-solid fa-heart-pulse"></i> Hồ Sơ Sức Khỏe</div>
+                        <div class="ud-health-grid">
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">Cân nặng</span>
+                                <span class="ud-health-val">${h.weight} kg</span>
+                            </div>
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">Chiều cao</span>
+                                <span class="ud-health-val">${h.height} cm</span>
+                            </div>
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">Tuổi</span>
+                                <span class="ud-health-val">${h.age || '--'}</span>
+                            </div>
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">Giới tính</span>
+                                <span class="ud-health-val">${h.gender || '--'}</span>
+                            </div>
+                            <div class="ud-health-item ud-health-highlight" style="border-color: ${bmiColor}">
+                                <span class="ud-health-label">BMI</span>
+                                <span class="ud-health-val" style="color: ${bmiColor}">${h.bmi || '--'}</span>
+                                <span class="ud-health-sub">${h.bmi_status}</span>
+                            </div>
+                            <div class="ud-health-item ud-health-highlight">
+                                <span class="ud-health-label">BMR</span>
+                                <span class="ud-health-val">${h.bmr || '--'}</span>
+                                <span class="ud-health-sub">kcal/ngày</span>
+                            </div>
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">TDEE</span>
+                                <span class="ud-health-val">${h.tdee || '--'}</span>
+                                <span class="ud-health-sub">kcal/ngày</span>
+                            </div>
+                            <div class="ud-health-item">
+                                <span class="ud-health-label">Mục tiêu</span>
+                                <span class="ud-health-val">${h.goal || '--'}</span>
+                                <span class="ud-health-sub">${h.target_cal ? h.target_cal + ' kcal' : ''}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            } else {
+                healthHTML = `
+                    <div class="ud-section">
+                        <div class="ud-section-title"><i class="fa-solid fa-heart-pulse"></i> Hồ Sơ Sức Khỏe</div>
+                        <p style="color: var(--text-muted); font-size: 14px; padding: 16px;">Chưa cập nhật hồ sơ sức khỏe</p>
+                    </div>`;
+            }
+
+            // Recent history section
+            let historyHTML = '';
+            if (d.recent_history && d.recent_history.length > 0) {
+                const rows = d.recent_history.map(h => {
+                    const ratingMap = {
+                        'chinh_xac': '✅',
+                        'trung_binh': '⚠️',
+                        'sai': '❌'
+                    };
+                    return `<tr>
+                        <td style="font-weight: 500; color: var(--primary-light)">${h.food_name}</td>
+                        <td>${h.calories ? Math.round(h.calories) + ' kcal' : '--'}</td>
+                        <td>${ratingMap[h.rating] || '—'}</td>
+                        <td style="font-size: 12px; color: var(--text-muted)">${h.time}</td>
+                    </tr>`;
+                }).join('');
+                historyHTML = `
+                    <div class="ud-section">
+                        <div class="ud-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Hoạt Động Gần Đây</div>
+                        <div class="table-responsive">
+                            <table class="admin-table ud-history-table">
+                                <thead><tr><th>Món ăn</th><th>Calo</th><th>Đánh giá</th><th>Thời gian</th></tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+            } else {
+                historyHTML = `
+                    <div class="ud-section">
+                        <div class="ud-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Hoạt Động</div>
+                        <p style="color: var(--text-muted); font-size: 14px; padding: 16px;">Chưa có hoạt động nào</p>
+                    </div>`;
+            }
+
+            content.innerHTML = `
+                <div class="ud-header">
+                    <div class="ud-avatar-lg" style="background: ${avatarColors[colorIdx]};">${initial}</div>
+                    <div class="ud-header-info">
+                        <h2 class="ud-name">${d.name}</h2>
+                        <div class="ud-meta">
+                            <span>${d.email}</span>
+                            ${authBadge}
+                            <span class="user-status-badge ${status.cls}"><span class="status-dot"></span> ${status.text}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ud-stats-row">
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-camera-retro" style="color: #f59e0b;"></i>
+                        <span class="ud-stat-val">${d.stats.total_analyses}</span>
+                        <span class="ud-stat-label">Phân tích</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-fire" style="color: #ef4444;"></i>
+                        <span class="ud-stat-val">${d.stats.avg_calories}</span>
+                        <span class="ud-stat-label">Calo TB</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-calendar-check" style="color: #22c55e;"></i>
+                        <span class="ud-stat-val">${d.created_at ? new Date(d.created_at).toLocaleDateString('vi-VN') : '--'}</span>
+                        <span class="ud-stat-label">Ngày đăng ký</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-clock" style="color: #3b82f6;"></i>
+                        <span class="ud-stat-val">${d.stats.last_analysis || 'Chưa có'}</span>
+                        <span class="ud-stat-label">Phân tích cuối</span>
+                    </div>
+                </div>
+
+                ${healthHTML}
+                ${historyHTML}
+            `;
+        } catch(e) {
+            console.error('User detail error:', e);
+            content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi khi tải chi tiết</p></div>';
+        }
+    };
 
     // ============================================
     // HISTORY: GRID + TABLE + DETAIL MODAL

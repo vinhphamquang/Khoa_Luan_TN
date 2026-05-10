@@ -15,7 +15,8 @@ from db_queries import (
     get_user_food_stats, update_user_rating, update_history_record,
     create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
     delete_history_record, bulk_delete_history,
-    create_google_user, get_user_by_google_id, update_user_google_id
+    create_google_user, get_user_by_google_id, update_user_google_id,
+    get_user_detail_admin, update_last_active
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -70,9 +71,14 @@ def run_migrations():
             ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS GoogleId TEXT DEFAULT NULL
         """)
         
+        # 5. Thêm cột LastActive vào NguoiDung (trạng thái online)
+        cursor.execute("""
+            ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS LastActive TIMESTAMP DEFAULT NULL
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId)")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
@@ -183,7 +189,10 @@ def login():
     user = get_user_by_email(data["email"])
     if not user or not check_password_hash(user["MatKhau"], data["password"]):
         return jsonify({"success": False, "message": "Email hoặc mật khẩu không đúng"}), 401
-        
+    
+    # Cập nhật trạng thái hoạt động
+    update_last_active(user["MaNguoiDung"])
+    
     return jsonify({
         "success": True,
         "message": "Đăng nhập thành công",
@@ -673,6 +682,14 @@ def api_admin_get_users():
 def api_admin_delete_user(user_id):
     if delete_user(user_id): return jsonify({"success": True, "message": "Xóa người dùng thành công"})
     return jsonify({"success": False, "message": "Lỗi khi xóa người dùng"}), 500
+
+@app.route("/api/admin/users/<int:user_id>/detail", methods=["GET"])
+def api_admin_user_detail(user_id):
+    """Xem chi tiết user: info + health + history"""
+    detail = get_user_detail_admin(user_id)
+    if detail:
+        return jsonify({"success": True, "detail": detail})
+    return jsonify({"success": False, "message": "Không tìm thấy người dùng"}), 404
 
 @app.route("/api/admin/stats", methods=["GET"])
 def api_admin_get_stats():

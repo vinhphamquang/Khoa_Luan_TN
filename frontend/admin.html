@@ -167,12 +167,56 @@
                             <h3><i class="fa-solid fa-user-group"></i> Quản Lý Người Dùng</h3>
                             <p>Xem thông tin và quản lý tài khoản người dùng trên hệ thống</p>
                         </div>
+                        <span class="user-total-badge" id="user-total-badge">0 người dùng</span>
+                    </div>
+                    <!-- Filter / Search / Sort Bar -->
+                    <div class="user-filter-bar">
+                        <div class="user-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="user-search-input" class="form-input" placeholder="Tìm theo tên, email...">
+                        </div>
+                        <div class="user-filter-controls">
+                            <select id="user-role-filter" class="form-input user-filter-select">
+                                <option value="all">Tất cả vai trò</option>
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                                <option value="google">Google User</option>
+                            </select>
+                            <select id="user-sort-select" class="form-input user-filter-select">
+                                <option value="newest">Mới nhất</option>
+                                <option value="oldest">Cũ nhất</option>
+                                <option value="name_az">Tên A → Z</option>
+                                <option value="most_active">Hoạt động nhiều nhất</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Tên</th><th>Email</th><th>Vai Trò</th><th>Đăng Ký</th><th>Thao Tác</th></tr></thead>
+                            <thead><tr>
+                                <th>Avatar</th>
+                                <th>Tên</th>
+                                <th>Email</th>
+                                <th>Vai Trò</th>
+                                <th>Trạng Thái</th>
+                                <th>Phân Tích</th>
+                                <th>Đăng Ký</th>
+                                <th>Thao Tác</th>
+                            </tr></thead>
                             <tbody id="tb-users"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USER DETAIL MODAL -->
+            <div id="user-detail-overlay" class="modal-overlay hidden">
+                <div id="user-detail-modal" class="glass-card modal-box" style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
+                    <button class="modal-close" onclick="document.getElementById('user-detail-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+                    <div id="user-detail-content">
+                        <div class="history-loading">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Đang tải chi tiết...</span>
+                        </div>
                     </div>
                 </div>
             </div>
