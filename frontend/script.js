@@ -414,6 +414,9 @@ function initAnalyzePage() {
                     console.log('✨ Món mới vừa được thêm vào CSDL');
                 }
                 showResult(data);
+            } else if (data.is_food === false) {
+                // Hình ảnh không phải món ăn
+                showNotFoodError(data.message, data.suggestion);
             } else {
                 showError(
                     data.message || 'Lỗi từ Backend Server!',
@@ -468,6 +471,8 @@ function initAnalyzePage() {
                 showResult(data);
                 // Scroll to result
                 resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else if (data.is_food === false) {
+                showNotFoodError(data.message, data.suggestion);
             } else {
                 showError(
                     data.message || 'Không thể nhận diện lại. Vui lòng thử ảnh khác.',
@@ -674,6 +679,88 @@ function showError(message, suggestion = null) {
     
     // Initialize accordion (for nutrition section)
     initAccordion();
+}
+
+function showNotFoodError(message, suggestion = null) {
+    const resultSection = document.getElementById('result-section');
+    const sysMsg = document.getElementById('sys-msg');
+
+    if (resultSection) resultSection.classList.remove('hidden');
+
+    // Tạo nội dung đặc biệt cho "không phải món ăn"
+    _setText('food-name', '⚠️ Không phải món ăn');
+    _setText('food-desc', '');
+    _setText('confidence-score', '0');
+
+    // Hiển thị thông báo chi tiết trong sys-msg
+    if (sysMsg) {
+        sysMsg.innerHTML = `
+            <div class="not-food-alert">
+                <div class="not-food-icon">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <h3 class="not-food-title">${message || 'Hình ảnh này không phải là món ăn!'}</h3>
+                <p class="not-food-desc">${suggestion || 'Vui lòng chụp hoặc tải lên hình ảnh một món ăn để hệ thống có thể nhận diện và phân tích dinh dưỡng.'}</p>
+                <button class="btn btn-primary not-food-retake-btn" id="not-food-retake-btn">
+                    <i class="fa-solid fa-camera-rotate"></i> Chụp / Chọn Ảnh Khác
+                </button>
+            </div>
+        `;
+        sysMsg.classList.add('visible');
+
+        // Gắn sự kiện cho nút "Chụp lại"
+        const retakeBtn = document.getElementById('not-food-retake-btn');
+        if (retakeBtn) {
+            retakeBtn.addEventListener('click', () => {
+                // Reset trạng thái về upload
+                resultSection.classList.add('hidden');
+                sysMsg.textContent = '';
+                sysMsg.classList.remove('visible');
+
+                const previewContainer = document.getElementById('image-preview-container');
+                const uploadContent = document.getElementById('upload-content');
+                const fileInput = document.getElementById('file-input');
+                const previewImg = document.getElementById('preview-img');
+                const cameraSection = document.getElementById('camera-section');
+                const modeUploadBtn = document.getElementById('mode-upload-btn');
+                const modeCameraBtn = document.getElementById('mode-camera-btn');
+
+                if (previewContainer) previewContainer.classList.add('hidden');
+                if (fileInput) fileInput.value = '';
+                if (previewImg) previewImg.src = '';
+
+                // Kiểm tra mode hiện tại
+                if (modeCameraBtn && modeCameraBtn.classList.contains('btn-primary')) {
+                    // Đang ở mode camera → mở lại camera
+                    if (cameraSection) cameraSection.classList.remove('hidden');
+                } else {
+                    // Mode upload → hiện lại upload zone
+                    if (uploadContent) uploadContent.classList.remove('hidden');
+                }
+            });
+        }
+    }
+
+    // Ẩn các section dinh dưỡng
+    ['val-cal', 'val-prot', 'val-carb', 'val-fat'].forEach(id => {
+        _setText(id, '--');
+    });
+
+    _setStyle('ingredients-accordion', 'display', 'none');
+    _setStyle('recipe-accordion', 'display', 'none');
+
+    // Ẩn retry section và rating section cho trường hợp này
+    const retrySection = document.getElementById('retry-section');
+    const ratingSection = document.getElementById('user-rating-section');
+    if (retrySection) retrySection.style.display = 'none';
+    if (ratingSection) ratingSection.style.display = 'none';
+
+    // Ẩn health recommendation
+    const recBox = document.getElementById('health-recommendation-box');
+    if (recBox) recBox.style.display = 'none';
+
+    // Scroll tới kết quả
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function togglePassword(inputId, iconElement) {

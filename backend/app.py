@@ -968,6 +968,15 @@ def predict():
                 "suggestion": "Bạn có thể thử upload ảnh Phở, Bánh Mì hoặc Bún Chả để xem demo với dữ liệu có sẵn."
             }), 503  # Service Unavailable
         
+        # Kiểm tra nếu hình ảnh KHÔNG PHẢI MÓN ĂN
+        if food_name_english == "NOT_FOOD":
+            return jsonify({
+                "success": False,
+                "is_food": False,
+                "message": "Hình ảnh này không phải là món ăn!",
+                "suggestion": "Vui lòng chụp hoặc tải lên hình ảnh một món ăn để hệ thống có thể nhận diện và phân tích dinh dưỡng."
+            }), 400
+        
         # 2. Dịch tên món ăn sang tiếng Việt
         food_name_vietnamese = translate_food_name(food_name_english)
         print(f"[TRANSLATE] '{food_name_english}' → '{food_name_vietnamese}'")
@@ -1183,6 +1192,15 @@ def retry_recognition():
             "message": "Vẫn không thể nhận diện. Vui lòng thử ảnh khác hoặc chọn món thủ công.",
             "error_detail": error_msg
         }), 503
+    
+    # Kiểm tra nếu hình ảnh KHÔNG PHẢI MÓN ĂN
+    if food_name_english == "NOT_FOOD":
+        return jsonify({
+            "success": False,
+            "is_food": False,
+            "message": "Hình ảnh này không phải là món ăn!",
+            "suggestion": "Vui lòng chụp hoặc tải lên hình ảnh một món ăn để hệ thống có thể nhận diện và phân tích dinh dưỡng."
+        }), 400
     
     # Dịch sang tiếng Việt
     food_name_vietnamese = translate_food_name(food_name_english)

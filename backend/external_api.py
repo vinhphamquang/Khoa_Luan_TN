@@ -222,7 +222,7 @@ def recognize_food_gemini(image_bytes: bytes):
     payload = {
         "contents": [{
             "parts": [
-                {"text": "Analyze this food image. Reply with ONLY a single English core keyword label for the main dish in snake_case, nothing else. E.g., pho, beef_stew, pizza, sushi, salad."},
+                {"text": "Analyze this image. If the image does NOT contain any food or dish (e.g., it shows a person, animal, object, scenery, text, etc.), reply with ONLY the word NOT_FOOD. If the image DOES contain food, reply with ONLY a single English core keyword label for the main dish in snake_case, nothing else. E.g., pho, beef_stew, pizza, sushi, salad."},
                 {"inlineData": {"mimeType": "image/jpeg", "data": encoded_image}}
             ]
         }],
@@ -237,6 +237,12 @@ def recognize_food_gemini(image_bytes: bytes):
             data = response.json()
             label = data['candidates'][0]['content']['parts'][0]['text'].strip().lower()
             print(f"[DEBUG] Gemini success: {label}")
+            
+            # Kiểm tra nếu không phải món ăn
+            if label == "not_food":
+                print(f"[DEBUG] Gemini detected: NOT FOOD")
+                return "NOT_FOOD", 0.99, None
+            
             return label, 0.95, None
         else:
             error_msg = f"Gemini API lỗi {response.status_code}"
