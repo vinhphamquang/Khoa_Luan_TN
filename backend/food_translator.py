@@ -76,7 +76,44 @@ FOOD_TRANSLATION = {
     "shaking beef": "Bò Lúc Lắc",
     "canh chua": "Canh Chua",
     "canh chua ca": "Canh Chua Cá",
+    "canh chua ca loc": "Canh Chua Cá Lóc",
+    "canh chua tom": "Canh Chua Tôm",
+    "canh chua ca tre": "Canh Chua Cá Trê",
     "sour soup": "Canh Chua",
+    "fish sour soup": "Canh Chua Cá",
+    "shrimp sour soup": "Canh Chua Tôm",
+    
+    # Các loại canh cụ thể
+    "canh kho qua": "Canh Khổ Qua",
+    "canh kho qua nhoi thit": "Canh Khổ Qua Nhồi Thịt",
+    "bitter melon soup": "Canh Khổ Qua",
+    "stuffed bitter melon soup": "Canh Khổ Qua Nhồi Thịt",
+    "canh bi dao": "Canh Bí Đao",
+    "winter melon soup": "Canh Bí Đao",
+    "canh bi do": "Canh Bí Đỏ",
+    "pumpkin soup": "Canh Bí Đỏ",
+    "canh mong toi": "Canh Mồng Tơi",
+    "spinach soup": "Canh Mồng Tơi",
+    "malabar spinach soup": "Canh Mồng Tơi",
+    "canh cai xoong": "Canh Cải Xoong",
+    "watercress soup": "Canh Cải Xoong",
+    "canh bau": "Canh Bầu",
+    "gourd soup": "Canh Bầu",
+    "canh bap cai": "Canh Bắp Cải",
+    "cabbage soup": "Canh Bắp Cải",
+    "canh suon": "Canh Sườn",
+    "pork rib soup": "Canh Sườn",
+    "canh rau": "Canh Rau",
+    "vegetable soup": "Canh Rau",
+    "canh ca chua trung": "Canh Cà Chua Trứng",
+    "tomato egg soup": "Canh Cà Chua Trứng",
+    "canh rong bien": "Canh Rong Biển",
+    "seaweed soup": "Canh Rong Biển",
+    "canh cai": "Canh Cải",
+    "canh cai thia": "Canh Cải Thìa",
+    "canh hen": "Canh Hến",
+    "canh ngao": "Canh Ngao",
+    "clam soup": "Canh Ngao",
     "thit kho": "Thịt Kho",
     "thit kho tau": "Thịt Kho Tàu",
     "braised pork": "Thịt Kho Tàu",
@@ -241,11 +278,25 @@ def translate_food_name(english_name: str) -> str:
         print(f"[TRANSLATE] '{english_name}' -> '{vietnamese_name}'")
         return vietnamese_name
     
-    # Thử tìm partial match
+    # Thử tìm partial match - chấm điểm để chọn kết quả tốt nhất
+    best_match = None
+    best_score = 0
     for eng_key, viet_value in FOOD_TRANSLATION.items():
-        if eng_key in english_lower or english_lower in eng_key:
-            print(f"[TRANSLATE] '{english_name}' -> '{viet_value}' (partial match)")
-            return viet_value
+        score = 0
+        if eng_key in english_lower:
+            # Key nằm trong input: ưu tiên key dài hơn (cụ thể hơn)
+            score = len(eng_key) * 2
+        elif english_lower in eng_key:
+            # Input nằm trong key: điểm thấp hơn (match ngược)
+            score = len(english_lower)
+        
+        if score > best_score:
+            best_match = viet_value
+            best_score = score
+    
+    if best_match:
+        print(f"[TRANSLATE] '{english_name}' -> '{best_match}' (best partial match, score={best_score})")
+        return best_match
     
     # Không tìm thấy, giữ nguyên tên gốc
     print(f"[TRANSLATE] '{english_name}' -> Giu nguyen (khong tim thay ban dich)")

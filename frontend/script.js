@@ -507,7 +507,6 @@ function showResult(data) {
     sysMsg.textContent = '';
     sysMsg.classList.remove('visible');
 
-    _setText('confidence-score', data.confidence);
 
     if (data.food_data) {
         document.getElementById('food-name').textContent = data.food_data.name;
@@ -662,8 +661,6 @@ function showError(message, suggestion = null) {
     }
     
     _setText('food-desc', fullMessage);
-    _setText('confidence-score', '0');
-
     if (sysMsg) {
         sysMsg.textContent = fullMessage;
         sysMsg.classList.add('visible');
@@ -690,8 +687,6 @@ function showNotFoodError(message, suggestion = null) {
     // Tạo nội dung đặc biệt cho "không phải món ăn"
     _setText('food-name', '⚠️ Không phải món ăn');
     _setText('food-desc', '');
-    _setText('confidence-score', '0');
-
     // Hiển thị thông báo chi tiết trong sys-msg
     if (sysMsg) {
         sysMsg.innerHTML = `
@@ -1260,7 +1255,6 @@ async function loadFoodHistory(userId) {
                         <div class="history-card-name" title="${item.food_name}">${item.food_name}</div>
                         <div class="history-card-meta">
                             <span class="history-card-cal"><i class="fa-solid fa-fire"></i> ${calStr}</span>
-                            <span class="history-card-acc">${item.accuracy}%</span>
                         </div>
                         <div class="history-card-time"><i class="fa-regular fa-clock"></i> ${timeStr}</div>
                     </div>

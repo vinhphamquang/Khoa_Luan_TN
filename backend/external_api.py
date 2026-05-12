@@ -222,7 +222,30 @@ def recognize_food_gemini(image_bytes: bytes):
     payload = {
         "contents": [{
             "parts": [
-                {"text": "Analyze this image. If the image does NOT contain any food or dish (e.g., it shows a person, animal, object, scenery, text, etc.), reply with ONLY the word NOT_FOOD. If the image DOES contain food, reply with ONLY a single English core keyword label for the main dish in snake_case, nothing else. E.g., pho, beef_stew, pizza, sushi, salad."},
+                {"text": """Analyze this food image carefully. 
+
+If the image does NOT contain any food or dish (e.g., person, animal, object, scenery, text), reply with ONLY: NOT_FOOD
+
+If the image DOES contain food, identify the SPECIFIC dish name. Reply with ONLY the dish name in snake_case, nothing else.
+
+IMPORTANT RULES:
+- For Vietnamese soups/canh dishes, identify the SPECIFIC type. Do NOT just say "soup" or "sour_soup". Instead identify:
+  + canh_chua_ca (sour fish soup), canh_chua_tom (sour shrimp soup)
+  + canh_kho_qua (bitter melon soup), canh_kho_qua_nhoi_thit (stuffed bitter melon soup)
+  + canh_bi_dao (winter melon soup), canh_bi_do (pumpkin soup)
+  + canh_mong_toi (Malabar spinach soup), canh_cai_xoong (watercress soup)
+  + canh_bau (gourd soup), canh_bap_cai (cabbage soup)
+  + canh_suon (pork rib soup), canh_rau (vegetable soup)
+  + canh_ca_chua_trung (tomato egg soup), canh_rong_bien (seaweed soup)
+- For Vietnamese noodle soups: pho_bo, pho_ga, bun_bo_hue, bun_rieu, hu_tieu, banh_canh, mi_quang
+- For Vietnamese stews/braised: thit_kho, ca_kho_to, bo_kho
+- For hotpots: lau_thai, lau_hai_san, lau_nam
+- For other Vietnamese dishes, use Vietnamese romanized names without diacritics: com_tam, banh_mi, bun_cha, goi_cuon, banh_xeo
+- For non-Vietnamese dishes, use English: pizza, sushi, hamburger, pasta, steak
+
+Identify the KEY INGREDIENT visible in the dish (fish, shrimp, pork, chicken, beef, tofu, vegetables) to give the most specific name possible.
+
+Reply with ONLY the dish name, nothing else."""},
                 {"inlineData": {"mimeType": "image/jpeg", "data": encoded_image}}
             ]
         }],

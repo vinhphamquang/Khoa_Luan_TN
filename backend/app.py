@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from external_api import analyze_image
 from db_queries import (
-    search_food_by_name, insert_lich_su, get_db_connection,
+    search_food_by_name, insert_lich_su, get_db_connection, get_db_cursor,
     create_user, get_user_by_email, get_user_history, get_user_by_id, update_password,
     get_all_users, delete_user, get_system_stats, get_all_history_admin, get_history_detail_admin,
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
@@ -16,7 +16,7 @@ from db_queries import (
     create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
     delete_history_record, bulk_delete_history,
     create_google_user, get_user_by_google_id, update_user_google_id,
-    get_user_detail_admin, update_last_active
+    get_user_detail_admin, update_last_active, notify_admins
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -176,6 +176,14 @@ def register():
             }
             upsert_health_profile(user_id, hp_data)
             
+        # Thông báo cho admin khi có người đăng ký mới
+        try:
+            notify_admins(
+                f"👤 Người dùng mới đăng ký: {data['name']} ({data['email']})"
+            )
+        except Exception as e:
+            print(f"[NOTIFY] Error notifying admins about new user: {e}")
+        
         return jsonify({"success": True, "message": message})
     else:
         return jsonify({"success": False, "message": message}), 400
@@ -746,6 +754,32 @@ def api_user_rating():
         return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
     
     if update_user_rating(history_id, rating):
+        # Thông báo admin khi đánh giá sai hoặc trung bình
+        if rating in ('sai', 'trung_binh'):
+            try:
+                conn = get_db_connection()
+                cursor = get_db_cursor(conn)
+                cursor.execute("""
+                    SELECT l.TenMonAn, n.TenNguoiDung 
+                    FROM LichSu l 
+                    LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung 
+                    WHERE l.MaLichSu = %s
+                """, (history_id,))
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    food_name = row['tenmonan'] or 'Không rõ'
+                    user_name = row['tennguoidung'] or 'Ẩn danh'
+                    rating_text = 'Sai kết quả' if rating == 'sai' else 'Trung bình'
+                    icon = '❌' if rating == 'sai' else '⚠️'
+                    notify_admins(
+                        f"{icon} Đánh giá [{rating_text}] cho món \"{food_name}\" bởi {user_name}",
+                        history_id=history_id
+                    )
+            except Exception as e:
+                print(f"[NOTIFY] Error notifying admins about rating: {e}")
+        
         return jsonify({"success": True, "message": "Đã lưu đánh giá"})
     return jsonify({"success": False, "message": "Lỗi khi lưu đánh giá"}), 500
 

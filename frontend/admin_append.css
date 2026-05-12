@@ -1671,3 +1671,264 @@
         justify-content: center;
     }
 }
+
+/* ============================================
+   RATING OVERVIEW SECTION
+   ============================================ */
+.rating-overview-section {
+    margin-top: 28px;
+    animation: fadeIn 0.5s ease;
+}
+
+.rating-overview-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rating-overview-title i {
+    color: #f59e0b;
+    font-size: 20px;
+}
+
+/* Rating Cards Grid */
+.rating-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.rating-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.rating-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.rating-card-icon {
+    font-size: 22px;
+}
+
+.rating-card-good .rating-card-icon { color: #22c55e; }
+.rating-card-mid .rating-card-icon { color: #f59e0b; }
+.rating-card-bad .rating-card-icon { color: #ef4444; }
+.rating-card-total .rating-card-icon { color: #3b82f6; }
+
+.rating-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rating-card-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1;
+}
+
+.rating-card-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.rating-card-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.rating-card-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rating-card-good .rating-card-fill { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.rating-card-mid .rating-card-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.rating-card-bad .rating-card-fill { background: linear-gradient(90deg, #ef4444, #f87171); }
+.rating-card-total .rating-card-fill { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+
+.rating-card-pct {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Rating Detail Grid (bottom panels) */
+.rating-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.rating-detail-panel {
+    padding: 20px;
+    border-radius: 14px;
+}
+
+.rating-detail-panel h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rating-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 24px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Top Wrong Foods List */
+.wrong-food-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.wrong-food-item:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.wrong-food-rank {
+    font-size: 13px;
+    font-weight: 800;
+    color: #ef4444;
+    min-width: 28px;
+}
+
+.wrong-food-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+}
+
+.wrong-food-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+/* Recent Ratings List */
+.recent-rating-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.recent-rating-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.recent-rating-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.recent-rating-icon.rating-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.recent-rating-icon.rating-yellow { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.recent-rating-icon.rating-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+.recent-rating-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.recent-rating-food {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recent-rating-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.recent-rating-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+.recent-rating-badge.rating-green { background: rgba(34, 197, 94, 0.12); color: #22c55e; }
+.recent-rating-badge.rating-yellow { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.recent-rating-badge.rating-red { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .rating-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .rating-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 500px) {
+    .rating-cards-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

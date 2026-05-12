@@ -451,8 +451,86 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('st-users').textContent = data.stats.total_users;
                 document.getElementById('st-foods').textContent = data.stats.total_foods;
                 document.getElementById('st-recs').textContent = data.stats.total_recognitions;
+                
+                // Render Rating Stats
+                renderRatingStats(data.stats);
             }
         } catch(e) { console.error(e); }
+    }
+
+    function renderRatingStats(stats) {
+        const ratings = stats.ratings || { good: 0, mid: 0, bad: 0, total: 0 };
+        const total = ratings.total || 0;
+        
+        // Update values
+        document.getElementById('rt-good').textContent = ratings.good;
+        document.getElementById('rt-mid').textContent = ratings.mid;
+        document.getElementById('rt-bad').textContent = ratings.bad;
+        document.getElementById('rt-total').textContent = total;
+        
+        // Update percentages and bars
+        const goodPct = total > 0 ? Math.round((ratings.good / total) * 100) : 0;
+        const midPct = total > 0 ? Math.round((ratings.mid / total) * 100) : 0;
+        const badPct = total > 0 ? Math.round((ratings.bad / total) * 100) : 0;
+        
+        document.getElementById('rt-good-pct').textContent = goodPct + '%';
+        document.getElementById('rt-mid-pct').textContent = midPct + '%';
+        document.getElementById('rt-bad-pct').textContent = badPct + '%';
+        
+        const unrated = stats.total_recognitions - total;
+        document.getElementById('rt-unrated').textContent = unrated > 0 ? `${unrated} chưa đánh giá` : 'Tất cả đã đánh giá';
+        
+        // Animate bars
+        setTimeout(() => {
+            document.getElementById('rt-good-bar').style.width = goodPct + '%';
+            document.getElementById('rt-mid-bar').style.width = midPct + '%';
+            document.getElementById('rt-bad-bar').style.width = badPct + '%';
+        }, 100);
+        
+        // Top Wrong Foods
+        const wrongList = document.getElementById('top-wrong-foods-list');
+        const topWrong = stats.top_wrong_foods || [];
+        if (topWrong.length > 0) {
+            wrongList.innerHTML = topWrong.map((item, idx) => `
+                <div class="wrong-food-item">
+                    <span class="wrong-food-rank">#${idx + 1}</span>
+                    <span class="wrong-food-name">${item.name}</span>
+                    <span class="wrong-food-count">${item.count} lần</span>
+                </div>
+            `).join('');
+        } else {
+            wrongList.innerHTML = '<p class="rating-empty"><i class="fa-solid fa-circle-check" style="color: #22c55e;"></i> Chưa có món bị đánh giá sai</p>';
+        }
+        
+        // Recent Ratings
+        const recentList = document.getElementById('recent-ratings-list');
+        const recentRatings = stats.recent_ratings || [];
+        if (recentRatings.length > 0) {
+            const ratingIcons = {
+                'chinh_xac': { icon: 'fa-circle-check', cls: 'rating-green', text: 'Chính xác' },
+                'trung_binh': { icon: 'fa-minus-circle', cls: 'rating-yellow', text: 'Trung bình' },
+                'sai': { icon: 'fa-circle-xmark', cls: 'rating-red', text: 'Sai' }
+            };
+            recentList.innerHTML = recentRatings.map(item => {
+                const r = ratingIcons[item.rating] || ratingIcons['chinh_xac'];
+                return `
+                    <div class="recent-rating-item">
+                        <div class="recent-rating-icon ${r.cls}">
+                            <i class="fa-solid ${r.icon}"></i>
+                        </div>
+                        <div class="recent-rating-info">
+                            <span class="recent-rating-food">${item.food_name}</span>
+                            <span class="recent-rating-meta">
+                                <i class="fa-solid fa-user"></i> ${item.user_name} · ${item.time}
+                            </span>
+                        </div>
+                        <span class="recent-rating-badge ${r.cls}">${r.text}</span>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            recentList.innerHTML = '<p class="rating-empty"><i class="fa-solid fa-hourglass-half"></i> Chưa có đánh giá nào</p>';
+        }
     }
 
     async function fetchAdminFoods() {
@@ -1254,3 +1332,106 @@ document.addEventListener('click', async (e) => {
     btn.disabled = false;
     updateBulkSelection();
 });
+
+// ============================================
+// ADMIN NOTIFICATIONS
+// ============================================
+(function initAdminNotifications() {
+    const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (!loggedUser || !loggedUser.id) return;
+
+    const bellWrap = document.getElementById('notif-bell-wrap');
+    const bellBtn = document.getElementById('notif-bell-btn');
+    const dropdown = document.getElementById('notif-dropdown');
+    const readAllBtn = document.getElementById('notif-read-all');
+
+    if (!bellWrap) return;
+
+    // Toggle dropdown
+    bellBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+        if (!bellWrap.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    // Mark all read
+    readAllBtn?.addEventListener('click', async () => {
+        try {
+            await fetch(`/api/notifications/${loggedUser.id}/read-all`, { method: 'PUT' });
+            fetchAdminNotifications();
+        } catch (e) { console.error(e); }
+    });
+
+    async function fetchAdminNotifications() {
+        try {
+            const res = await fetch(`/api/notifications/${loggedUser.id}`);
+            const data = await res.json();
+            if (!data.success) return;
+
+            const badge = document.getElementById('notif-badge');
+            const body = document.getElementById('notif-dropdown-body');
+
+            // Update badge
+            if (data.unread_count > 0) {
+                badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Render
+            if (data.notifications.length === 0) {
+                body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>';
+                return;
+            }
+
+            body.innerHTML = data.notifications.map(n => {
+                const timeStr = n.time ? new Date(n.time).toLocaleString('vi-VN') : '';
+                const unreadClass = n.is_read ? '' : 'notif-unread';
+                
+                // Detect notification type for icon
+                let icon = 'fa-pen-to-square';
+                if (n.content.includes('👤') || n.content.includes('đăng ký')) icon = 'fa-user-plus';
+                else if (n.content.includes('❌') || n.content.includes('Sai')) icon = 'fa-circle-xmark';
+                else if (n.content.includes('⚠️') || n.content.includes('Trung bình')) icon = 'fa-triangle-exclamation';
+                
+                return `
+                    <div class="notif-item ${unreadClass}" data-id="${n.id}" onclick="markAdminNotifRead(${n.id})">
+                        <div class="notif-item-icon">
+                            <i class="fa-solid ${icon}"></i>
+                        </div>
+                        <div class="notif-item-body">
+                            <p class="notif-item-text">${n.content}</p>
+                            ${n.old_name && n.new_name ? `
+                                <div class="notif-item-change">
+                                    <span class="notif-old">${n.old_name}</span>
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                    <span class="notif-new">${n.new_name}</span>
+                                </div>` : ''}
+                            <span class="notif-item-time"><i class="fa-regular fa-clock"></i> ${timeStr}</span>
+                        </div>
+                    </div>`;
+            }).join('');
+        } catch (e) {
+            console.error('Admin notification fetch error:', e);
+        }
+    }
+
+    // Mark single notification read
+    window.markAdminNotifRead = async (notifId) => {
+        try {
+            await fetch(`/api/notifications/${notifId}/read`, { method: 'PUT' });
+            fetchAdminNotifications();
+        } catch (e) { console.error(e); }
+    };
+
+    // Initial fetch + polling
+    fetchAdminNotifications();
+    setInterval(() => fetchAdminNotifications(), 30000);
+})();

@@ -242,17 +242,34 @@ def search_food_by_name(food_name):
                 conn.close()
                 return result
         
-        # Priority 2: Partial match
+        # Priority 2: Starts-with match (chính xác hơn contains)
         for variant in search_variants:
             cursor.execute("""
                 SELECT * FROM MonAn 
                 WHERE LOWER(TenMonAn) LIKE LOWER(%s) AND IsDeleted = 0
+                ORDER BY LENGTH(TenMonAn) ASC
+                LIMIT 1
+            """, (f'{variant}%',))
+            
+            mon_an = cursor.fetchone()
+            if mon_an:
+                print(f"[SEARCH] ✅ Starts-with match: '{variant}' → '{mon_an['tenmonan']}'")
+                result = format_food_data(mon_an, cursor, conn)
+                conn.close()
+                return result
+        
+        # Priority 3: Contains match (rộng nhất, ưu tiên tên ngắn nhất)
+        for variant in search_variants:
+            cursor.execute("""
+                SELECT * FROM MonAn 
+                WHERE LOWER(TenMonAn) LIKE LOWER(%s) AND IsDeleted = 0
+                ORDER BY LENGTH(TenMonAn) ASC
                 LIMIT 1
             """, (f'%{variant}%',))
             
             mon_an = cursor.fetchone()
             if mon_an:
-                print(f"[SEARCH] ⚠️ Partial match: '{variant}'")
+                print(f"[SEARCH] ⚠️ Contains match: '{variant}' → '{mon_an['tenmonan']}'")
                 result = format_food_data(mon_an, cursor, conn)
                 conn.close()
                 return result
@@ -781,7 +798,7 @@ def delete_user(user_id):
         return False
 
 def get_system_stats():
-    """Lấy thống kê hệ thống"""
+    """Lấy thống kê hệ thống + tổng hợp đánh giá người dùng"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
@@ -798,16 +815,71 @@ def get_system_stats():
         cursor.execute("SELECT COUNT(*) as count FROM LichSu")
         total_scans = cursor.fetchone()['count']
         
+        # Rating aggregation
+        cursor.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'chinh_xac') as rating_good,
+                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'trung_binh') as rating_mid,
+                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'sai') as rating_bad,
+                COUNT(*) FILTER (WHERE DanhGiaNguoiDung IS NOT NULL) as rating_total
+            FROM LichSu
+        """)
+        rating_row = cursor.fetchone()
+        
+        # Top 5 foods rated as "sai" (incorrect) — để admin biết cần cải thiện
+        cursor.execute("""
+            SELECT TenMonAn, COUNT(*) as so_lan
+            FROM LichSu
+            WHERE DanhGiaNguoiDung = 'sai'
+            GROUP BY TenMonAn
+            ORDER BY so_lan DESC
+            LIMIT 5
+        """)
+        top_wrong = [{'name': r['tenmonan'], 'count': r['so_lan']} for r in cursor.fetchall()]
+        
+        # Recent ratings (10 đánh giá gần nhất)
+        cursor.execute("""
+            SELECT l.TenMonAn, l.DanhGiaNguoiDung, l.ThoiGian, 
+                   n.TenNguoiDung
+            FROM LichSu l
+            LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
+            WHERE l.DanhGiaNguoiDung IS NOT NULL
+            ORDER BY l.ThoiGian DESC
+            LIMIT 10
+        """)
+        recent_ratings = []
+        for r in cursor.fetchall():
+            recent_ratings.append({
+                'food_name': r['tenmonan'],
+                'rating': r['danhgianguoidung'],
+                'user_name': r['tennguoidung'] or 'Ẩn danh',
+                'time': r['thoigian'].strftime('%d/%m/%Y %H:%M') if r['thoigian'] else ''
+            })
+        
         conn.close()
         
         return {
             'total_users': total_users,
             'total_foods': total_foods,
-            'total_scans': total_scans
+            'total_recognitions': total_scans,
+            'ratings': {
+                'good': rating_row['rating_good'] or 0,
+                'mid': rating_row['rating_mid'] or 0,
+                'bad': rating_row['rating_bad'] or 0,
+                'total': rating_row['rating_total'] or 0
+            },
+            'top_wrong_foods': top_wrong,
+            'recent_ratings': recent_ratings
         }
     except Exception as e:
         print(f"Error: {e}")
-        return {'total_users': 0, 'total_foods': 0, 'total_scans': 0}
+        import traceback
+        traceback.print_exc()
+        return {
+            'total_users': 0, 'total_foods': 0, 'total_recognitions': 0,
+            'ratings': {'good': 0, 'mid': 0, 'bad': 0, 'total': 0},
+            'top_wrong_foods': [], 'recent_ratings': []
+        }
 
 def get_all_history_admin():
     """Lấy tất cả lịch sử (admin) - bao gồm ảnh và calo"""
@@ -1374,6 +1446,25 @@ def update_history_record(history_id, new_food_name, new_calories=None):
         import traceback
         traceback.print_exc()
         return None
+
+def get_admin_user_ids():
+    """Lấy danh sách MaNguoiDung của tất cả admin"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        cursor.execute("SELECT MaNguoiDung FROM NguoiDung WHERE VaiTro = 'admin'")
+        ids = [r['manguoidung'] for r in cursor.fetchall()]
+        conn.close()
+        return ids
+    except Exception as e:
+        print(f"Error get_admin_user_ids: {e}")
+        return []
+
+def notify_admins(content, history_id=None, old_name='', new_name=''):
+    """Gửi thông báo tới tất cả admin"""
+    admin_ids = get_admin_user_ids()
+    for admin_id in admin_ids:
+        create_notification(admin_id, history_id, content, old_name, new_name)
 
 def create_notification(user_id, history_id, content, old_name='', new_name=''):
     """Tạo thông báo cho user"""
