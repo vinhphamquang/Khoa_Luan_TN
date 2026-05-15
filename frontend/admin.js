@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(tab.dataset.tab === 'admin-foods') fetchAdminFoods();
             if(tab.dataset.tab === 'admin-users') fetchAdminUsers();
             if(tab.dataset.tab === 'admin-history') fetchAdminHistory();
+            if(tab.dataset.tab === 'admin-comments') fetchAdminComments();
         });
     });
 
@@ -447,84 +448,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('st-foods').textContent = data.stats.total_foods;
                 document.getElementById('st-recs').textContent = data.stats.total_recognitions;
                 
-                // Render Rating Stats
-                renderRatingStats(data.stats);
+                // Render Comment Stats
+                renderCommentStats(data.stats);
             }
         } catch(e) { console.error(e); }
     }
 
-    function renderRatingStats(stats) {
-        const ratings = stats.ratings || { good: 0, mid: 0, bad: 0, total: 0 };
-        const total = ratings.total || 0;
+    function renderCommentStats(stats) {
+        const comments = stats.comments || { total: 0, replied: 0, pending: 0 };
         
         // Update values
-        document.getElementById('rt-good').textContent = ratings.good;
-        document.getElementById('rt-mid').textContent = ratings.mid;
-        document.getElementById('rt-bad').textContent = ratings.bad;
-        document.getElementById('rt-total').textContent = total;
+        const csTotal = document.getElementById('cs-total');
+        const csPending = document.getElementById('cs-pending');
+        const csReplied = document.getElementById('cs-replied');
         
-        // Update percentages and bars
-        const goodPct = total > 0 ? Math.round((ratings.good / total) * 100) : 0;
-        const midPct = total > 0 ? Math.round((ratings.mid / total) * 100) : 0;
-        const badPct = total > 0 ? Math.round((ratings.bad / total) * 100) : 0;
+        if (csTotal) csTotal.textContent = comments.total;
+        if (csPending) csPending.textContent = comments.pending;
+        if (csReplied) csReplied.textContent = comments.replied;
         
-        document.getElementById('rt-good-pct').textContent = goodPct + '%';
-        document.getElementById('rt-mid-pct').textContent = midPct + '%';
-        document.getElementById('rt-bad-pct').textContent = badPct + '%';
-        
-        const unrated = stats.total_recognitions - total;
-        document.getElementById('rt-unrated').textContent = unrated > 0 ? `${unrated} chưa đánh giá` : 'Tất cả đã đánh giá';
-        
-        // Animate bars
-        setTimeout(() => {
-            document.getElementById('rt-good-bar').style.width = goodPct + '%';
-            document.getElementById('rt-mid-bar').style.width = midPct + '%';
-            document.getElementById('rt-bad-bar').style.width = badPct + '%';
-        }, 100);
-        
-        // Top Wrong Foods
-        const wrongList = document.getElementById('top-wrong-foods-list');
-        const topWrong = stats.top_wrong_foods || [];
-        if (topWrong.length > 0) {
-            wrongList.innerHTML = topWrong.map((item, idx) => `
-                <div class="wrong-food-item">
-                    <span class="wrong-food-rank">#${idx + 1}</span>
-                    <span class="wrong-food-name">${item.name}</span>
-                    <span class="wrong-food-count">${item.count} lần</span>
-                </div>
-            `).join('');
-        } else {
-            wrongList.innerHTML = '<p class="rating-empty"><i class="fa-solid fa-circle-check" style="color: #22c55e;"></i> Chưa có món bị đánh giá sai</p>';
-        }
-        
-        // Recent Ratings
-        const recentList = document.getElementById('recent-ratings-list');
-        const recentRatings = stats.recent_ratings || [];
-        if (recentRatings.length > 0) {
-            const ratingIcons = {
-                'chinh_xac': { icon: 'fa-circle-check', cls: 'rating-green', text: 'Chính xác' },
-                'trung_binh': { icon: 'fa-minus-circle', cls: 'rating-yellow', text: 'Trung bình' },
-                'sai': { icon: 'fa-circle-xmark', cls: 'rating-red', text: 'Sai' }
-            };
-            recentList.innerHTML = recentRatings.map(item => {
-                const r = ratingIcons[item.rating] || ratingIcons['chinh_xac'];
-                return `
-                    <div class="recent-rating-item">
-                        <div class="recent-rating-icon ${r.cls}">
-                            <i class="fa-solid ${r.icon}"></i>
+        // Recent Comments
+        const recentList = document.getElementById('recent-comments-list');
+        const recentComments = stats.recent_comments || [];
+        if (recentList) {
+            if (recentComments.length > 0) {
+                recentList.innerHTML = recentComments.map(item => {
+                    const statusCls = item.reply_count > 0 ? 'comment-status-replied' : 'comment-status-pending';
+                    const statusText = item.reply_count > 0 ? 'Đã phản hồi' : 'Chưa phản hồi';
+                    const statusIcon = item.reply_count > 0 ? 'fa-check-double' : 'fa-clock';
+                    return `
+                        <div class="recent-comment-item">
+                            <div class="recent-comment-info">
+                                <span class="recent-comment-user"><i class="fa-solid fa-user"></i> ${item.user_name}</span>
+                                <span class="recent-comment-food">${item.food_name}</span>
+                                <p class="recent-comment-text">${item.content.length > 60 ? item.content.substring(0, 60) + '...' : item.content}</p>
+                                <span class="recent-comment-time"><i class="fa-regular fa-clock"></i> ${item.time}</span>
+                            </div>
+                            <span class="comment-status-badge ${statusCls}"><i class="fa-solid ${statusIcon}"></i> ${statusText}</span>
                         </div>
-                        <div class="recent-rating-info">
-                            <span class="recent-rating-food">${item.food_name}</span>
-                            <span class="recent-rating-meta">
-                                <i class="fa-solid fa-user"></i> ${item.user_name} · ${item.time}
-                            </span>
-                        </div>
-                        <span class="recent-rating-badge ${r.cls}">${r.text}</span>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            recentList.innerHTML = '<p class="rating-empty"><i class="fa-solid fa-hourglass-half"></i> Chưa có đánh giá nào</p>';
+                    `;
+                }).join('');
+            } else {
+                recentList.innerHTML = '<p class="rating-empty"><i class="fa-solid fa-comments"></i> Chưa có bình luận nào</p>';
+            }
         }
     }
 
@@ -930,15 +895,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return imageData;
     }
 
-    function getRatingBadge(rating) {
-        if (!rating) return '<span class="rating-badge rating-none"><i class="fa-solid fa-minus"></i> Chưa đánh giá</span>';
-        const map = {
-            'chinh_xac': { cls: 'rating-green', icon: 'fa-circle-check', text: 'Chính xác' },
-            'trung_binh': { cls: 'rating-yellow', icon: 'fa-minus-circle', text: 'Trung bình' },
-            'sai': { cls: 'rating-red', icon: 'fa-circle-xmark', text: 'Sai kết quả' }
-        };
-        const r = map[rating] || map['chinh_xac'];
-        return `<span class="rating-badge ${r.cls}"><i class="fa-solid ${r.icon}"></i> ${r.text}</span>`;
+    function getCommentBadge(commentCount) {
+        if (!commentCount || commentCount === 0) return '<span class="rating-badge rating-none"><i class="fa-solid fa-minus"></i> --</span>';
+        return `<span class="rating-badge rating-green"><i class="fa-solid fa-comments"></i> ${commentCount}</span>`;
     }
 
     function renderHistoryGrid(data) {
@@ -976,7 +935,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </span>
                         ${h.calories ? `<span class="history-card-cal"><i class="fa-solid fa-fire-flame-curved"></i> ${Math.round(h.calories)} kcal</span>` : ''}
                     </div>
-                    <div class="history-card-rating">${getRatingBadge(h.user_rating)}</div>
+                    <div class="history-card-rating">${getCommentBadge(h.comment_count)}</div>
                     <div class="history-card-time">
                         <i class="fa-regular fa-clock"></i> ${dateStr} ${timeStr}
                     </div>
@@ -1014,7 +973,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${h.user_name}</td>
                 <td style="font-weight:500; color:var(--primary-light)">${h.food_name}</td>
                 <td>${h.calories ? Math.round(h.calories) + ' kcal' : '--'}</td>
-                <td>${getRatingBadge(h.user_rating)}</td>
+                <td>${getCommentBadge(h.comment_count)}</td>
                 <td><span style="font-size: 13px; color: var(--text-muted);">${dateStr}</span></td>
                 <td>
                     <button class="btn-icon" title="Xem chi tiết" onclick="viewHistoryDetail(${h.id})">
@@ -1430,3 +1389,151 @@ document.addEventListener('click', async (e) => {
     fetchAdminNotifications();
     setInterval(() => fetchAdminNotifications(), 30000);
 })();
+
+// ============================================
+// ADMIN COMMENTS MANAGEMENT
+// ============================================
+async function fetchAdminComments() {
+    const listEl = document.getElementById('admin-comments-list');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '<div class="history-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải...</span></div>';
+    
+    const filter = document.getElementById('comment-filter-status')?.value || 'all';
+    
+    try {
+        const res = await fetch(`/api/admin/comments?status=${filter}`);
+        const data = await res.json();
+        if (data.success) {
+            renderAdminComments(data.comments);
+        }
+    } catch (e) {
+        console.error(e);
+        listEl.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải dữ liệu</p></div>';
+    }
+}
+
+function renderAdminComments(comments) {
+    const listEl = document.getElementById('admin-comments-list');
+    if (!listEl) return;
+    
+    if (!comments || comments.length === 0) {
+        listEl.innerHTML = '<div class="history-empty"><i class="fa-solid fa-comments"></i><p>Chưa có bình luận nào</p></div>';
+        return;
+    }
+    
+    listEl.innerHTML = comments.map(c => {
+        const statusCls = c.status === 'replied' ? 'comment-status-replied' : 'comment-status-pending';
+        const statusText = c.status === 'replied' ? 'Đã phản hồi' : 'Chưa phản hồi';
+        const statusIcon = c.status === 'replied' ? 'fa-check-double' : 'fa-clock';
+        
+        const repliesHTML = (c.replies || []).map(r => `
+            <div class="admin-reply-item">
+                <div class="admin-reply-avatar">${r.is_admin ? '🛡️' : 'U'}</div>
+                <div class="admin-reply-body">
+                    <span class="admin-reply-author">${r.is_admin ? 'Admin' : r.user_name}</span>
+                    <p class="admin-reply-text">${r.content}</p>
+                    <span class="admin-reply-time"><i class="fa-regular fa-clock"></i> ${r.time}</span>
+                </div>
+            </div>
+        `).join('');
+        
+        return `
+            <div class="admin-comment-card" data-id="${c.id}">
+                <div class="admin-comment-header">
+                    <div class="admin-comment-user">
+                        <div class="admin-comment-avatar">${(c.user_name || 'U').charAt(0).toUpperCase()}</div>
+                        <div>
+                            <span class="admin-comment-name">${c.user_name}</span>
+                            <span class="admin-comment-email">${c.user_email || ''}</span>
+                        </div>
+                    </div>
+                    <span class="comment-status-badge ${statusCls}"><i class="fa-solid ${statusIcon}"></i> ${statusText}</span>
+                </div>
+                <div class="admin-comment-food">
+                    <i class="fa-solid fa-utensils"></i> ${c.food_name}
+                </div>
+                <div class="admin-comment-content">
+                    <p>${c.content}</p>
+                    <span class="admin-comment-time"><i class="fa-regular fa-clock"></i> ${c.time}</span>
+                </div>
+                ${repliesHTML ? `<div class="admin-comment-replies">${repliesHTML}</div>` : ''}
+                <div class="admin-comment-actions">
+                    <div class="admin-reply-form-wrap" id="reply-form-${c.id}" style="display: none;">
+                        <textarea class="admin-reply-textarea" id="reply-input-${c.id}" placeholder="Nhập phản hồi cho người dùng..." rows="2"></textarea>
+                        <div class="admin-reply-btns">
+                            <button class="btn btn-ghost" style="padding: 6px 14px; font-size: 13px;" onclick="document.getElementById('reply-form-${c.id}').style.display='none'">Hủy</button>
+                            <button class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;" onclick="submitAdminReply(${c.id})">
+                                <i class="fa-solid fa-paper-plane"></i> Gửi
+                            </button>
+                        </div>
+                    </div>
+                    <div class="admin-comment-btn-row">
+                        <button class="btn btn-outline" style="padding: 6px 14px; font-size: 13px;" onclick="toggleReplyForm(${c.id})">
+                            <i class="fa-solid fa-reply"></i> Phản hồi
+                        </button>
+                        <button class="btn-icon btn-icon-danger" title="Xóa bình luận" onclick="deleteAdminComment(${c.id})">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.toggleReplyForm = (commentId) => {
+    const form = document.getElementById(`reply-form-${commentId}`);
+    if (form) {
+        form.style.display = form.style.display === 'none' ? '' : 'none';
+        if (form.style.display !== 'none') {
+            form.querySelector('textarea')?.focus();
+        }
+    }
+};
+
+window.submitAdminReply = async (commentId) => {
+    const input = document.getElementById(`reply-input-${commentId}`);
+    const content = input?.value.trim();
+    if (!content) { alert('Vui lòng nhập nội dung phản hồi'); return; }
+    
+    const adminUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (!adminUser) { alert('Vui lòng đăng nhập'); return; }
+    
+    try {
+        const res = await fetch(`/api/admin/comments/${commentId}/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_id: adminUser.id, content })
+        });
+        const data = await res.json();
+        if (data.success) {
+            fetchAdminComments();
+        } else {
+            alert(data.message || 'Lỗi khi gửi phản hồi');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Lỗi kết nối server');
+    }
+};
+
+window.deleteAdminComment = async (commentId) => {
+    if (!confirm('Bạn có chắc muốn xóa bình luận này và tất cả phản hồi liên quan?')) return;
+    try {
+        const res = await fetch(`/api/admin/comments/${commentId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            fetchAdminComments();
+        } else {
+            alert(data.message || 'Lỗi khi xóa');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+// Filter change listener
+document.getElementById('comment-filter-status')?.addEventListener('change', () => {
+    fetchAdminComments();
+});

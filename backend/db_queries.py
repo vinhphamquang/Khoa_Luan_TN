@@ -15,6 +15,9 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 def get_db_connection():
     """Kết nối PostgreSQL"""
     conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("SET timezone = 'Asia/Ho_Chi_Minh'")
+    conn.commit()
     return conn
 
 def get_db_cursor(conn):
@@ -467,13 +470,13 @@ def insert_lich_su(user_id, image_path, food_name, accuracy, calories=0):
         return None
 
 def get_user_history(user_id):
-    """Lấy lịch sử nhận diện của user (bao gồm ảnh và calories)"""
+    """Lấy lịch sử nhận diện của user (bao gồm ảnh, calories và số bình luận)"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo, DanhGiaNguoiDung
+            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo
             FROM LichSu
             WHERE MaNguoiDung = %s
             ORDER BY ThoiGian DESC
@@ -481,20 +484,32 @@ def get_user_history(user_id):
         """, (user_id,))
         
         history = cursor.fetchall()
-        conn.close()
         
-        return [
-            {
+        result = []
+        for h in history:
+            # Đếm bình luận
+            comment_count = 0
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as count FROM BinhLuan 
+                    WHERE MaLichSu = %s
+                """, (h['malichsu'],))
+                comment_count = cursor.fetchone()['count'] or 0
+            except:
+                pass
+            
+            result.append({
                 'id': h['malichsu'],
                 'food_name': h['tenmonan'],
                 'accuracy': float(h['dochinhxac']) if h['dochinhxac'] else 0,
                 'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
                 'image': h.get('duongdananh', '') or '',
                 'calories': float(h['calo']) if h.get('calo') else 0,
-                'user_rating': h.get('danhgianguoidung') or None
-            }
-            for h in history
-        ]
+                'comment_count': comment_count
+            })
+        
+        conn.close()
+        return result
     except Exception as e:
         print(f"Error getting user history: {e}")
         import traceback
@@ -798,7 +813,7 @@ def delete_user(user_id):
         return False
 
 def get_system_stats():
-    """Lấy thống kê hệ thống + tổng hợp đánh giá người dùng"""
+    """Lấy thống kê hệ thống + tổng hợp bình luận phản hồi"""
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
@@ -815,46 +830,58 @@ def get_system_stats():
         cursor.execute("SELECT COUNT(*) as count FROM LichSu")
         total_scans = cursor.fetchone()['count']
         
-        # Rating aggregation
-        cursor.execute("""
-            SELECT 
-                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'chinh_xac') as rating_good,
-                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'trung_binh') as rating_mid,
-                COUNT(*) FILTER (WHERE DanhGiaNguoiDung = 'sai') as rating_bad,
-                COUNT(*) FILTER (WHERE DanhGiaNguoiDung IS NOT NULL) as rating_total
-            FROM LichSu
-        """)
-        rating_row = cursor.fetchone()
+        # Comment aggregation
+        try:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) FILTER (WHERE MaBinhLuanCha IS NULL) as total_comments,
+                    COUNT(*) FILTER (WHERE MaBinhLuanCha IS NOT NULL) as total_replies
+                FROM BinhLuan
+            """)
+            comment_row = cursor.fetchone()
+            total_comments = comment_row['total_comments'] or 0
+            total_replies = comment_row['total_replies'] or 0
+            
+            # Đếm bình luận chưa được phản hồi
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM BinhLuan b
+                WHERE b.MaBinhLuanCha IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM BinhLuan r WHERE r.MaBinhLuanCha = b.MaBinhLuan
+                )
+            """)
+            pending_comments = cursor.fetchone()['count'] or 0
+        except:
+            total_comments = 0
+            total_replies = 0
+            pending_comments = 0
         
-        # Top 5 foods rated as "sai" (incorrect) — để admin biết cần cải thiện
-        cursor.execute("""
-            SELECT TenMonAn, COUNT(*) as so_lan
-            FROM LichSu
-            WHERE DanhGiaNguoiDung = 'sai'
-            GROUP BY TenMonAn
-            ORDER BY so_lan DESC
-            LIMIT 5
-        """)
-        top_wrong = [{'name': r['tenmonan'], 'count': r['so_lan']} for r in cursor.fetchall()]
-        
-        # Recent ratings (10 đánh giá gần nhất)
-        cursor.execute("""
-            SELECT l.TenMonAn, l.DanhGiaNguoiDung, l.ThoiGian, 
-                   n.TenNguoiDung
-            FROM LichSu l
-            LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
-            WHERE l.DanhGiaNguoiDung IS NOT NULL
-            ORDER BY l.ThoiGian DESC
-            LIMIT 10
-        """)
-        recent_ratings = []
-        for r in cursor.fetchall():
-            recent_ratings.append({
-                'food_name': r['tenmonan'],
-                'rating': r['danhgianguoidung'],
-                'user_name': r['tennguoidung'] or 'Ẩn danh',
-                'time': r['thoigian'].strftime('%d/%m/%Y %H:%M') if r['thoigian'] else ''
-            })
+        # Recent comments (10 bình luận gần nhất)
+        recent_comments = []
+        try:
+            cursor.execute("""
+                SELECT b.MaBinhLuan, b.NoiDung, b.ThoiGian, b.MaLichSu,
+                       n.TenNguoiDung, l.TenMonAn,
+                       (SELECT COUNT(*) FROM BinhLuan r WHERE r.MaBinhLuanCha = b.MaBinhLuan) as reply_count
+                FROM BinhLuan b
+                LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+                LEFT JOIN LichSu l ON b.MaLichSu = l.MaLichSu
+                WHERE b.MaBinhLuanCha IS NULL
+                ORDER BY b.ThoiGian DESC
+                LIMIT 10
+            """)
+            for r in cursor.fetchall():
+                recent_comments.append({
+                    'id': r['mabinhluan'],
+                    'content': r['noidung'],
+                    'user_name': r['tennguoidung'] or 'Ẩn danh',
+                    'food_name': r['tenmonan'] or 'Không rõ',
+                    'history_id': r['malichsu'],
+                    'reply_count': r['reply_count'] or 0,
+                    'time': r['thoigian'].strftime('%d/%m/%Y %H:%M') if r['thoigian'] else ''
+                })
+        except:
+            pass
         
         conn.close()
         
@@ -862,14 +889,13 @@ def get_system_stats():
             'total_users': total_users,
             'total_foods': total_foods,
             'total_recognitions': total_scans,
-            'ratings': {
-                'good': rating_row['rating_good'] or 0,
-                'mid': rating_row['rating_mid'] or 0,
-                'bad': rating_row['rating_bad'] or 0,
-                'total': rating_row['rating_total'] or 0
+            'comments': {
+                'total': total_comments,
+                'replied': total_comments - pending_comments,
+                'pending': pending_comments,
+                'total_replies': total_replies
             },
-            'top_wrong_foods': top_wrong,
-            'recent_ratings': recent_ratings
+            'recent_comments': recent_comments
         }
     except Exception as e:
         print(f"Error: {e}")
@@ -877,8 +903,8 @@ def get_system_stats():
         traceback.print_exc()
         return {
             'total_users': 0, 'total_foods': 0, 'total_recognitions': 0,
-            'ratings': {'good': 0, 'mid': 0, 'bad': 0, 'total': 0},
-            'top_wrong_foods': [], 'recent_ratings': []
+            'comments': {'total': 0, 'replied': 0, 'pending': 0, 'total_replies': 0},
+            'recent_comments': []
         }
 
 def get_all_history_admin():
@@ -889,8 +915,7 @@ def get_all_history_admin():
         
         cursor.execute("""
             SELECT l.MaLichSu, n.TenNguoiDung, n.Email, l.TenMonAn, 
-                   l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo,
-                   l.DanhGiaNguoiDung
+                   l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo
             FROM LichSu l
             LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
             ORDER BY l.ThoiGian DESC
@@ -898,10 +923,20 @@ def get_all_history_admin():
         """)
         
         history = cursor.fetchall()
-        conn.close()
         
-        return [
-            {
+        # Đếm comment cho mỗi history
+        result = []
+        for h in history:
+            comment_count = 0
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as count FROM BinhLuan 
+                    WHERE MaLichSu = %s AND MaBinhLuanCha IS NULL
+                """, (h['malichsu'],))
+                comment_count = cursor.fetchone()['count'] or 0
+            except:
+                pass
+            result.append({
                 'id': h['malichsu'],
                 'user_name': h['tennguoidung'] or 'Khách',
                 'user_email': h.get('email', ''),
@@ -910,10 +945,11 @@ def get_all_history_admin():
                 'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
                 'image': h.get('duongdananh', '') or '',
                 'calories': float(h['calo']) if h.get('calo') else 0,
-                'user_rating': h.get('danhgianguoidung') or None
-            }
-            for h in history
-        ]
+                'comment_count': comment_count
+            })
+        
+        conn.close()
+        return result
     except Exception as e:
         print(f"Error getting history: {e}")
         import traceback
@@ -928,8 +964,7 @@ def get_history_detail_admin(history_id):
         
         cursor.execute("""
             SELECT l.MaLichSu, l.MaNguoiDung, n.TenNguoiDung, n.Email,
-                   l.TenMonAn, l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo,
-                   l.DanhGiaNguoiDung
+                   l.TenMonAn, l.DoChinhXac, l.ThoiGian, l.DuongDanAnh, l.Calo
             FROM LichSu l
             LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung
             WHERE l.MaLichSu = %s
@@ -1003,6 +1038,29 @@ def get_history_detail_admin(history_id):
                     'carbs': float(food_row['carbohydrate']) if food_row.get('carbohydrate') else 0,
                 }
         
+        # Lấy bình luận cho history này
+        comments = []
+        try:
+            cursor.execute("""
+                SELECT b.MaBinhLuan, b.NoiDung, b.ThoiGian, b.MaBinhLuanCha,
+                       n.TenNguoiDung, n.VaiTro
+                FROM BinhLuan b
+                LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+                WHERE b.MaLichSu = %s
+                ORDER BY b.ThoiGian ASC
+            """, (h['malichsu'],))
+            for c in cursor.fetchall():
+                comments.append({
+                    'id': c['mabinhluan'],
+                    'content': c['noidung'],
+                    'time': c['thoigian'].strftime('%d/%m/%Y %H:%M') if c['thoigian'] else '',
+                    'user_name': c['tennguoidung'] or 'Ẩn danh',
+                    'is_admin': c.get('vaitro') == 'admin',
+                    'parent_id': c['mabinhluancha']
+                })
+        except:
+            pass
+        
         conn.close()
         
         return {
@@ -1015,7 +1073,7 @@ def get_history_detail_admin(history_id):
             'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
             'image': h.get('duongdananh', '') or '',
             'calories': float(h['calo']) if h.get('calo') else 0,
-            'user_rating': h.get('danhgianguoidung') or None,
+            'comments': comments,
             'food_info': food_info
         }
     except Exception as e:
@@ -1383,27 +1441,210 @@ def upsert_health_profile(user_id, data):
         return False
 
 # ============================================
-# USER RATING & ADMIN EDIT & NOTIFICATIONS
+# COMMENT / FEEDBACK SYSTEM & ADMIN EDIT & NOTIFICATIONS
 # ============================================
 
-def update_user_rating(history_id, rating):
-    """Cập nhật đánh giá của user cho bản ghi lịch sử"""
+def insert_comment(history_id, user_id, content):
+    """Thêm bình luận phản hồi từ user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            INSERT INTO BinhLuan (MaLichSu, MaNguoiDung, NoiDung)
+            VALUES (%s, %s, %s)
+            RETURNING MaBinhLuan
+        """, (history_id, user_id, content))
+        
+        result = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        return result['mabinhluan'] if result else None
+    except Exception as e:
+        print(f"Error inserting comment: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def get_comments_by_history(history_id):
+    """Lấy danh sách bình luận theo history_id (kèm replies)"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT b.MaBinhLuan, b.NoiDung, b.ThoiGian, b.MaBinhLuanCha, b.MaNguoiDung,
+                   n.TenNguoiDung, n.VaiTro
+            FROM BinhLuan b
+            LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+            WHERE b.MaLichSu = %s
+            ORDER BY b.ThoiGian ASC
+        """, (history_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        comments = []
+        for r in rows:
+            comments.append({
+                'id': r['mabinhluan'],
+                'content': r['noidung'],
+                'time': r['thoigian'].strftime('%d/%m/%Y %H:%M') if r['thoigian'] else '',
+                'time_raw': r['thoigian'].isoformat() if r['thoigian'] else '',
+                'parent_id': r['mabinhluancha'],
+                'user_id': r['manguoidung'],
+                'user_name': r['tennguoidung'] or 'Ẩn danh',
+                'is_admin': r.get('vaitro') == 'admin'
+            })
+        return comments
+    except Exception as e:
+        print(f"Error getting comments: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def get_all_comments_admin(filter_status='all'):
+    """Lấy tất cả bình luận gốc cho admin (có filter)"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT b.MaBinhLuan, b.NoiDung, b.ThoiGian, b.MaLichSu, b.MaNguoiDung,
+                   n.TenNguoiDung, n.Email, l.TenMonAn, l.DuongDanAnh,
+                   (SELECT COUNT(*) FROM BinhLuan r WHERE r.MaBinhLuanCha = b.MaBinhLuan) as reply_count
+            FROM BinhLuan b
+            LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+            LEFT JOIN LichSu l ON b.MaLichSu = l.MaLichSu
+            WHERE b.MaBinhLuanCha IS NULL
+            ORDER BY b.ThoiGian DESC
+            LIMIT 200
+        """)
+        
+        rows = cursor.fetchall()
+        
+        comments = []
+        for r in rows:
+            reply_count = r['reply_count'] or 0
+            status = 'replied' if reply_count > 0 else 'pending'
+            
+            if filter_status != 'all' and status != filter_status:
+                continue
+            
+            # Lấy replies cho comment này
+            replies = []
+            if reply_count > 0:
+                cursor.execute("""
+                    SELECT b.MaBinhLuan, b.NoiDung, b.ThoiGian,
+                           n.TenNguoiDung, n.VaiTro
+                    FROM BinhLuan b
+                    LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+                    WHERE b.MaBinhLuanCha = %s
+                    ORDER BY b.ThoiGian ASC
+                """, (r['mabinhluan'],))
+                for rep in cursor.fetchall():
+                    replies.append({
+                        'id': rep['mabinhluan'],
+                        'content': rep['noidung'],
+                        'time': rep['thoigian'].strftime('%d/%m/%Y %H:%M') if rep['thoigian'] else '',
+                        'user_name': rep['tennguoidung'] or 'Admin',
+                        'is_admin': rep.get('vaitro') == 'admin'
+                    })
+            
+            comments.append({
+                'id': r['mabinhluan'],
+                'content': r['noidung'],
+                'time': r['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if r['thoigian'] else '',
+                'history_id': r['malichsu'],
+                'user_id': r['manguoidung'],
+                'user_name': r['tennguoidung'] or 'Ẩn danh',
+                'user_email': r.get('email', ''),
+                'food_name': r['tenmonan'] or 'Không rõ',
+                'food_image': r.get('duongdananh', '') or '',
+                'reply_count': reply_count,
+                'status': status,
+                'replies': replies
+            })
+        
+        conn.close()
+        return comments
+    except Exception as e:
+        print(f"Error getting all comments admin: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def admin_reply_comment(comment_id, admin_id, content, history_id):
+    """Admin phản hồi bình luận"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            INSERT INTO BinhLuan (MaLichSu, MaNguoiDung, NoiDung, MaBinhLuanCha)
+            VALUES (%s, %s, %s, %s)
+            RETURNING MaBinhLuan
+        """, (history_id, admin_id, content, comment_id))
+        
+        result = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        return result['mabinhluan'] if result else None
+    except Exception as e:
+        print(f"Error admin reply comment: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def delete_comment(comment_id):
+    """Xóa bình luận (và replies)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            UPDATE LichSu
-            SET DanhGiaNguoiDung = %s
-            WHERE MaLichSu = %s
-        """, (rating, history_id))
+        # Xóa replies trước
+        cursor.execute("DELETE FROM BinhLuan WHERE MaBinhLuanCha = %s", (comment_id,))
+        # Xóa comment gốc
+        cursor.execute("DELETE FROM BinhLuan WHERE MaBinhLuan = %s", (comment_id,))
         
         conn.commit()
         conn.close()
         return True
     except Exception as e:
-        print(f"Error updating user rating: {e}")
+        print(f"Error deleting comment: {e}")
         return False
+
+def get_comment_detail(comment_id):
+    """Lấy chi tiết 1 comment (để tìm user_id, history_id)"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT b.MaBinhLuan, b.MaLichSu, b.MaNguoiDung, b.NoiDung,
+                   n.TenNguoiDung, l.TenMonAn
+            FROM BinhLuan b
+            LEFT JOIN NguoiDung n ON b.MaNguoiDung = n.MaNguoiDung
+            LEFT JOIN LichSu l ON b.MaLichSu = l.MaLichSu
+            WHERE b.MaBinhLuan = %s
+        """, (comment_id,))
+        
+        r = cursor.fetchone()
+        conn.close()
+        
+        if r:
+            return {
+                'id': r['mabinhluan'],
+                'history_id': r['malichsu'],
+                'user_id': r['manguoidung'],
+                'content': r['noidung'],
+                'user_name': r['tennguoidung'] or 'Ẩn danh',
+                'food_name': r['tenmonan'] or 'Không rõ'
+            }
+        return None
+    except Exception as e:
+        print(f"Error getting comment detail: {e}")
+        return None
 
 def update_history_record(history_id, new_food_name, new_calories=None):
     """Admin cập nhật tên món và calo trong bản ghi lịch sử"""

@@ -434,59 +434,60 @@ function initAnalyzePage() {
         }
     });
 
-    // ---- RETRY RECOGNITION ----
-    const retryBtn = document.getElementById('retry-btn');
-    retryBtn?.addEventListener('click', async () => {
-        if (!currentFile) return;
+    // ---- COMMENT / FEEDBACK SYSTEM ----
+    const commentInput = document.getElementById('comment-input');
+    const charCount = document.getElementById('comment-char-count');
+    const submitBtn = document.getElementById('btn-submit-comment');
 
-        const retrySection = document.getElementById('retry-section');
-        
-        // Show loading state on button
-        retryBtn.classList.add('loading');
-        const originalHTML = retryBtn.innerHTML;
-        retryBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Đang nhận diện lại...';
+    if (commentInput) {
+        commentInput.addEventListener('input', () => {
+            const len = commentInput.value.length;
+            charCount.textContent = `${len}/1000`;
+            submitBtn.disabled = len === 0;
+        });
+    }
 
-        const formData = new FormData();
-        formData.append('file', currentFile);
-        formData.append('skip_api', 'gemini'); // Skip primary API to get different result
-        
-        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
-        if (loggedUser) {
-            formData.append('user_id', loggedUser.id);
-        }
-
-        try {
-            const response = await fetch('/api/retry-recognition', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            // Restore button
-            retryBtn.classList.remove('loading');
-            retryBtn.innerHTML = originalHTML;
-
-            if (data.success) {
-                showResult(data);
-                // Scroll to result
-                resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } else if (data.is_food === false) {
-                showNotFoodError(data.message, data.suggestion);
-            } else {
-                showError(
-                    data.message || 'Không thể nhận diện lại. Vui lòng thử ảnh khác.',
-                    null
-                );
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            const content = commentInput.value.trim();
+            if (!content || !window._currentHistoryId) return;
+            
+            const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+            if (!loggedUser) {
+                alert('Vui lòng đăng nhập để gửi bình luận');
+                return;
             }
 
-        } catch (err) {
-            console.error('Retry error:', err);
-            retryBtn.classList.remove('loading');
-            retryBtn.innerHTML = originalHTML;
-            showError('Lỗi kết nối tới Server khi nhận diện lại.');
-        }
-    });
+            submitBtn.disabled = true;
+            const origHTML = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+
+            try {
+                const res = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        history_id: window._currentHistoryId,
+                        user_id: loggedUser.id,
+                        content: content
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    commentInput.value = '';
+                    charCount.textContent = '0/1000';
+                    loadComments(window._currentHistoryId);
+                } else {
+                    alert(data.message || 'Lỗi khi gửi bình luận');
+                }
+            } catch (e) {
+                console.error('Comment submit error:', e);
+                alert('Lỗi kết nối server');
+            }
+            submitBtn.innerHTML = origHTML;
+            submitBtn.disabled = false;
+        });
+    }
 }
 
 // Helper: safely set textContent (prevents crash if element missing)
@@ -598,24 +599,24 @@ function showResult(data) {
     // Initialize accordion functionality
     initAccordion();
 
-    // Show user rating section if logged in
-    const ratingSection = document.getElementById('user-rating-section');
-    const ratingBtns = document.getElementById('rating-buttons');
-    const ratingDone = document.getElementById('rating-done');
-    const loggedForRating = JSON.parse(localStorage.getItem('smartfood_user'));
+    // Show comment section if logged in
+    const commentSection = document.getElementById('user-comment-section');
+    const loggedForComment = JSON.parse(localStorage.getItem('smartfood_user'));
     
-    if (ratingSection && loggedForRating && data.history_id) {
+    if (commentSection && loggedForComment && data.history_id) {
         window._currentHistoryId = data.history_id;
-        ratingSection.style.display = '';
-        ratingBtns.classList.remove('hidden');
-        ratingDone.classList.add('hidden');
-        // Reset button states
-        ratingSection.querySelectorAll('.rating-btn').forEach(b => {
-            b.classList.remove('selected');
-            b.disabled = false;
-        });
-    } else if (ratingSection) {
-        ratingSection.style.display = 'none';
+        commentSection.style.display = '';
+        // Reset form
+        const cInput = document.getElementById('comment-input');
+        if (cInput) cInput.value = '';
+        const cCount = document.getElementById('comment-char-count');
+        if (cCount) cCount.textContent = '0/1000';
+        const cBtn = document.getElementById('btn-submit-comment');
+        if (cBtn) cBtn.disabled = true;
+        // Load existing comments
+        loadComments(data.history_id);
+    } else if (commentSection) {
+        commentSection.style.display = 'none';
     }
 
     // Scroll result into view
@@ -744,11 +745,9 @@ function showNotFoodError(message, suggestion = null) {
     _setStyle('ingredients-accordion', 'display', 'none');
     _setStyle('recipe-accordion', 'display', 'none');
 
-    // Ẩn retry section và rating section cho trường hợp này
-    const retrySection = document.getElementById('retry-section');
-    const ratingSection = document.getElementById('user-rating-section');
-    if (retrySection) retrySection.style.display = 'none';
-    if (ratingSection) ratingSection.style.display = 'none';
+    // Ẩn comment section cho trường hợp không phải món ăn
+    const commentSection = document.getElementById('user-comment-section');
+    if (commentSection) commentSection.style.display = 'none';
 
     // Ẩn health recommendation
     const recBox = document.getElementById('health-recommendation-box');
@@ -1237,6 +1236,8 @@ async function loadFoodHistory(userId) {
             data.history.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'history-card';
+                card.style.cursor = 'pointer';
+                card.onclick = () => openHistoryCommentModal(item.id, item.food_name);
                 
                 const timeStr = item.time ? new Date(item.time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
                 const calStr = item.calories > 0 ? Math.round(item.calories) + ' kcal' : '--';
@@ -1249,12 +1250,18 @@ async function loadFoodHistory(userId) {
                     imgHTML = `<div class="history-card-img"><div class="no-img"><i class="fa-solid fa-bowl-food"></i></div></div>`;
                 }
                 
+                // Comment badge
+                const commentBadge = item.comment_count > 0
+                    ? `<span class="history-comment-badge"><i class="fa-solid fa-comments"></i> ${item.comment_count}</span>`
+                    : `<span class="history-comment-badge history-comment-badge-empty"><i class="fa-regular fa-comment"></i> Phản hồi</span>`;
+                
                 card.innerHTML = `
                     ${imgHTML}
                     <div class="history-card-body">
                         <div class="history-card-name" title="${item.food_name}">${item.food_name}</div>
                         <div class="history-card-meta">
                             <span class="history-card-cal"><i class="fa-solid fa-fire"></i> ${calStr}</span>
+                            ${commentBadge}
                         </div>
                         <div class="history-card-time"><i class="fa-regular fa-clock"></i> ${timeStr}</div>
                     </div>
@@ -1690,3 +1697,207 @@ window.markNotifRead = async (notifId, userId) => {
         fetchNotifications(userId);
     } catch (e) { console.error(e); }
 };
+
+// ============================================
+// COMMENT / FEEDBACK SYSTEM
+// ============================================
+async function loadComments(historyId) {
+    const listEl = document.getElementById('comment-list');
+    if (!listEl) return;
+
+    try {
+        const res = await fetch(`/api/comments/${historyId}`);
+        const data = await res.json();
+        if (data.success) {
+            renderComments(data.comments);
+        }
+    } catch (e) {
+        console.error('Load comments error:', e);
+    }
+}
+
+function renderComments(comments) {
+    const listEl = document.getElementById('comment-list');
+    if (!listEl) return;
+
+    if (!comments || comments.length === 0) {
+        listEl.innerHTML = '';
+        return;
+    }
+
+    // Group: root comments and their replies
+    const roots = comments.filter(c => !c.parent_id);
+    const replies = comments.filter(c => c.parent_id);
+
+    listEl.innerHTML = roots.map(c => {
+        const childReplies = replies.filter(r => r.parent_id === c.id);
+        const initial = (c.user_name || 'U').charAt(0).toUpperCase();
+        const repliesHTML = childReplies.map(r => {
+            const rInitial = r.is_admin ? 'A' : (r.user_name || 'U').charAt(0).toUpperCase();
+            return `
+                <div class="comment-reply-item">
+                    <div class="comment-avatar comment-avatar-admin">${rInitial}</div>
+                    <div class="comment-body">
+                        <div class="comment-meta">
+                            <span class="comment-author ${r.is_admin ? 'comment-admin-badge' : ''}">${r.is_admin ? '🛡️ Admin' : r.user_name}</span>
+                            <span class="comment-time"><i class="fa-regular fa-clock"></i> ${r.time}</span>
+                        </div>
+                        <p class="comment-text">${r.content}</p>
+                    </div>
+                </div>`;
+        }).join('');
+
+        return `
+            <div class="comment-item">
+                <div class="comment-avatar">${initial}</div>
+                <div class="comment-body">
+                    <div class="comment-meta">
+                        <span class="comment-author">${c.user_name}</span>
+                        <span class="comment-time"><i class="fa-regular fa-clock"></i> ${c.time}</span>
+                    </div>
+                    <p class="comment-text">${c.content}</p>
+                    ${repliesHTML ? `<div class="comment-replies">${repliesHTML}</div>` : ''}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// ============================================
+// HISTORY COMMENT MODAL (Profile page)
+// ============================================
+let _hcCurrentHistoryId = null;
+
+function openHistoryCommentModal(historyId, foodName) {
+    _hcCurrentHistoryId = historyId;
+    const overlay = document.getElementById('history-comment-overlay');
+    const foodLabel = document.getElementById('hc-modal-food');
+    const commentInput = document.getElementById('hc-comment-input');
+    const charCount = document.getElementById('hc-char-count');
+    const submitBtn = document.getElementById('hc-btn-submit');
+    const listEl = document.getElementById('hc-comment-list');
+    
+    if (!overlay) return;
+    
+    foodLabel.textContent = `Món: ${foodName}`;
+    commentInput.value = '';
+    charCount.textContent = '0/1000';
+    submitBtn.disabled = true;
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>';
+    
+    overlay.classList.remove('hidden');
+    
+    // Load comments
+    loadHistoryComments(historyId);
+}
+
+async function loadHistoryComments(historyId) {
+    const listEl = document.getElementById('hc-comment-list');
+    if (!listEl) return;
+    
+    try {
+        const res = await fetch(`/api/comments/${historyId}`);
+        const data = await res.json();
+        if (data.success) {
+            renderHistoryComments(data.comments, listEl);
+        }
+    } catch (e) {
+        listEl.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px">Lỗi tải bình luận</p>';
+    }
+}
+
+function renderHistoryComments(comments, listEl) {
+    if (!comments || comments.length === 0) {
+        listEl.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px"><i class="fa-regular fa-comment"></i> Chưa có bình luận nào. Hãy gửi phản hồi đầu tiên!</p>';
+        return;
+    }
+
+    const roots = comments.filter(c => !c.parent_id);
+    const replies = comments.filter(c => c.parent_id);
+
+    listEl.innerHTML = roots.map(c => {
+        const childReplies = replies.filter(r => r.parent_id === c.id);
+        const initial = (c.user_name || 'U').charAt(0).toUpperCase();
+        const repliesHTML = childReplies.map(r => {
+            const rInitial = r.is_admin ? 'A' : (r.user_name || 'U').charAt(0).toUpperCase();
+            return `
+                <div class="comment-reply-item">
+                    <div class="comment-avatar comment-avatar-admin">${rInitial}</div>
+                    <div class="comment-body">
+                        <div class="comment-meta">
+                            <span class="comment-author ${r.is_admin ? 'comment-admin-badge' : ''}">${r.is_admin ? '🛡️ Admin' : r.user_name}</span>
+                            <span class="comment-time"><i class="fa-regular fa-clock"></i> ${r.time}</span>
+                        </div>
+                        <p class="comment-text">${r.content}</p>
+                    </div>
+                </div>`;
+        }).join('');
+
+        return `
+            <div class="comment-item">
+                <div class="comment-avatar">${initial}</div>
+                <div class="comment-body">
+                    <div class="comment-meta">
+                        <span class="comment-author">${c.user_name}</span>
+                        <span class="comment-time"><i class="fa-regular fa-clock"></i> ${c.time}</span>
+                    </div>
+                    <p class="comment-text">${c.content}</p>
+                    ${repliesHTML ? `<div class="comment-replies">${repliesHTML}</div>` : ''}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// History comment modal form handlers
+(function() {
+    const input = document.getElementById('hc-comment-input');
+    const charCount = document.getElementById('hc-char-count');
+    const submitBtn = document.getElementById('hc-btn-submit');
+    
+    if (input) {
+        input.addEventListener('input', () => {
+            const len = input.value.length;
+            charCount.textContent = `${len}/1000`;
+            submitBtn.disabled = len === 0;
+        });
+    }
+    
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            const content = input.value.trim();
+            if (!content || !_hcCurrentHistoryId) return;
+            
+            const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+            if (!loggedUser) { alert('Vui lòng đăng nhập'); return; }
+            
+            submitBtn.disabled = true;
+            const origHTML = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+            
+            try {
+                const res = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        history_id: _hcCurrentHistoryId,
+                        user_id: loggedUser.id,
+                        content: content
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    input.value = '';
+                    charCount.textContent = '0/1000';
+                    loadHistoryComments(_hcCurrentHistoryId);
+                    // Refresh history to update badge count
+                    loadFoodHistory(loggedUser.id);
+                } else {
+                    alert(data.message || 'Lỗi khi gửi bình luận');
+                }
+            } catch (e) {
+                alert('Lỗi kết nối server');
+            }
+            submitBtn.innerHTML = origHTML;
+            submitBtn.disabled = false;
+        });
+    }
+})();

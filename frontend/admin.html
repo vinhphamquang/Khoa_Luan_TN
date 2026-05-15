@@ -97,6 +97,9 @@
                 <button class="admin-tab" data-tab="admin-history">
                     <i class="fa-solid fa-timeline"></i><span>Lịch Sử</span>
                 </button>
+                <button class="admin-tab" data-tab="admin-comments">
+                    <i class="fa-solid fa-comments"></i><span>Phản Hồi</span>
+                </button>
             </div>
 
             <!-- TAB: Tổng Quan -->
@@ -134,76 +137,42 @@
                     </div>
                 </div>
 
-                <!-- Rating Summary Section -->
-                <div class="rating-overview-section" id="rating-overview-section">
-                    <h3 class="rating-overview-title">
-                        <i class="fa-solid fa-star"></i> Tổng Hợp Đánh Giá Người Dùng
+                <!-- Comments Overview Section -->
+                <div class="comments-overview-section" id="comments-overview-section">
+                    <h3 class="comments-overview-title">
+                        <i class="fa-solid fa-comments"></i> Tổng Hợp Bình Luận Phản Hồi
                     </h3>
                     
-                    <!-- Rating Cards -->
-                    <div class="rating-cards-grid">
-                        <div class="rating-card rating-card-good">
-                            <div class="rating-card-icon"><i class="fa-solid fa-circle-check"></i></div>
-                            <div class="rating-card-info">
-                                <span class="rating-card-value" id="rt-good">0</span>
-                                <span class="rating-card-label">Chính xác</span>
+                    <!-- Comment Stats Cards -->
+                    <div class="comment-stats-grid">
+                        <div class="comment-stat-card comment-stat-total">
+                            <div class="comment-stat-icon"><i class="fa-solid fa-message"></i></div>
+                            <div class="comment-stat-info">
+                                <span class="comment-stat-value" id="cs-total">0</span>
+                                <span class="comment-stat-label">Tổng bình luận</span>
                             </div>
-                            <div class="rating-card-bar">
-                                <div class="rating-card-fill" id="rt-good-bar" style="width: 0%;"></div>
-                            </div>
-                            <span class="rating-card-pct" id="rt-good-pct">0%</span>
                         </div>
-                        <div class="rating-card rating-card-mid">
-                            <div class="rating-card-icon"><i class="fa-solid fa-minus-circle"></i></div>
-                            <div class="rating-card-info">
-                                <span class="rating-card-value" id="rt-mid">0</span>
-                                <span class="rating-card-label">Trung bình</span>
+                        <div class="comment-stat-card comment-stat-pending">
+                            <div class="comment-stat-icon"><i class="fa-solid fa-clock"></i></div>
+                            <div class="comment-stat-info">
+                                <span class="comment-stat-value" id="cs-pending">0</span>
+                                <span class="comment-stat-label">Chưa phản hồi</span>
                             </div>
-                            <div class="rating-card-bar">
-                                <div class="rating-card-fill" id="rt-mid-bar" style="width: 0%;"></div>
-                            </div>
-                            <span class="rating-card-pct" id="rt-mid-pct">0%</span>
                         </div>
-                        <div class="rating-card rating-card-bad">
-                            <div class="rating-card-icon"><i class="fa-solid fa-circle-xmark"></i></div>
-                            <div class="rating-card-info">
-                                <span class="rating-card-value" id="rt-bad">0</span>
-                                <span class="rating-card-label">Sai kết quả</span>
+                        <div class="comment-stat-card comment-stat-replied">
+                            <div class="comment-stat-icon"><i class="fa-solid fa-check-double"></i></div>
+                            <div class="comment-stat-info">
+                                <span class="comment-stat-value" id="cs-replied">0</span>
+                                <span class="comment-stat-label">Đã phản hồi</span>
                             </div>
-                            <div class="rating-card-bar">
-                                <div class="rating-card-fill" id="rt-bad-bar" style="width: 0%;"></div>
-                            </div>
-                            <span class="rating-card-pct" id="rt-bad-pct">0%</span>
-                        </div>
-                        <div class="rating-card rating-card-total">
-                            <div class="rating-card-icon"><i class="fa-solid fa-chart-simple"></i></div>
-                            <div class="rating-card-info">
-                                <span class="rating-card-value" id="rt-total">0</span>
-                                <span class="rating-card-label">Tổng đánh giá</span>
-                            </div>
-                            <div class="rating-card-bar">
-                                <div class="rating-card-fill" id="rt-total-bar" style="width: 100%; opacity: 0.3;"></div>
-                            </div>
-                            <span class="rating-card-pct" id="rt-unrated">--</span>
                         </div>
                     </div>
 
-                    <!-- Bottom Grid: Top Wrong + Recent Ratings -->
-                    <div class="rating-detail-grid">
-                        <!-- Top Wrong Foods -->
-                        <div class="rating-detail-panel glass-card">
-                            <h4><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i> Món Bị Đánh Giá Sai Nhiều Nhất</h4>
-                            <div id="top-wrong-foods-list" class="top-wrong-list">
-                                <p class="rating-empty">Chưa có dữ liệu</p>
-                            </div>
-                        </div>
-
-                        <!-- Recent Ratings -->
-                        <div class="rating-detail-panel glass-card">
-                            <h4><i class="fa-solid fa-clock-rotate-left" style="color: #3b82f6;"></i> Đánh Giá Gần Đây</h4>
-                            <div id="recent-ratings-list" class="recent-ratings-list">
-                                <p class="rating-empty">Chưa có dữ liệu</p>
-                            </div>
+                    <!-- Recent Comments -->
+                    <div class="recent-comments-panel glass-card">
+                        <h4><i class="fa-solid fa-clock-rotate-left" style="color: #3b82f6;"></i> Bình Luận Gần Đây</h4>
+                        <div id="recent-comments-list" class="recent-comments-list">
+                            <p class="rating-empty">Chưa có bình luận</p>
                         </div>
                     </div>
                 </div>
@@ -359,9 +328,34 @@
                     <!-- Table View (hidden by default) -->
                     <div id="history-table-view" class="table-responsive" style="display: none;">
                         <table class="admin-table">
-                            <thead><tr><th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th><th>ID</th><th>Ảnh</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Calo</th><th>Đánh Giá</th><th>Thời Gian</th><th>Thao Tác</th></tr></thead>
+                            <thead><tr><th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th><th>ID</th><th>Ảnh</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Calo</th><th>Bình Luận</th><th>Thời Gian</th><th>Thao Tác</th></tr></thead>
                             <tbody id="tb-history"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Phản Hồi -->
+            <div id="admin-comments" class="admin-tab-content hidden">
+                <div class="admin-panel">
+                    <div class="admin-panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-comments"></i> Quản Lý Phản Hồi</h3>
+                            <p>Xem và phản hồi bình luận của người dùng về kết quả nhận diện</p>
+                        </div>
+                        <div class="comment-filter-wrap">
+                            <select id="comment-filter-status" class="form-input" style="width: auto; padding: 8px 16px; font-size: 13px;">
+                                <option value="all">Tất cả</option>
+                                <option value="pending">Chưa phản hồi</option>
+                                <option value="replied">Đã phản hồi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="admin-comments-list" class="admin-comments-list">
+                        <div class="history-loading">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Đang tải bình luận...</span>
+                        </div>
                     </div>
                 </div>
             </div>

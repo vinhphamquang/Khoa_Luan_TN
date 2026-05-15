@@ -12,11 +12,13 @@ from db_queries import (
     get_all_users, delete_user, get_system_stats, get_all_history_admin, get_history_detail_admin,
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
     delete_food_soft, restore_food_soft, delete_food_hard, get_health_profile, upsert_health_profile,
-    get_user_food_stats, update_user_rating, update_history_record,
+    get_user_food_stats, update_history_record,
     create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
     delete_history_record, bulk_delete_history,
     create_google_user, get_user_by_google_id, update_user_google_id,
-    get_user_detail_admin, update_last_active, notify_admins
+    get_user_detail_admin, update_last_active, notify_admins,
+    insert_comment, get_comments_by_history, get_all_comments_admin,
+    admin_reply_comment, delete_comment, get_comment_detail
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
@@ -76,9 +78,21 @@ def run_migrations():
             ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS LastActive TIMESTAMP DEFAULT NULL
         """)
         
+        # 6. Tạo bảng BinhLuan (bình luận phản hồi)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS BinhLuan (
+                MaBinhLuan SERIAL PRIMARY KEY,
+                MaLichSu INTEGER REFERENCES LichSu(MaLichSu) ON DELETE CASCADE,
+                MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+                NoiDung TEXT NOT NULL,
+                MaBinhLuanCha INTEGER DEFAULT NULL,
+                ThoiGian TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive)")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive, BinhLuan)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
@@ -743,45 +757,99 @@ def api_admin_update_history(history_id):
     
     return jsonify({"success": True, "message": "Đã cập nhật và thông báo cho người dùng"})
 
-@app.route("/api/user-rating", methods=["POST"])
-def api_user_rating():
-    """User đánh giá kết quả nhận diện (chinh_xac / trung_binh / sai)"""
+# ============================================
+# COMMENT / FEEDBACK SYSTEM
+# ============================================
+
+@app.route("/api/comments", methods=["POST"])
+def api_submit_comment():
+    """User gửi bình luận phản hồi về kết quả nhận diện"""
     data = request.json
     history_id = data.get("history_id")
-    rating = data.get("rating")
+    user_id = data.get("user_id")
+    content = data.get("content", "").strip()
     
-    if not history_id or rating not in ('chinh_xac', 'trung_binh', 'sai'):
+    if not history_id or not user_id or not content:
         return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
     
-    if update_user_rating(history_id, rating):
-        # Thông báo admin khi đánh giá sai hoặc trung bình
-        if rating in ('sai', 'trung_binh'):
-            try:
-                conn = get_db_connection()
-                cursor = get_db_cursor(conn)
-                cursor.execute("""
-                    SELECT l.TenMonAn, n.TenNguoiDung 
-                    FROM LichSu l 
-                    LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung 
-                    WHERE l.MaLichSu = %s
-                """, (history_id,))
-                row = cursor.fetchone()
-                conn.close()
-                
-                if row:
-                    food_name = row['tenmonan'] or 'Không rõ'
-                    user_name = row['tennguoidung'] or 'Ẩn danh'
-                    rating_text = 'Sai kết quả' if rating == 'sai' else 'Trung bình'
-                    icon = '❌' if rating == 'sai' else '⚠️'
-                    notify_admins(
-                        f"{icon} Đánh giá [{rating_text}] cho món \"{food_name}\" bởi {user_name}",
-                        history_id=history_id
-                    )
-            except Exception as e:
-                print(f"[NOTIFY] Error notifying admins about rating: {e}")
+    if len(content) > 1000:
+        return jsonify({"success": False, "message": "Nội dung quá dài (tối đa 1000 ký tự)"}), 400
+    
+    comment_id = insert_comment(history_id, user_id, content)
+    if comment_id:
+        # Thông báo cho admin
+        try:
+            conn = get_db_connection()
+            cursor = get_db_cursor(conn)
+            cursor.execute("""
+                SELECT l.TenMonAn, n.TenNguoiDung 
+                FROM LichSu l 
+                LEFT JOIN NguoiDung n ON l.MaNguoiDung = n.MaNguoiDung 
+                WHERE l.MaLichSu = %s
+            """, (history_id,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                food_name = row['tenmonan'] or 'Không rõ'
+                user_name = row['tennguoidung'] or 'Ẩn danh'
+                notify_admins(
+                    f"💬 Bình luận mới từ {user_name} về món \"{food_name}\": {content[:50]}{'...' if len(content) > 50 else ''}",
+                    history_id=history_id
+                )
+        except Exception as e:
+            print(f"[NOTIFY] Error notifying admins about comment: {e}")
         
-        return jsonify({"success": True, "message": "Đã lưu đánh giá"})
-    return jsonify({"success": False, "message": "Lỗi khi lưu đánh giá"}), 500
+        return jsonify({"success": True, "message": "Đã gửi bình luận", "comment_id": comment_id})
+    return jsonify({"success": False, "message": "Lỗi khi gửi bình luận"}), 500
+
+@app.route("/api/comments/<int:history_id>", methods=["GET"])
+def api_get_comments(history_id):
+    """Lấy danh sách bình luận theo history_id"""
+    comments = get_comments_by_history(history_id)
+    return jsonify({"success": True, "comments": comments})
+
+@app.route("/api/admin/comments", methods=["GET"])
+def api_admin_get_comments():
+    """Admin lấy tất cả bình luận"""
+    filter_status = request.args.get("status", "all")
+    comments = get_all_comments_admin(filter_status)
+    return jsonify({"success": True, "comments": comments})
+
+@app.route("/api/admin/comments/<int:comment_id>/reply", methods=["POST"])
+def api_admin_reply_comment(comment_id):
+    """Admin phản hồi bình luận"""
+    data = request.json
+    admin_id = data.get("admin_id")
+    content = data.get("content", "").strip()
+    
+    if not admin_id or not content:
+        return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
+    
+    # Lấy thông tin comment gốc
+    comment_info = get_comment_detail(comment_id)
+    if not comment_info:
+        return jsonify({"success": False, "message": "Không tìm thấy bình luận"}), 404
+    
+    reply_id = admin_reply_comment(comment_id, admin_id, content, comment_info['history_id'])
+    if reply_id:
+        # Thông báo cho user
+        if comment_info['user_id']:
+            create_notification(
+                comment_info['user_id'],
+                comment_info['history_id'],
+                f"💬 Admin đã phản hồi bình luận của bạn về món \"{comment_info['food_name']}\": {content[:80]}{'...' if len(content) > 80 else ''}",
+                '', ''
+            )
+        return jsonify({"success": True, "message": "Đã gửi phản hồi", "reply_id": reply_id})
+    return jsonify({"success": False, "message": "Lỗi khi gửi phản hồi"}), 500
+
+@app.route("/api/admin/comments/<int:comment_id>", methods=["DELETE"])
+def api_admin_delete_comment(comment_id):
+    """Admin xóa bình luận"""
+    if delete_comment(comment_id):
+        return jsonify({"success": True, "message": "Đã xóa bình luận"})
+    return jsonify({"success": False, "message": "Lỗi khi xóa"}), 500
 
 @app.route("/api/notifications/<int:user_id>", methods=["GET"])
 def api_get_notifications(user_id):
@@ -1164,182 +1232,6 @@ def predict():
             "message": f"Lỗi server khi phân tích: {str(e)}",
             "suggestion": "Vui lòng thử lại sau hoặc chọn ảnh khác."
         }), 500
-
-@app.route("/api/feedback", methods=["POST"])
-def submit_feedback():
-    """API để user đánh giá kết quả nhận diện"""
-    data = request.json
-    
-    user_id = data.get("user_id")
-    food_name = data.get("food_name")
-    confidence = data.get("confidence", 0)
-    rating = data.get("rating")  # 'accurate' hoặc 'inaccurate'
-    correct_name = data.get("correct_name")  # Tên đúng nếu user sửa
-    
-    if not food_name or not rating:
-        return jsonify({"success": False, "message": "Thiếu thông tin"}), 400
-    
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO FeedbackNhanDien (MaNguoiDung, TenMonNhanDien, DoChinhXac, DanhGia, TenMonDung)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user_id, food_name, confidence, rating, correct_name))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Cảm ơn bạn đã đánh giá!"
-        })
-    except Exception as e:
-        print(f"[ERROR] Lỗi khi lưu feedback: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@app.route("/api/retry-recognition", methods=["POST"])
-def retry_recognition():
-    """API để nhận diện lại với các API khác"""
-    if 'file' not in request.files:
-        return jsonify({"success": False, "message": "No file uploaded"}), 400
-        
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"success": False, "message": "No file selected"}), 400
-    
-    # Lấy kết quả cũ để skip API đó
-    skip_api = request.form.get("skip_api", "")
-    
-    image_bytes = file.read()
-    
-    print(f"[RETRY] Nhận diện lại, skip API: {skip_api}")
-    
-    # Gọi API nhận diện với logic retry
-    from external_api import analyze_image_with_retry
-    food_name_english, confidence, error_msg = analyze_image_with_retry(image_bytes, skip_api)
-    
-    if not food_name_english:
-        return jsonify({
-            "success": False,
-            "message": "Vẫn không thể nhận diện. Vui lòng thử ảnh khác hoặc chọn món thủ công.",
-            "error_detail": error_msg
-        }), 503
-    
-    # Kiểm tra nếu hình ảnh KHÔNG PHẢI MÓN ĂN
-    if food_name_english == "NOT_FOOD":
-        return jsonify({
-            "success": False,
-            "is_food": False,
-            "message": "Hình ảnh này không phải là món ăn!",
-            "suggestion": "Vui lòng chụp hoặc tải lên hình ảnh một món ăn để hệ thống có thể nhận diện và phân tích dinh dưỡng."
-        }), 400
-    
-    # Dịch sang tiếng Việt
-    food_name_vietnamese = translate_food_name(food_name_english)
-    print(f"[RETRY TRANSLATE] '{food_name_english}' → '{food_name_vietnamese}'")
-    
-    # Tìm trong database
-    food_data = search_food_by_name(food_name_vietnamese)
-    
-    if not food_data and food_name_vietnamese != food_name_english:
-        food_data = search_food_by_name(food_name_english)
-    
-    # Tự động thêm nếu chưa có
-    is_newly_added = False
-    if not food_data:
-        try:
-            from ai_generator import generate_food_data_vietnamese
-            
-            ai_data = generate_food_data_vietnamese(food_name_english)
-            
-            if ai_data:
-                if food_name_vietnamese == food_name_english and "TenMonAn" in ai_data:
-                    food_name_vietnamese = ai_data["TenMonAn"]
-                
-                food_to_insert = {
-                    "TenMonAn": food_name_vietnamese,
-                    "MoTa": ai_data.get("MoTa", f"Món ăn {food_name_vietnamese}"),
-                    "PhanLoai": ai_data.get("PhanLoai", "Món ăn"),
-                    "DinhDuong": ai_data.get("DinhDuong", {
-                        "Calo": 0, "Protein": 0, "ChatBeo": 0, "Carbohydrate": 0, "Vitamin": ""
-                    }),
-                    "CongThuc": ai_data.get("CongThuc", {
-                        "HuongDan": "Chưa có hướng dẫn",
-                        "ThoiGianNau": 30,
-                        "KhauPhan": 1,
-                        "NguyenLieu": []
-                    })
-                }
-                
-                if insert_food_full(food_to_insert):
-                    is_newly_added = True
-                    food_data = search_food_by_name(food_name_vietnamese)
-        except Exception as e:
-            print(f"[ERROR] Lỗi khi thêm món: {e}")
-    
-    # Format response
-    confidence_pct = round(confidence * 100, 2) if confidence else 0
-    
-    response_data = {
-        "success": True,
-        "predicted_class_name": food_name_vietnamese,
-        "confidence": confidence_pct,
-        "food_data": None,
-        "message": ""
-    }
-    
-    if food_data:
-        dinh_duong = food_data.get("DinhDuong") or {}
-        cong_thuc = food_data.get("CongThuc") or {}
-        nguyen_lieu = cong_thuc.get("NguyenLieu") or []
-        
-        response_data["food_data"] = {
-            "name": food_data.get("TenMonAn", food_name_vietnamese),
-            "description": food_data.get("MoTa", ""),
-            "calories": dinh_duong.get("Calo", "--"),
-            "proteins": dinh_duong.get("Protein", "--"),
-            "carbs": dinh_duong.get("Carbohydrate", "--"),
-            "fats": dinh_duong.get("ChatBeo", "--"),
-            "recipe_instructions": cong_thuc.get("HuongDan", ""),
-            "recipe_time": cong_thuc.get("ThoiGianNau", ""),
-            "ingredients": nguyen_lieu
-        }
-        
-        if is_newly_added:
-            response_data["message"] = f"✨ Nhận diện lại thành công! Món '{food_name_vietnamese}' vừa được thêm vào."
-        else:
-            response_data["message"] = f"✅ Nhận diện lại thành công: '{food_name_vietnamese}'"
-    
-    # Tạo base64 image để lưu lịch sử
-    image_base64_retry = ""
-    try:
-        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
-        mime = 'image/jpeg'
-        if file.filename and file.filename.lower().endswith('.png'):
-            mime = 'image/png'
-        image_base64_retry = f"data:{mime};base64,{img_b64}"
-    except Exception as e:
-        print(f"[WARNING] Không thể encode ảnh base64: {e}")
-
-    # Lấy calories
-    retry_calories = 0
-    if food_data and food_data.get("DinhDuong"):
-        try:
-            retry_calories = float(food_data["DinhDuong"].get("Calo", 0))
-        except:
-            retry_calories = 0
-
-    # Lưu lịch sử
-    user_id = request.form.get("user_id")
-    if user_id and str(user_id).isdigit():
-        try:
-            insert_lich_su(int(user_id), image_base64_retry, food_name_vietnamese, confidence_pct, retry_calories)
-        except Exception as e:
-            print(f"Error saving history: {e}")
-    
-    return jsonify(response_data)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

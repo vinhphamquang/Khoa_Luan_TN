@@ -515,40 +515,29 @@
                         </div>
                     </div>
 
-                    <!-- Nút Nhận Diện Lại -->
-                    <div class="retry-recognition-section" id="retry-section">
-                        <div class="retry-divider"></div>
-                        <p class="retry-question">
-                            <i class="fa-solid fa-circle-question"></i>
-                            Kết quả không chính xác?
-                        </p>
-                        <button class="btn btn-retry" id="retry-btn">
-                            <i class="fa-solid fa-rotate-right"></i> Nhận Diện Lại
-                        </button>
-                        <p class="retry-hint">AI sẽ sử dụng thuật toán khác để phân tích lại ảnh của bạn</p>
-                    </div>
+                    <!-- User Comment / Feedback Section -->
+                    <div class="user-comment-section" id="user-comment-section" style="display: none;">
+                        <div class="comment-section-divider"></div>
+                        <div class="comment-section-header">
+                            <i class="fa-solid fa-comments"></i>
+                            <span>Phản Hồi & Bình Luận</span>
+                        </div>
 
-                    <!-- User Rating Section -->
-                    <div class="user-rating-section" id="user-rating-section" style="display: none;">
-                        <div class="retry-divider"></div>
-                        <p class="rating-question">
-                            <i class="fa-solid fa-star"></i>
-                            Bạn đánh giá kết quả nhận diện này thế nào?
-                        </p>
-                        <div class="rating-buttons" id="rating-buttons">
-                            <button class="rating-btn rating-good" data-rating="chinh_xac">
-                                <i class="fa-solid fa-circle-check"></i> Chính xác
-                            </button>
-                            <button class="rating-btn rating-mid" data-rating="trung_binh">
-                                <i class="fa-solid fa-minus-circle"></i> Trung bình
-                            </button>
-                            <button class="rating-btn rating-bad" data-rating="sai">
-                                <i class="fa-solid fa-circle-xmark"></i> Sai kết quả
-                            </button>
+                        <!-- Comment Form -->
+                        <div class="comment-form" id="comment-form">
+                            <textarea class="comment-textarea" id="comment-input" 
+                                placeholder="Nhập phản hồi của bạn về kết quả nhận diện... (VD: Kết quả không chính xác, món này là Phở bò)" 
+                                rows="3" maxlength="1000"></textarea>
+                            <div class="comment-form-actions">
+                                <span class="comment-char-count" id="comment-char-count">0/1000</span>
+                                <button class="btn-comment-submit" id="btn-submit-comment" disabled>
+                                    <i class="fa-solid fa-paper-plane"></i> Gửi Phản Hồi
+                                </button>
+                            </div>
                         </div>
-                        <div class="rating-done hidden" id="rating-done">
-                            <i class="fa-solid fa-check"></i> Cảm ơn bạn đã đánh giá!
-                        </div>
+
+                        <!-- Comments List -->
+                        <div class="comment-list" id="comment-list"></div>
                     </div>
                 </div>
             </div>
@@ -881,6 +870,32 @@
         </div>
     </div>
 
+
+    <!-- ========== HISTORY COMMENT MODAL ========== -->
+    <div id="history-comment-overlay" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+        <div class="glass-card modal-box" style="max-width: 600px; max-height: 85vh; overflow-y: auto;">
+            <button class="modal-close" onclick="document.getElementById('history-comment-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+            <h2 class="section-title" style="font-size: 20px; text-align: center; margin-bottom: 6px;">
+                <i class="fa-solid fa-comments" style="color: var(--primary);"></i> Phản Hồi & Bình Luận
+            </h2>
+            <p id="hc-modal-food" style="text-align: center; color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;"></p>
+            
+            <!-- Comment form -->
+            <div class="comment-form" id="hc-comment-form">
+                <textarea class="comment-textarea" id="hc-comment-input" 
+                    placeholder="Nhập bình luận của bạn..." rows="2" maxlength="1000"></textarea>
+                <div class="comment-form-actions">
+                    <span class="comment-char-count" id="hc-char-count">0/1000</span>
+                    <button class="btn-comment-submit" id="hc-btn-submit" disabled>
+                        <i class="fa-solid fa-paper-plane"></i> Gửi
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Comments list -->
+            <div id="hc-comment-list" class="comment-list" style="margin-top: 16px;"></div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="/static/script.js?v=3"></script>
