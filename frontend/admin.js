@@ -189,23 +189,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Food Modal Logic
-    const btnAddFood = document.getElementById('btn-admin-add-food');
+    // Food Modal Logic (edit only - food is added automatically by AI)
     const adminModalOverlay = document.getElementById('admin-modal-overlay');
     const foodForm = document.getElementById('food-admin-form');
     const btnAddIng = document.getElementById('fa-add-ing');
     const ingsContainer = document.getElementById('fa-ingredients');
-
-    if (btnAddFood) {
-        btnAddFood.addEventListener('click', () => {
-            foodForm.reset();
-            document.getElementById('fa-id').value = '';
-            document.getElementById('food-modal-title').textContent = 'Thêm Món Ăn';
-            ingsContainer.innerHTML = ''; // clear ingredients
-            addIngredientRow('');
-            adminModalOverlay.classList.remove('hidden');
-        });
-    }
 
     if (btnAddIng) {
         btnAddIng.addEventListener('click', () => {
@@ -295,6 +283,13 @@ document.addEventListener('DOMContentLoaded', () => {
             errDiv.classList.add('hidden');
 
             const id = document.getElementById('fa-id').value;
+            
+            // Chỉ cho phép sửa, không cho thêm mới thủ công
+            if (!id) {
+                errDiv.textContent = 'Không thể thêm món ăn thủ công. Món ăn được thêm tự động bởi AI khi người dùng nhận diện.';
+                errDiv.classList.remove('hidden');
+                return;
+            }
             
             const ings = [];
             ingsContainer.querySelectorAll('div').forEach(row => {

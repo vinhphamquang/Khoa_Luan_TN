@@ -91,10 +91,16 @@ def generate_food_data_vietnamese(food_name_english: str):
         from external_api import get_food_info_from_spoonacular
         sp_data = get_food_info_from_spoonacular(food_name_english)
         if sp_data:
+            # Spoonacular trả về tiếng Anh → dùng Gemini để dịch sang tiếng Việt
+            translated = _translate_spoonacular_to_vietnamese(food_name_english, sp_data)
+            if translated:
+                return translated
+            
+            # Nếu không dịch được, vẫn trả về bản gốc với tên tiếng Việt
             data_dict = {
-                "TenMonAn": food_name_english.capitalize(),
-                "MoTa": sp_data.get("description", f"Food {food_name_english}"),
-                "PhanLoai": sp_data.get("category", "Food"),
+                "TenMonAn": food_name_english.replace("_", " ").title(),
+                "MoTa": sp_data.get("description", f"Món ăn {food_name_english}"),
+                "PhanLoai": sp_data.get("category", "Món ăn"),
                 "DinhDuong": {
                     "Calo": sp_data.get("calories", 0),
                     "Protein": sp_data.get("protein", 0),
@@ -103,7 +109,7 @@ def generate_food_data_vietnamese(food_name_english: str):
                     "Vitamin": sp_data.get("vitamins", "")
                 },
                 "CongThuc": {
-                    "HuongDan": sp_data.get("instructions", "No instructions available"),
+                    "HuongDan": sp_data.get("instructions", "Chưa có hướng dẫn"),
                     "ThoiGianNau": sp_data.get("cooking_time", 30),
                     "KhauPhan": sp_data.get("servings", 1),
                     "NguyenLieu": sp_data.get("ingredients", [])
@@ -113,6 +119,93 @@ def generate_food_data_vietnamese(food_name_english: str):
     except Exception as fallback_err:
         print(f"[Fallback Error] Spoonacular failed too: {fallback_err}")
         
+    return None
+
+
+def _translate_spoonacular_to_vietnamese(food_name_english: str, sp_data: dict):
+    """
+    Dùng Gemini để dịch dữ liệu Spoonacular (tiếng Anh) sang tiếng Việt.
+    Giữ nguyên số liệu dinh dưỡng, chỉ dịch text.
+    """
+    if not GEMINI_API_KEY:
+        return None
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
+    
+    # Lấy thông tin cần dịch
+    description = sp_data.get("description", "")
+    instructions = sp_data.get("instructions", "")
+    category = sp_data.get("category", "")
+    ingredients_list = sp_data.get("ingredients", [])
+    ingredients_text = ", ".join([ing.get("TenNguyenLieu", "") for ing in ingredients_list])
+    
+    prompt = f"""Dịch thông tin món ăn "{food_name_english}" từ tiếng Anh sang tiếng Việt.
+Trả về JSON hợp lệ, KHÔNG có markdown, KHÔNG giải thích thêm.
+
+Thông tin gốc (tiếng Anh):
+- Description: {description[:300]}
+- Category: {category}
+- Instructions: {instructions[:500]}
+- Ingredients: {ingredients_text[:300]}
+
+Trả về JSON theo cấu trúc:
+{{
+    "TenMonAn": "Tên tiếng Việt phổ biến của món ăn",
+    "MoTa": "Mô tả ngắn gọn bằng tiếng Việt (2-3 câu)",
+    "PhanLoai": "Phân loại bằng tiếng Việt (VD: Món nước, Món xào, Tráng miệng...)",
+    "HuongDan": "Hướng dẫn nấu bằng tiếng Việt",
+    "NguyenLieu": [
+        {{"TenNguyenLieu": "Tên nguyên liệu tiếng Việt", "SoLuong": "số lượng"}}
+    ]
+}}"""
+    
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json"
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        if response.status_code == 200:
+            data = response.json()
+            text_response = data['candidates'][0]['content']['parts'][0]['text'].strip()
+            
+            if text_response.startswith("```"):
+                text_response = text_response.split("```")[1]
+                if text_response.startswith("json"):
+                    text_response = text_response[4:]
+                text_response = text_response.strip()
+            
+            translated = json.loads(text_response)
+            
+            # Kết hợp dữ liệu dịch với số liệu dinh dưỡng gốc (giữ nguyên số)
+            result = {
+                "TenMonAn": translated.get("TenMonAn", food_name_english.replace("_", " ").title()),
+                "MoTa": translated.get("MoTa", description),
+                "PhanLoai": translated.get("PhanLoai", category),
+                "DinhDuong": {
+                    "Calo": sp_data.get("calories", 0),
+                    "Protein": sp_data.get("protein", 0),
+                    "ChatBeo": sp_data.get("fat", 0),
+                    "Carbohydrate": sp_data.get("carbs", 0),
+                    "Vitamin": sp_data.get("vitamins", "")
+                },
+                "CongThuc": {
+                    "HuongDan": translated.get("HuongDan", instructions),
+                    "ThoiGianNau": sp_data.get("cooking_time", 30),
+                    "KhauPhan": sp_data.get("servings", 1),
+                    "NguyenLieu": translated.get("NguyenLieu", sp_data.get("ingredients", []))
+                }
+            }
+            
+            print(f"[SUCCESS] Đã dịch dữ liệu Spoonacular sang tiếng Việt: {result['TenMonAn']}")
+            return result
+    except Exception as e:
+        print(f"[TRANSLATE ERROR] Không thể dịch dữ liệu Spoonacular: {e}")
+    
     return None
 
 if __name__ == "__main__":

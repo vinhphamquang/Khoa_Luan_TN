@@ -507,24 +507,24 @@ def get_food_info_from_gemini(food_name: str):
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
         
-        prompt = f"""Provide detailed information about the dish "{food_name}" in JSON format:
-{{
-  "description": "Brief description (max 200 chars)",
-  "category": "Food category (e.g., Main dish, Appetizer, Dessert)",
-  "calories": <number>,
-  "protein": <number in grams>,
-  "fat": <number in grams>,
-  "carbs": <number in grams>,
-  "vitamins": "Main vitamins",
-  "instructions": "Step-by-step cooking instructions (5 steps max)",
-  "cooking_time": <number in minutes>,
-  "servings": <number>,
-  "ingredients": [
-    {{"TenNguyenLieu": "ingredient name", "SoLuong": "amount"}}
-  ]
-}}
+        prompt = f"""Cung cấp thông tin chi tiết BẰNG TIẾNG VIỆT về món ăn "{food_name}" theo cấu trúc JSON sau.
+Chỉ trả về JSON hợp lệ, KHÔNG có markdown, KHÔNG giải thích thêm.
 
-Reply with ONLY valid JSON, no markdown, no explanation."""
+{{
+  "description": "Mô tả ngắn gọn bằng tiếng Việt (tối đa 200 ký tự)",
+  "category": "Phân loại món ăn bằng tiếng Việt (VD: Món nước, Món xào, Tráng miệng, Khai vị...)",
+  "calories": <số>,
+  "protein": <số tính bằng gram>,
+  "fat": <số tính bằng gram>,
+  "carbs": <số tính bằng gram>,
+  "vitamins": "Các vitamin chính",
+  "instructions": "Hướng dẫn nấu từng bước bằng tiếng Việt (tối đa 5 bước)",
+  "cooking_time": <số phút>,
+  "servings": <số khẩu phần>,
+  "ingredients": [
+    {{"TenNguyenLieu": "tên nguyên liệu tiếng Việt", "SoLuong": "số lượng"}}
+  ]
+}}"""
 
         payload = {
             "contents": [{
