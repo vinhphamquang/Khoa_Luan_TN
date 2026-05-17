@@ -596,6 +596,52 @@ function showResult(data) {
         recBox.style.display = 'none';
     }
 
+    // Plan Advice Rendering (Kế hoạch dinh dưỡng)
+    const planBox = document.getElementById('plan-advice-box');
+    const planAdvice = data.health_recommendation?.plan_advice;
+    if (planAdvice && planBox) {
+        const iconEl = document.getElementById('plan-advice-icon');
+        const statusEl = document.getElementById('plan-advice-status');
+        const msgEl = document.getElementById('plan-advice-message');
+        const consumedEl = document.getElementById('plan-consumed');
+        const totalEl = document.getElementById('plan-total');
+        const fillEl = document.getElementById('plan-progress-fill');
+        const foodEl = document.getElementById('plan-progress-food');
+
+        // Status mapping
+        const statusMap = {
+            'phu_hop': { text: '✅ Phù hợp', cls: 'plan-status-good', color: '#22c55e' },
+            'an_it': { text: '⚠️ Ăn vừa phải', cls: 'plan-status-warn', color: '#f59e0b' },
+            'khong_nen': { text: '❌ Không nên ăn', cls: 'plan-status-bad', color: '#ef4444' }
+        };
+        const st = statusMap[planAdvice.plan_status] || statusMap['an_it'];
+
+        statusEl.textContent = st.text;
+        statusEl.className = 'plan-advice-status ' + st.cls;
+        msgEl.textContent = planAdvice.plan_message;
+        consumedEl.textContent = planAdvice.plan_consumed_calo;
+        totalEl.textContent = planAdvice.plan_total_calo;
+
+        // Progress bar
+        const total = planAdvice.plan_total_calo || 1;
+        const consumedPct = Math.min(100, (planAdvice.plan_consumed_calo / total) * 100);
+        const foodPct = Math.min(100 - consumedPct, (planAdvice.food_calo / total) * 100);
+
+        planBox.style.borderLeftColor = st.color;
+        iconEl.style.background = st.color + '20';
+        iconEl.querySelector('i').style.color = st.color;
+
+        setTimeout(() => {
+            fillEl.style.width = consumedPct + '%';
+            foodEl.style.width = foodPct + '%';
+            foodEl.style.left = consumedPct + '%';
+        }, 200);
+
+        planBox.style.display = '';
+    } else if (planBox) {
+        planBox.style.display = 'none';
+    }
+
     // Initialize accordion functionality
     initAccordion();
 
@@ -1237,7 +1283,7 @@ async function loadFoodHistory(userId) {
                 const card = document.createElement('div');
                 card.className = 'history-card';
                 card.style.cursor = 'pointer';
-                card.onclick = () => openHistoryCommentModal(item.id, item.food_name);
+                card.onclick = () => openHistoryCommentModal(item.id, item.food_name, item.plan_advice);
                 
                 const timeStr = item.time ? new Date(item.time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
                 const calStr = item.calories > 0 ? Math.round(item.calories) + ' kcal' : '--';
@@ -1255,10 +1301,23 @@ async function loadFoodHistory(userId) {
                     ? `<span class="history-comment-badge"><i class="fa-solid fa-comments"></i> ${item.comment_count}</span>`
                     : `<span class="history-comment-badge history-comment-badge-empty"><i class="fa-regular fa-comment"></i> Phản hồi</span>`;
                 
+                // Plan advice badge
+                let planBadge = '';
+                if (item.plan_advice) {
+                    const pm = {
+                        'phu_hop': { icon: '✅', text: 'Phù hợp KH', cls: 'plan-badge-good' },
+                        'an_it': { icon: '⚠️', text: 'Ăn vừa phải', cls: 'plan-badge-warn' },
+                        'khong_nen': { icon: '❌', text: 'Không nên', cls: 'plan-badge-bad' }
+                    };
+                    const ps = pm[item.plan_advice.plan_status] || pm['an_it'];
+                    planBadge = `<span class="history-plan-badge ${ps.cls}">${ps.icon} ${ps.text}</span>`;
+                }
+                
                 card.innerHTML = `
                     ${imgHTML}
                     <div class="history-card-body">
                         <div class="history-card-name" title="${item.food_name}">${item.food_name}</div>
+                        ${planBadge}
                         <div class="history-card-meta">
                             <span class="history-card-cal"><i class="fa-solid fa-fire"></i> ${calStr}</span>
                             ${commentBadge}
@@ -1660,19 +1719,27 @@ async function fetchNotifications(userId) {
             badge.style.display = 'none';
         }
 
-        // Render notifications
-        if (data.notifications.length === 0) {
-            body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>';
+        // Only show unread notifications
+        const unread = data.notifications.filter(n => !n.is_read);
+
+        if (unread.length === 0) {
+            body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Không có thông báo mới</p></div>';
             return;
         }
 
-        body.innerHTML = data.notifications.map(n => {
+        body.innerHTML = unread.map(n => {
             const timeStr = n.time ? new Date(n.time).toLocaleString('vi-VN') : '';
-            const unreadClass = n.is_read ? '' : 'notif-unread';
+            
+            // Detect icon based on content
+            let icon = 'fa-pen-to-square';
+            if (n.content.includes('bình luận') || n.content.includes('phản hồi')) icon = 'fa-comments';
+            else if (n.content.includes('chỉnh sửa') || n.content.includes('sửa')) icon = 'fa-pen-to-square';
+            
             return `
-                <div class="notif-item ${unreadClass}" data-id="${n.id}" onclick="markNotifRead(${n.id}, ${userId})">
+                <div class="notif-item notif-unread" data-id="${n.id}" data-history="${n.history_id || ''}" 
+                     onclick="markNotifRead(${n.id}, ${userId}, '${n.history_id || ''}', this)">
                     <div class="notif-item-icon">
-                        <i class="fa-solid fa-pen-to-square"></i>
+                        <i class="fa-solid ${icon}"></i>
                     </div>
                     <div class="notif-item-body">
                         <p class="notif-item-text">${n.content}</p>
@@ -1691,10 +1758,55 @@ async function fetchNotifications(userId) {
     }
 }
 
-window.markNotifRead = async (notifId, userId) => {
+window.markNotifRead = async (notifId, userId, historyId, el) => {
     try {
+        // 1. Mark as read on server
         await fetch(`/api/notifications/${notifId}/read`, { method: 'PUT' });
-        fetchNotifications(userId);
+        
+        // 2. Remove from dropdown with animation
+        if (el) {
+            el.style.transition = 'opacity 0.3s, transform 0.3s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(20px)';
+            setTimeout(() => {
+                el.remove();
+                // Check if dropdown is now empty
+                const body = document.getElementById('notif-dropdown-body');
+                if (body && body.querySelectorAll('.notif-item').length === 0) {
+                    body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Không có thông báo mới</p></div>';
+                }
+            }, 300);
+        }
+        
+        // 3. Update badge count
+        const badge = document.getElementById('notif-badge');
+        if (badge) {
+            let count = parseInt(badge.textContent) || 0;
+            count = Math.max(0, count - 1);
+            if (count > 0) {
+                badge.textContent = count > 9 ? '9+' : count;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        // 4. Close dropdown
+        const dropdown = document.getElementById('notif-dropdown');
+        if (dropdown) dropdown.classList.add('hidden');
+        
+        // 5. Navigate to profile > history
+        window.location.hash = 'profile';
+        // Wait for page to load then open comment modal if history_id exists
+        if (historyId) {
+            setTimeout(() => {
+                const card = document.querySelector(`[onclick*="openHistoryCommentModal(${historyId}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.boxShadow = '0 0 0 2px var(--primary), 0 0 20px rgba(34, 197, 94, 0.3)';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 3000);
+                }
+            }, 500);
+        }
     } catch (e) { console.error(e); }
 };
 
@@ -1767,7 +1879,7 @@ function renderComments(comments) {
 // ============================================
 let _hcCurrentHistoryId = null;
 
-function openHistoryCommentModal(historyId, foodName) {
+function openHistoryCommentModal(historyId, foodName, planAdvice) {
     _hcCurrentHistoryId = historyId;
     const overlay = document.getElementById('history-comment-overlay');
     const foodLabel = document.getElementById('hc-modal-food');
@@ -1783,6 +1895,48 @@ function openHistoryCommentModal(historyId, foodName) {
     charCount.textContent = '0/1000';
     submitBtn.disabled = true;
     listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>';
+    
+    // Render plan advice in modal
+    let planDetailEl = document.getElementById('hc-plan-detail');
+    if (!planDetailEl) {
+        planDetailEl = document.createElement('div');
+        planDetailEl.id = 'hc-plan-detail';
+        const formEl = document.getElementById('hc-comment-form');
+        formEl.parentNode.insertBefore(planDetailEl, formEl);
+    }
+    
+    if (planAdvice) {
+        const statusMap = {
+            'phu_hop': { text: '✅ Phù hợp với kế hoạch', cls: 'plan-status-good', color: '#22c55e' },
+            'an_it': { text: '⚠️ Nên ăn vừa phải', cls: 'plan-status-warn', color: '#f59e0b' },
+            'khong_nen': { text: '❌ Không phù hợp kế hoạch', cls: 'plan-status-bad', color: '#ef4444' }
+        };
+        const st = statusMap[planAdvice.plan_status] || statusMap['an_it'];
+        const total = planAdvice.plan_total_calo || 1;
+        const consumedPct = Math.min(100, (planAdvice.plan_consumed_calo / total) * 100);
+        const foodPct = Math.min(100 - consumedPct, (planAdvice.food_calo / total) * 100);
+        
+        planDetailEl.innerHTML = `
+            <div style="padding:14px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);margin-bottom:14px;border-left:3px solid ${st.color};background:rgba(255,255,255,0.02)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <i class="fa-solid fa-clipboard-check" style="color:${st.color}"></i>
+                    <strong style="font-size:13px">Đánh giá kế hoạch</strong>
+                    <span class="${st.cls}" style="font-size:12px;padding:2px 8px;border-radius:10px;font-weight:700">${st.text}</span>
+                </div>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">${planAdvice.plan_message}</p>
+                <div style="position:relative;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;margin-bottom:6px">
+                    <div style="position:absolute;left:0;top:0;height:100%;width:${consumedPct}%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:5px"></div>
+                    <div style="position:absolute;top:0;height:100%;width:${foodPct}%;left:${consumedPct}%;background:linear-gradient(90deg,#f59e0b,#f97316);border-radius:5px;opacity:0.85"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+                    <span>Đã ăn: <strong style="color:var(--text-main)">${planAdvice.plan_consumed_calo}</strong> kcal</span>
+                    <span>Món này: <strong style="color:#f59e0b">${planAdvice.food_calo}</strong> kcal</span>
+                    <span>Mục tiêu: <strong style="color:var(--text-main)">${planAdvice.plan_total_calo}</strong> kcal</span>
+                </div>
+            </div>`;
+    } else {
+        planDetailEl.innerHTML = '';
+    }
     
     overlay.classList.remove('hidden');
     

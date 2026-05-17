@@ -1339,24 +1339,35 @@ document.addEventListener('click', async (e) => {
                 badge.style.display = 'none';
             }
 
-            // Render
-            if (data.notifications.length === 0) {
-                body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>';
+            // Only show unread
+            const unread = data.notifications.filter(n => !n.is_read);
+
+            if (unread.length === 0) {
+                body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Không có thông báo mới</p></div>';
                 return;
             }
 
-            body.innerHTML = data.notifications.map(n => {
+            body.innerHTML = unread.map(n => {
                 const timeStr = n.time ? new Date(n.time).toLocaleString('vi-VN') : '';
-                const unreadClass = n.is_read ? '' : 'notif-unread';
                 
-                // Detect notification type for icon
+                // Detect notification type for icon & target tab
                 let icon = 'fa-pen-to-square';
-                if (n.content.includes('👤') || n.content.includes('đăng ký')) icon = 'fa-user-plus';
-                else if (n.content.includes('❌') || n.content.includes('Sai')) icon = 'fa-circle-xmark';
-                else if (n.content.includes('⚠️') || n.content.includes('Trung bình')) icon = 'fa-triangle-exclamation';
+                let targetTab = 'admin-history';
+                if (n.content.includes('👤') || n.content.includes('đăng ký')) {
+                    icon = 'fa-user-plus';
+                    targetTab = 'admin-users';
+                } else if (n.content.includes('bình luận') || n.content.includes('phản hồi') || n.content.includes('💬')) {
+                    icon = 'fa-comments';
+                    targetTab = 'admin-comments';
+                } else if (n.content.includes('❌') || n.content.includes('Sai')) {
+                    icon = 'fa-circle-xmark';
+                } else if (n.content.includes('⚠️') || n.content.includes('Trung bình')) {
+                    icon = 'fa-triangle-exclamation';
+                }
                 
                 return `
-                    <div class="notif-item ${unreadClass}" data-id="${n.id}" onclick="markAdminNotifRead(${n.id})">
+                    <div class="notif-item notif-unread" data-id="${n.id}" 
+                         onclick="markAdminNotifRead(${n.id}, '${targetTab}', this)">
                         <div class="notif-item-icon">
                             <i class="fa-solid ${icon}"></i>
                         </div>
@@ -1377,11 +1388,47 @@ document.addEventListener('click', async (e) => {
         }
     }
 
-    // Mark single notification read
-    window.markAdminNotifRead = async (notifId) => {
+    // Mark single notification read → navigate → remove from dropdown
+    window.markAdminNotifRead = async (notifId, targetTab, el) => {
         try {
+            // 1. Mark as read on server
             await fetch(`/api/notifications/${notifId}/read`, { method: 'PUT' });
-            fetchAdminNotifications();
+            
+            // 2. Animate removal
+            if (el) {
+                el.style.transition = 'opacity 0.3s, transform 0.3s';
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    el.remove();
+                    const body = document.getElementById('notif-dropdown-body');
+                    if (body && body.querySelectorAll('.notif-item').length === 0) {
+                        body.innerHTML = '<div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Không có thông báo mới</p></div>';
+                    }
+                }, 300);
+            }
+            
+            // 3. Update badge
+            const badge = document.getElementById('notif-badge');
+            if (badge) {
+                let count = parseInt(badge.textContent) || 0;
+                count = Math.max(0, count - 1);
+                if (count > 0) {
+                    badge.textContent = count > 9 ? '9+' : count;
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            
+            // 4. Close dropdown
+            const dropdown = document.getElementById('notif-dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+            
+            // 5. Navigate to target tab
+            if (targetTab) {
+                const tabBtn = document.querySelector(`.admin-tab-btn[data-tab="${targetTab}"]`);
+                if (tabBtn) tabBtn.click();
+            }
         } catch (e) { console.error(e); }
     };
 

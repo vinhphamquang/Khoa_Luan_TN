@@ -90,9 +90,14 @@ def run_migrations():
             )
         """)
         
+        # 7. Thêm cột KhuyenNghiKeHoach vào LichSu (lưu JSON khuyến nghị kế hoạch dinh dưỡng)
+        cursor.execute("""
+            ALTER TABLE LichSu ADD COLUMN IF NOT EXISTS KhuyenNghiKeHoach TEXT DEFAULT NULL
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive, BinhLuan)")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive, BinhLuan, KhuyenNghiKeHoach)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
@@ -970,7 +975,6 @@ def get_recommendation(user_id, calories):
     muc_tieu_lower = str(muc_tieu).lower()
     
     if 'giam' in muc_tieu_lower or 'giảm' in muc_tieu_lower:
-        # Giảm cân
         if calories > threshold:
             recommendation = "Hạn chế"
             reason = f"Món ăn có lượng calo ({calories} kcal) khá cao, không tốt cho mục tiêu giảm cân."
@@ -978,7 +982,6 @@ def get_recommendation(user_id, calories):
             recommendation = "Nên ăn"
             reason = f"Món ăn ít calo ({calories} kcal), phù hợp với mục tiêu giảm cân."
     elif 'tang' in muc_tieu_lower or 'tăng' in muc_tieu_lower:
-        # Tăng cân
         if calories > threshold:
             recommendation = "Nên ăn"
             reason = f"Món ăn giàu năng lượng ({calories} kcal), rất tốt cho mục tiêu tăng cân."
@@ -986,16 +989,74 @@ def get_recommendation(user_id, calories):
             recommendation = "Ăn vừa phải"
             reason = f"Món ăn ít năng lượng ({calories} kcal), nên ăn kèm các món khác để đủ calo tăng cân."
     else:
-        # Duy trì / Giữ dáng
         recommendation = "Ăn cân đối"
         reason = f"Món ăn cung cấp {calories} kcal, ăn uống cân đối để duy trì vóc dáng."
 
-    return {
+    result = {
         "bmi": bmi,
         "bmi_category": bmi_category,
         "recommendation": recommendation,
         "reason": reason
     }
+
+    # ---- TÍCH HỢP KẾ HOẠCH DINH DƯỠNG ----
+    try:
+        from psycopg2.extras import RealDictCursor
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Lấy kế hoạch dinh dưỡng MỚI NHẤT trong ngày hôm nay
+        cursor.execute("""
+            SELECT CaloDuKien, TongCaloChon,
+                   BuaSang, BuaSangCalo, BuaTrua, BuaTruaCalo,
+                   BuaToi, BuaToiCalo, BuaPhu, BuaPhuCalo
+            FROM KeHoachDinhDuong
+            WHERE MaNguoiDung = %s AND DATE(NgayLuu) = CURRENT_DATE
+            ORDER BY NgayLuu DESC LIMIT 1
+        """, (user_id,))
+        plan = cursor.fetchone()
+        
+        if plan:
+            plan_total = float(plan['calodukien']) if plan['calodukien'] else 0
+            
+            # Tính tổng calo đã ăn hôm nay (từ LichSu, KHÔNG tính lần hiện tại)
+            cursor.execute("""
+                SELECT COALESCE(SUM(Calo), 0) as consumed
+                FROM LichSu
+                WHERE MaNguoiDung = %s AND DATE(ThoiGian) = CURRENT_DATE
+            """, (user_id,))
+            consumed = float(cursor.fetchone()['consumed'] or 0)
+            
+            remaining = max(0, plan_total - consumed)
+            
+            # So sánh calo món ăn vs calo còn lại
+            if remaining <= 0:
+                plan_status = "khong_nen"
+                plan_msg = f"Bạn đã vượt kế hoạch calo hôm nay ({int(consumed)}/{int(plan_total)} kcal). Không nên ăn thêm món này."
+            elif calories <= remaining * 0.4:
+                plan_status = "phu_hop"
+                plan_msg = f"Món ăn ({int(calories)} kcal) phù hợp với kế hoạch. Còn lại {int(remaining)} kcal trong ngày."
+            elif calories <= remaining:
+                plan_status = "an_it"
+                plan_msg = f"Món ăn ({int(calories)} kcal) chiếm phần lớn lượng calo còn lại ({int(remaining)} kcal). Nên ăn vừa phải."
+            else:
+                plan_status = "khong_nen"
+                plan_msg = f"Món ăn ({int(calories)} kcal) vượt quá lượng calo còn lại ({int(remaining)} kcal). Nên hạn chế hoặc không ăn."
+            
+            result["plan_advice"] = {
+                "plan_status": plan_status,
+                "plan_message": plan_msg,
+                "plan_total_calo": int(plan_total),
+                "plan_consumed_calo": int(consumed),
+                "plan_remaining_calo": int(remaining),
+                "food_calo": int(calories)
+            }
+        
+        conn.close()
+    except Exception as e:
+        print(f"[PLAN ADVICE] Error: {e}")
+
+    return result
 
 @app.route("/api/dishes/<food_name>", methods=["GET"])
 def get_dish_info(food_name):
@@ -1220,6 +1281,20 @@ def predict():
                 rec = get_recommendation(int(user_id), calo)
                 if rec:
                     response_data["health_recommendation"] = rec
+                    
+                    # Lưu plan_advice vào LichSu nếu có
+                    if rec.get("plan_advice") and response_data.get("history_id"):
+                        try:
+                            import json
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                UPDATE LichSu SET KhuyenNghiKeHoach = %s WHERE MaLichSu = %s
+                            """, (json.dumps(rec["plan_advice"], ensure_ascii=False), response_data["history_id"]))
+                            conn.commit()
+                            conn.close()
+                        except Exception as pe:
+                            print(f"[PLAN SAVE] Error saving plan advice: {pe}")
 
         return jsonify(response_data)
     

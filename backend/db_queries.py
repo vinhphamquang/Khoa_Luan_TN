@@ -476,7 +476,7 @@ def get_user_history(user_id):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo
+            SELECT MaLichSu, TenMonAn, DoChinhXac, ThoiGian, DuongDanAnh, Calo, KhuyenNghiKeHoach
             FROM LichSu
             WHERE MaNguoiDung = %s
             ORDER BY ThoiGian DESC
@@ -498,6 +498,15 @@ def get_user_history(user_id):
             except:
                 pass
             
+            # Parse plan_advice JSON
+            plan_advice = None
+            if h.get('khuyennghikehoach'):
+                try:
+                    import json
+                    plan_advice = json.loads(h['khuyennghikehoach'])
+                except:
+                    pass
+            
             result.append({
                 'id': h['malichsu'],
                 'food_name': h['tenmonan'],
@@ -505,7 +514,8 @@ def get_user_history(user_id):
                 'time': h['thoigian'].strftime('%Y-%m-%d %H:%M:%S') if h['thoigian'] else '',
                 'image': h.get('duongdananh', '') or '',
                 'calories': float(h['calo']) if h.get('calo') else 0,
-                'comment_count': comment_count
+                'comment_count': comment_count,
+                'plan_advice': plan_advice
             })
         
         conn.close()
