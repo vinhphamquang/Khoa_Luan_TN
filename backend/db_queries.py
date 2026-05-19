@@ -13,12 +13,29 @@ load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db_connection():
-    """Kết nối PostgreSQL"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
-    cursor.execute("SET timezone = 'Asia/Ho_Chi_Minh'")
-    conn.commit()
-    return conn
+    """Kết nối PostgreSQL với SSL và retry logic"""
+    import time
+    
+    # Thêm sslmode=require nếu chưa có
+    db_url = DATABASE_URL
+    if db_url and 'sslmode' not in db_url:
+        separator = '&' if '?' in db_url else '?'
+        db_url = f"{db_url}{separator}sslmode=require"
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SET timezone = 'Asia/Ho_Chi_Minh'")
+            conn.commit()
+            return conn
+        except psycopg2.OperationalError as e:
+            print(f"[DB] Kết nối thất bại (lần {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            else:
+                raise
 
 def get_db_cursor(conn):
     """Lấy cursor với RealDictCursor để trả về dict"""
