@@ -975,8 +975,15 @@ function initAuth() {
     
     // Logout
     document.getElementById('btn-logout')?.addEventListener('click', () => {
+        if (typeof window.appToast === 'function') {
+            window.appToast('Đăng xuất thành công. Hẹn gặp lại!', 'success', 2200);
+        }
         localStorage.removeItem('smartfood_user');
         checkLoginState();
+        // Stay on the home page but ensure we land on the intro section
+        if (window.location.hash && window.location.hash !== '#intro') {
+            window.location.hash = 'intro';
+        }
     });
     
     // Google Sign-In
@@ -1256,6 +1263,9 @@ async function initProfilePage() {
     if (btnPageLogout && !btnPageLogout.dataset.initialized) {
         btnPageLogout.dataset.initialized = 'true';
         btnPageLogout.addEventListener('click', () => {
+            if (typeof window.appToast === 'function') {
+                window.appToast('Đăng xuất thành công. Hẹn gặp lại!', 'success', 2200);
+            }
             localStorage.removeItem('smartfood_user');
             checkLoginState();
             window.location.hash = 'intro';

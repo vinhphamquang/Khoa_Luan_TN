@@ -4993,3 +4993,146 @@ select.form-input {
     0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2); }
     50% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
 }
+
+/* ============================================
+   PAGE TRANSITIONS & TOAST (transitions.js)
+   ============================================ */
+@keyframes appBodyEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes appBodyLeave {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(8px); }
+}
+body {
+    animation: appBodyEnter 0.4s ease both;
+}
+body.is-leaving {
+    animation: appBodyLeave 0.28s ease forwards;
+    pointer-events: none;
+}
+
+/* Decorative food icons in background (transitions.js injects) */
+.bg-food-icons {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+.bg-food-icon {
+    position: absolute;
+    line-height: 1;
+    opacity: 0.13;
+    transform: rotate(var(--icon-rot, 0deg));
+    animation: bgFoodFloat var(--icon-dur, 20s) ease-in-out infinite;
+    animation-delay: var(--icon-delay, 0s);
+    will-change: transform;
+}
+.bg-food-icon i { display: block; }
+
+/* Subtle opacity variation for natural feel */
+.bg-food-icon-2,
+.bg-food-icon-7,
+.bg-food-icon-10,
+.bg-food-icon-14 { opacity: 0.15; }
+.bg-food-icon-3,
+.bg-food-icon-4,
+.bg-food-icon-8,
+.bg-food-icon-15 { opacity: 0.11; }
+
+@keyframes bgFoodFloat {
+    0%, 100% { transform: rotate(var(--icon-rot, 0deg)) translateY(0); }
+    50%      { transform: rotate(calc(var(--icon-rot, 0deg) + 4deg)) translateY(-12px); }
+}
+
+/* Tablet: reduce density slightly */
+@media (max-width: 900px) {
+    .bg-food-icon { font-size: 32px !important; opacity: 0.10; }
+    .bg-food-icon-3, .bg-food-icon-5, .bg-food-icon-7, .bg-food-icon-11, .bg-food-icon-13 {
+        display: none;
+    }
+}
+
+/* Phone: keep only a few large ones */
+@media (max-width: 560px) {
+    .bg-food-icon { font-size: 28px !important; opacity: 0.09; }
+    .bg-food-icon:nth-child(odd) { display: none; }
+}
+
+/* Toast host (top-right, stacked) */
+.app-toast-host {
+    position: fixed;
+    top: 84px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: calc(100vw - 40px);
+}
+.app-toast {
+    pointer-events: auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 18px 12px 14px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    min-width: 240px;
+    max-width: 360px;
+    border-left: 4px solid #22c55e;
+    opacity: 0;
+    transform: translateX(28px);
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.app-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+.app-toast.hide {
+    opacity: 0;
+    transform: translateX(28px);
+}
+.app-toast i {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.app-toast-success { border-left-color: #22c55e; }
+.app-toast-success i { color: #16a34a; }
+.app-toast-error { border-left-color: #ef4444; }
+.app-toast-error i { color: #dc2626; }
+.app-toast-warning { border-left-color: #f59e0b; }
+.app-toast-warning i { color: #d97706; }
+.app-toast-info { border-left-color: #3b82f6; }
+.app-toast-info i { color: #2563eb; }
+
+@media (max-width: 560px) {
+    .app-toast-host {
+        top: 70px;
+        right: 12px;
+        left: 12px;
+    }
+    .app-toast {
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    body,
+    body.is-leaving,
+    .app-toast,
+    .bg-food-icon {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+}

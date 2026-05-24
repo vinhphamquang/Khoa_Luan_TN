@@ -1357,6 +1357,78 @@ def delete_food_hard(food_id):
 # HEALTH PROFILE MANAGEMENT
 # ============================================
 
+def classify_bmi(bmi):
+    """Phân loại thể trạng theo BMI. Trả về (category, color, recommendation, suggested_goal)."""
+    if bmi < 18.5:
+        return (
+            "Gầy",
+            "#3b82f6",
+            "Bạn đang ở thể trạng gầy. Hãy tăng khẩu phần ăn lành mạnh, ưu tiên thực phẩm giàu protein, carbs phức hợp và chất béo tốt.",
+            "Tăng cân"
+        )
+    if bmi < 25:
+        return (
+            "Bình thường",
+            "#22c55e",
+            "Bạn đang ở thể trạng bình thường. Hãy duy trì chế độ ăn cân đối và vận động đều đặn.",
+            "Duy trì"
+        )
+    if bmi < 30:
+        return (
+            "Thừa cân",
+            "#f59e0b",
+            "Bạn đang ở thể trạng thừa cân. Hãy giảm lượng calo nạp vào (300-500 kcal/ngày), ưu tiên rau xanh và protein nạc.",
+            "Giảm cân"
+        )
+    return (
+        "Béo phì",
+        "#ef4444",
+        "Bạn đang ở thể trạng béo phì. Nên giảm cân an toàn 0.5-1kg/tuần, ưu tiên thực phẩm ít calo và tham vấn bác sĩ nếu có bệnh nền.",
+        "Giảm cân"
+    )
+
+
+def build_weight_message(muc_tieu, diff):
+    """Sinh thông điệp chúc mừng / khuyến nghị theo mục tiêu và mức chênh cân nặng (kg)."""
+    abs_diff = abs(diff)
+    abs_str = f"{abs_diff:.1f}"
+
+    if muc_tieu == "Giảm cân":
+        if diff < -0.3:
+            return ("success",
+                    "🎉 Chúc mừng giảm cân thành công!",
+                    f"Bạn đã giảm {abs_str}kg so với lần trước. Tiếp tục duy trì kế hoạch dinh dưỡng nhé!")
+        if diff > 0.3:
+            return ("warning",
+                    "💪 Cần cải thiện",
+                    f"Cân nặng tăng {abs_str}kg so với mục tiêu giảm cân. Hãy xem lại lượng calo và tăng vận động.")
+        return ("info",
+                "Hãy kiên trì!",
+                "Cân nặng chưa thay đổi đáng kể, tiếp tục bám sát kế hoạch để đạt mục tiêu.")
+
+    if muc_tieu == "Tăng cân":
+        if diff > 0.3:
+            return ("success",
+                    "🎉 Chúc mừng tăng cân thành công!",
+                    f"Bạn đã tăng {abs_str}kg so với lần trước. Tiếp tục bổ sung dinh dưỡng đầy đủ nhé!")
+        if diff < -0.3:
+            return ("warning",
+                    "💪 Cần cải thiện",
+                    f"Cân nặng giảm {abs_str}kg so với mục tiêu tăng cân. Hãy bổ sung thêm calo và protein.")
+        return ("info",
+                "Hãy kiên trì!",
+                "Cân nặng chưa thay đổi đáng kể, tiếp tục bám sát kế hoạch để đạt mục tiêu.")
+
+    # Duy trì
+    if abs_diff <= 1.0:
+        return ("success",
+                "🎯 Duy trì tốt!",
+                f"Cân nặng dao động {abs_str}kg, vẫn nằm trong khoảng duy trì lành mạnh. Cố lên nhé!")
+    return ("warning",
+            "⚠️ Cần điều chỉnh",
+            f"Cân nặng biến động {abs_str}kg so với lần trước, vượt khoảng duy trì cho phép. Hãy xem lại kế hoạch.")
+
+
 def get_health_profile(user_id):
     """Lấy hồ sơ sức khỏe của user"""
     try:
@@ -1398,11 +1470,11 @@ def get_health_profile(user_id):
         return None
 
 def upsert_health_profile(user_id, data):
-    """Thêm hoặc cập nhật hồ sơ sức khỏe"""
+    """Thêm hoặc cập nhật hồ sơ sức khỏe. Trả về dict thông tin thay đổi cân nặng."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Calculate BMR, TDEE, CaloDuKien
         can_nang = float(data.get('CanNang', 0))
         chieu_cao = float(data.get('ChieuCao', 0))
@@ -1410,13 +1482,13 @@ def upsert_health_profile(user_id, data):
         gioi_tinh = data.get('GioiTinh', 'Nam')
         muc_do_van_dong = data.get('MucDoVanDong', 'Vừa')
         muc_tieu = data.get('MucTieu', 'Duy trì')
-        
+
         # Calculate BMR (Mifflin-St Jeor)
         if gioi_tinh == 'Nam':
             bmr = 10 * can_nang + 6.25 * chieu_cao - 5 * tuoi + 5
         else:
             bmr = 10 * can_nang + 6.25 * chieu_cao - 5 * tuoi - 161
-        
+
         # Calculate TDEE
         activity_factors = {
             'Ít': 1.2,
@@ -1424,7 +1496,7 @@ def upsert_health_profile(user_id, data):
             'Nhiều': 1.725
         }
         tdee = bmr * activity_factors.get(muc_do_van_dong, 1.55)
-        
+
         # Adjust for goal
         goal_adjustments = {
             'Giảm cân': -400,
@@ -1432,40 +1504,133 @@ def upsert_health_profile(user_id, data):
             'Duy trì': 0
         }
         calo_du_kien = tdee + goal_adjustments.get(muc_tieu, 0)
-        
+
+        # Fetch old weight/height before update to compute diff
+        old_weight = None
+        old_height = None
+        cursor.execute("""
+            SELECT CanNang, ChieuCao FROM HoSoSucKhoe WHERE MaNguoiDung = %s
+        """, (user_id,))
+        old_row = cursor.fetchone()
+        if old_row and old_row[0] is not None:
+            old_weight = float(old_row[0])
+            old_height = float(old_row[1]) if old_row[1] is not None else None
+
         # Check if profile exists
         cursor.execute("""
             SELECT MaHoSo FROM HoSoSucKhoe WHERE MaNguoiDung = %s
         """, (user_id,))
-        
         existing = cursor.fetchone()
-        
+
         if existing:
             # Update
             cursor.execute("""
                 UPDATE HoSoSucKhoe
                 SET CanNang = %s, ChieuCao = %s, Tuoi = %s, GioiTinh = %s,
-                    MucDoVanDong = %s, MucTieu = %s, BMR = %s, TDEE = %s, CaloDuKien = %s
+                    MucDoVanDong = %s, MucTieu = %s, BMR = %s, TDEE = %s, CaloDuKien = %s,
+                    NgayCapNhat = CURRENT_TIMESTAMP
                 WHERE MaNguoiDung = %s
-            """, (can_nang, chieu_cao, tuoi, gioi_tinh, muc_do_van_dong, 
+            """, (can_nang, chieu_cao, tuoi, gioi_tinh, muc_do_van_dong,
                   muc_tieu, bmr, tdee, calo_du_kien, user_id))
         else:
             # Insert
             cursor.execute("""
-                INSERT INTO HoSoSucKhoe 
+                INSERT INTO HoSoSucKhoe
                 (MaNguoiDung, CanNang, ChieuCao, Tuoi, GioiTinh, MucDoVanDong, MucTieu, BMR, TDEE, CaloDuKien)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (user_id, can_nang, chieu_cao, tuoi, gioi_tinh, muc_do_van_dong,
                   muc_tieu, bmr, tdee, calo_du_kien))
-        
+
+        # Compute BMI for the new entry and log history
+        bmi_new = None
+        category_new = None
+        if chieu_cao > 0:
+            bmi_new = round(can_nang / ((chieu_cao / 100) ** 2), 2)
+            category_new, _color, _rec, _suggested = classify_bmi(bmi_new)
+
+        cursor.execute("""
+            INSERT INTO LichSuCanNang (MaNguoiDung, CanNang, ChieuCao, BMI, PhanLoaiBMI)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, can_nang, chieu_cao, bmi_new, category_new))
+
         conn.commit()
         conn.close()
-        return True
+
+        # Compute diff & BMI old
+        diff = (can_nang - old_weight) if old_weight is not None else 0.0
+        bmi_old = None
+        category_old = None
+        if old_weight and old_height and old_height > 0:
+            bmi_old = round(old_weight / ((old_height / 100) ** 2), 2)
+            category_old, _c, _r, _s = classify_bmi(bmi_old)
+
+        # Create notification if weight change is notable
+        if old_weight is not None and abs(diff) >= 0.5:
+            msg_type, title, desc = build_weight_message(muc_tieu, diff)
+            try:
+                create_notification(
+                    user_id,
+                    None,
+                    f"{title} — {desc}",
+                    old_name=f"{old_weight:.1f}kg",
+                    new_name=f"{can_nang:.1f}kg"
+                )
+            except Exception as ne:
+                print(f"Warning: could not create weight notification: {ne}")
+
+        return {
+            "success": True,
+            "old_weight": old_weight,
+            "new_weight": can_nang,
+            "old_height": old_height,
+            "diff": round(diff, 2),
+            "bmi_old": bmi_old,
+            "bmi_new": bmi_new,
+            "category_old": category_old,
+            "category_new": category_new,
+            "muc_tieu": muc_tieu,
+            "is_first_entry": old_weight is None
+        }
     except Exception as e:
         print(f"Error upserting health profile: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return {"success": False, "error": str(e)}
+
+
+def get_weight_history(user_id, limit=30):
+    """Lấy lịch sử cân nặng gần nhất, sắp xếp theo thời gian tăng dần (để vẽ chart)."""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        cursor.execute("""
+            SELECT MaLichSuCN, CanNang, ChieuCao, BMI, PhanLoaiBMI, ThoiGian
+            FROM LichSuCanNang
+            WHERE MaNguoiDung = %s
+            ORDER BY ThoiGian DESC
+            LIMIT %s
+        """, (user_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+
+        history = []
+        for r in rows:
+            history.append({
+                'id': r.get('malichsucn'),
+                'can_nang': float(r.get('cannang')) if r.get('cannang') is not None else None,
+                'chieu_cao': float(r.get('chieucao')) if r.get('chieucao') is not None else None,
+                'bmi': float(r.get('bmi')) if r.get('bmi') is not None else None,
+                'phan_loai': r.get('phanloaibmi'),
+                'thoi_gian': r.get('thoigian').strftime('%Y-%m-%d %H:%M:%S') if r.get('thoigian') else None
+            })
+        # Reverse to ASC for chart
+        history.reverse()
+        return history
+    except Exception as e:
+        print(f"Error fetching weight history: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 # ============================================
 # COMMENT / FEEDBACK SYSTEM & ADMIN EDIT & NOTIFICATIONS

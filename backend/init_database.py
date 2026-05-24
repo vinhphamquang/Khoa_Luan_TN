@@ -139,7 +139,26 @@ try:
         )
     """)
     print("  [OK] Bang HoSoSucKhoe")
-    
+
+    # 8b. LichSuCanNang (Weight History)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS LichSuCanNang (
+            MaLichSuCN SERIAL PRIMARY KEY,
+            MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+            CanNang DECIMAL(5,2) NOT NULL,
+            ChieuCao DECIMAL(5,2),
+            BMI DECIMAL(5,2),
+            PhanLoaiBMI VARCHAR(30),
+            GhiChu TEXT,
+            ThoiGian TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_lscn_user_time
+        ON LichSuCanNang(MaNguoiDung, ThoiGian DESC)
+    """)
+    print("  [OK] Bang LichSuCanNang")
+
     # 9. BinhLuan (Comments)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS BinhLuan (

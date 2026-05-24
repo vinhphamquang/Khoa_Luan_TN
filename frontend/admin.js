@@ -31,8 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLogout = document.getElementById('btn-admin-logout');
     if (btnLogout) {
         btnLogout.addEventListener('click', () => {
-            localStorage.removeItem('smartfood_user');
-            window.location.href = '/';
+            if (typeof window.gracefulLogout === 'function') {
+                window.gracefulLogout();
+            } else {
+                localStorage.removeItem('smartfood_user');
+                window.location.href = '/';
+            }
         });
     }
 

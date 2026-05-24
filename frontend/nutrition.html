@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/nutrition.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Animated Background Blobs -->
@@ -198,6 +199,47 @@
                     </div>
                 </section>
 
+                <!-- Body Assessment (BMI in detail) -->
+                <section class="nutrition-section glass-card np-bmi-assessment" id="bmi-assessment-section">
+                    <div class="section-icon-header">
+                        <div class="section-icon-wrap" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+                            <i class="fa-solid fa-stethoscope"></i>
+                        </div>
+                        <div>
+                            <h2>Đánh Giá Thể Trạng</h2>
+                            <p>Phân tích chỉ số BMI và khuyến nghị dinh dưỡng phù hợp</p>
+                        </div>
+                    </div>
+                    <div class="np-bmi-grid">
+                        <div class="np-bmi-main" id="bmi-main-card">
+                            <div class="np-bmi-number" id="bmi-number">--</div>
+                            <div class="np-bmi-badge" id="bmi-badge">Đang tải</div>
+                            <div class="np-bmi-range">Khoảng BMI: <span id="bmi-range-text">--</span></div>
+                        </div>
+                        <div class="np-bmi-detail">
+                            <div class="np-bmi-recommendation" id="bmi-recommendation">
+                                Hãy nhập đầy đủ thông tin để nhận đánh giá thể trạng.
+                            </div>
+                            <div class="np-bmi-goal-banner hidden" id="bmi-goal-banner">
+                                <i class="fa-solid fa-lightbulb"></i>
+                                <span id="bmi-goal-text"></span>
+                            </div>
+                            <div class="np-bmi-scale">
+                                <div class="np-bmi-scale-bar">
+                                    <div class="np-bmi-scale-seg" style="background:#3b82f6;flex:1.85" title="Gầy (<18.5)"></div>
+                                    <div class="np-bmi-scale-seg" style="background:#22c55e;flex:0.65" title="Bình thường (18.5-25)"></div>
+                                    <div class="np-bmi-scale-seg" style="background:#f59e0b;flex:0.5" title="Thừa cân (25-30)"></div>
+                                    <div class="np-bmi-scale-seg" style="background:#ef4444;flex:1" title="Béo phì (≥30)"></div>
+                                </div>
+                                <div class="np-bmi-scale-marker" id="bmi-scale-marker" style="left:0%"></div>
+                                <div class="np-bmi-scale-labels">
+                                    <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Macro Distribution -->
                 <section class="nutrition-section glass-card">
                     <div class="section-icon-header">
@@ -320,6 +362,44 @@
             </div>
         </div>
 
+        <!-- Weight History -->
+        <div class="nutrition-container">
+            <section class="nutrition-section glass-card" id="weight-history-section">
+                <div class="section-icon-header">
+                    <div class="section-icon-wrap" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+                        <i class="fa-solid fa-weight-scale"></i>
+                    </div>
+                    <div>
+                        <h2>Lịch Sử Cân Nặng</h2>
+                        <p>Theo dõi tiến trình cân nặng và BMI của bạn theo thời gian</p>
+                    </div>
+                </div>
+                <div class="np-weight-stats" id="weight-stats">
+                    <div class="np-weight-stat-card">
+                        <span class="np-weight-stat-label"><i class="fa-solid fa-weight-scale"></i> Cân nặng hiện tại</span>
+                        <span class="np-weight-stat-value" id="wh-current">--</span>
+                        <span class="np-weight-stat-unit">kg</span>
+                    </div>
+                    <div class="np-weight-stat-card">
+                        <span class="np-weight-stat-label"><i class="fa-solid fa-arrows-up-down"></i> Tổng thay đổi</span>
+                        <span class="np-weight-stat-value" id="wh-change">--</span>
+                        <span class="np-weight-stat-unit">kg</span>
+                    </div>
+                    <div class="np-weight-stat-card">
+                        <span class="np-weight-stat-label"><i class="fa-solid fa-list-ol"></i> Số lần cập nhật</span>
+                        <span class="np-weight-stat-value" id="wh-count">--</span>
+                        <span class="np-weight-stat-unit">lần</span>
+                    </div>
+                </div>
+                <div class="np-weight-chart-wrap">
+                    <canvas id="weight-chart" height="90"></canvas>
+                </div>
+                <div class="np-weight-history-list" id="weight-history-list">
+                    <div class="np-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+                </div>
+            </section>
+        </div>
+
         <!-- Meal Plan History - Redirect to Profile -->
         <div class="nutrition-container">
             <section class="nutrition-section glass-card" id="plan-history-section">
@@ -375,6 +455,36 @@
         </div>
     </footer>
 
+    <!-- Weight Change Modal -->
+    <div class="np-weight-modal-overlay hidden" id="weight-modal-overlay">
+        <div class="np-weight-modal" id="weight-modal">
+            <button class="np-weight-modal-close" id="weight-modal-close" aria-label="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="np-weight-modal-icon" id="weight-modal-icon">🎉</div>
+            <div class="np-weight-modal-title" id="weight-modal-title">Chúc mừng!</div>
+            <div class="np-weight-modal-desc" id="weight-modal-desc"></div>
+            <div class="np-weight-modal-compare" id="weight-modal-compare">
+                <div class="np-weight-modal-old">
+                    <span class="np-weight-modal-label">Trước</span>
+                    <span class="np-weight-modal-value" id="weight-modal-old-val">--</span>
+                </div>
+                <div class="np-weight-modal-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+                <div class="np-weight-modal-new">
+                    <span class="np-weight-modal-label">Hiện tại</span>
+                    <span class="np-weight-modal-value" id="weight-modal-new-val">--</span>
+                </div>
+            </div>
+            <div class="np-weight-modal-diff" id="weight-modal-diff"></div>
+            <button class="btn btn-primary np-weight-modal-btn" id="weight-modal-ok">
+                <i class="fa-solid fa-check"></i> Đóng
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/transitions.js"></script>
     <script src="/static/nutrition.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ from db_queries import (
     get_all_users, delete_user, get_system_stats, get_all_history_admin, get_history_detail_admin,
     get_all_foods_admin, get_food_detail_admin, insert_food_full, update_food_full, 
     delete_food_soft, restore_food_soft, delete_food_hard, get_health_profile, upsert_health_profile,
+    get_weight_history, classify_bmi,
     get_user_food_stats, update_history_record,
     create_notification, get_user_notifications, mark_notification_read, mark_all_notifications_read,
     delete_history_record, bulk_delete_history,
@@ -360,9 +361,20 @@ def get_user_health_profile(user_id):
 @app.route("/api/health-profile/<int:user_id>", methods=["POST"])
 def update_user_health_profile(user_id):
     data = request.json
-    if upsert_health_profile(user_id, data):
-        return jsonify({"success": True, "message": "Cập nhật hồ sơ sức khỏe thành công"})
+    result = upsert_health_profile(user_id, data)
+    if result and result.get("success"):
+        return jsonify({
+            "success": True,
+            "message": "Cập nhật hồ sơ sức khỏe thành công",
+            "weightChange": result
+        })
     return jsonify({"success": False, "message": "Lỗi khi cập nhật hồ sơ"}), 500
+
+
+@app.route("/api/weight-history/<int:user_id>", methods=["GET"])
+def api_weight_history(user_id):
+    history = get_weight_history(user_id)
+    return jsonify({"success": True, "history": history})
 
 @app.route("/api/meal-suggestions", methods=["GET"])
 def get_meal_suggestions():
