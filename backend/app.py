@@ -3,7 +3,7 @@ import os
 import base64
 sys.path.append(os.path.dirname(__file__))
 
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, make_response
 from flask_cors import CORS
 from external_api import analyze_image
 from db_queries import (
@@ -109,17 +109,26 @@ def get_google_client_id():
     """Trả về Google Client ID cho frontend"""
     return jsonify({"client_id": GOOGLE_CLIENT_ID})
 
+def serve_html_no_cache(filename):
+    """Serve an HTML page without caching so updates ship immediately
+    (the inline page-veil script must be the latest version)."""
+    resp = make_response(send_file(os.path.join(app.static_folder, filename)))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
 @app.route("/")
 def index():
-    return send_file(os.path.join(app.static_folder, "index.html"))
+    return serve_html_no_cache("index.html")
 
 @app.route("/admin")
 def admin_page():
-    return send_file(os.path.join(app.static_folder, "admin.html"))
+    return serve_html_no_cache("admin.html")
 
 @app.route("/nutrition")
 def nutrition_page():
-    return send_file(os.path.join(app.static_folder, "nutrition.html"))
+    return serve_html_no_cache("nutrition.html")
 
 @app.route("/static/<path:path>")
 def serve_static(path):
@@ -133,7 +142,7 @@ def catch_all(path):
     if os.path.isfile(file_path):
         return send_from_directory(app.static_folder, path)
     # Ngược lại trả về index.html cho SPA routing
-    return send_file(os.path.join(app.static_folder, "index.html"))
+    return serve_html_no_cache("index.html")
 
 @app.route("/api/dishes")
 def get_dishes():

@@ -70,6 +70,7 @@
 html {
     scroll-behavior: smooth;
     scroll-padding-top: var(--nav-height);
+    background-color: var(--bg-deep);
 }
 
 body {
@@ -346,12 +347,23 @@ img {
 
 .page.active {
     display: block;
-    animation: pageFadeIn 0.4s ease forwards;
+    animation: pageFadeIn 0.38s ease forwards;
+}
+
+.page.is-leaving {
+    display: block;
+    animation: pageFadeOut 0.22s ease forwards;
+    pointer-events: none;
 }
 
 @keyframes pageFadeIn {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pageFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-10px); }
 }
 
 /* ============================================
@@ -5001,15 +5013,40 @@ select.form-input {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
 }
-@keyframes appBodyLeave {
-    from { opacity: 1; transform: translateY(0); }
-    to { opacity: 0; transform: translateY(8px); }
+
+/* NOTE: The body intentionally has no enter animation any more.
+   Direct page loads should not flash; smooth navigation between pages
+   is handled by the cross-page veil (see .app-page-veil below). */
+
+/* Cross-page veil: an opaque overlay matching the page background.
+   - Inline script in <head> sets html.app-navigating early when we
+     arrive from a smoothNavigate() call, so the veil is painted with
+     the very first frame of the new page (no white flash).
+   - transitions.js then fades the veil out once the page is interactive.
+   - Same element is used to fade IN before leaving the current page. */
+.app-page-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background-color: var(--bg-deep, #e8f5ec);
+    pointer-events: none;
+    opacity: 0;
+    /* NOTE: no default transition — the leave state must snap to opaque
+       INSTANTLY so the browser's paint-hold captures a fully-covered frame
+       (otherwise the page content bleeds through during the 0→1 fade). */
+    will-change: opacity;
 }
-body {
-    animation: appBodyEnter 0.4s ease both;
+html.app-navigating .app-page-veil,
+html.app-leaving .app-page-veil {
+    opacity: 1;
+    pointer-events: auto;
 }
-body.is-leaving {
-    animation: appBodyLeave 0.28s ease forwards;
+/* Transition is only enabled when fading OUT on arrival — applied by JS
+   one frame before removing the opacity-1 trigger. */
+.app-page-veil.veil-fading-out {
+    transition: opacity 0.34s ease;
+}
+html.app-leaving body {
     pointer-events: none;
 }
 
@@ -5128,9 +5165,11 @@ body.is-leaving {
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
     body,
-    body.is-leaving,
+    .app-page-veil,
     .app-toast,
-    .bg-food-icon {
+    .bg-food-icon,
+    .page.active,
+    .page.is-leaving {
         animation: none !important;
         transition: none !important;
         transform: none !important;

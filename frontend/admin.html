@@ -3,15 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#e8f5ec">
+    <style>
+        html { background-color: #e8f5ec; }
+        body { background-color: #e8f5ec; }
+        .app-page-veil {
+            position: fixed; inset: 0; z-index: 99998;
+            background-color: #e8f5ec; pointer-events: none;
+            opacity: 0;
+        }
+        html.app-navigating .app-page-veil,
+        html.app-leaving .app-page-veil { opacity: 1; pointer-events: auto; }
+        .app-page-veil.veil-fading-out { transition: opacity 0.34s ease; }
+    </style>
+    <script>
+        (function () {
+            try {
+                if (sessionStorage.getItem('app:nav')) {
+                    document.documentElement.classList.add('app-navigating');
+                }
+            } catch (e) { /* ignore */ }
+        })();
+    </script>
     <title>Admin Dashboard - Smart Food Analysis</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/admin_append.css?v=7">
+    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/admin_append.css?v=9">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
+    <!-- Cross-page veil: opaque overlay matching page bg, fades out when ready -->
+    <div id="app-page-veil" class="app-page-veil" aria-hidden="true"></div>
+
     <!-- Animated Background Blobs -->
     <div class="bg-blobs" aria-hidden="true">
         <div class="blob blob-1"></div>
@@ -424,7 +449,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="/static/transitions.js"></script>
-    <script src="/static/admin.js?v=8"></script>
+    <script src="/static/transitions.js?v=4"></script>
+    <script src="/static/admin.js?v=10"></script>
 </body>
 </html>

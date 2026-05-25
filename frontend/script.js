@@ -10,27 +10,44 @@ const navToggle = document.getElementById('nav-toggle');
 const navLinksContainer = document.getElementById('nav-links');
 const navbar = document.getElementById('navbar');
 
+const PAGE_LEAVE_MS = 220;
+let _pageSwapTimer = null;
+
 function navigateTo(pageId) {
-    pages.forEach(p => p.classList.remove('active'));
-    navLinks.forEach(l => l.classList.remove('active'));
-
     const target = document.getElementById('page-' + pageId);
-    if (target) {
-        target.classList.add('active');
-    }
-    
-    navLinks.forEach(l => {
-        if (l.dataset.page === pageId) l.classList.add('active');
-    });
+    if (!target) return;
 
-    // Close mobile menu
+    const current = document.querySelector('.page.active');
+
+    // Always sync nav-link active state and close mobile menu immediately.
+    navLinks.forEach(l => {
+        l.classList.toggle('active', l.dataset.page === pageId);
+    });
     navLinksContainer.classList.remove('open');
 
-    // Scroll to top on page change
-    window.scrollTo({ top: 0 });
+    // Clicking the active page again — no-op
+    if (current === target) return;
 
-    // Re-trigger reveal animations for the new page
-    initRevealAnimations();
+    const commit = () => {
+        pages.forEach(p => p.classList.remove('active', 'is-leaving'));
+        target.classList.add('active');
+        window.scrollTo({ top: 0 });
+        initRevealAnimations();
+    };
+
+    if (_pageSwapTimer) { clearTimeout(_pageSwapTimer); _pageSwapTimer = null; }
+
+    if (current && current !== target) {
+        // Fade out current section, then swap in target.
+        current.classList.remove('active');
+        current.classList.add('is-leaving');
+        _pageSwapTimer = setTimeout(() => {
+            _pageSwapTimer = null;
+            commit();
+        }, PAGE_LEAVE_MS);
+    } else {
+        commit();
+    }
 }
 
 function handleHashChange() {

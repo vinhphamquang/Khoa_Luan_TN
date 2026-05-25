@@ -6,8 +6,8 @@
 (function () {
     'use strict';
 
-    const FADE_OUT_MS = 280;
     const LOGOUT_DELAY_MS = 650;
+    const NAV_FLAG = 'app:nav';
 
     // ---------- Toast ----------
     function ensureToastHost() {
@@ -32,7 +32,6 @@
         toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
         host.appendChild(toast);
 
-        // Force reflow then add show class
         requestAnimationFrame(() => toast.classList.add('show'));
 
         setTimeout(() => {
@@ -44,9 +43,62 @@
         return toast;
     }
 
-    // ---------- Fade out helper ----------
-    function fadeOutBody() {
-        document.body.classList.add('is-leaving');
+    // ---------- Page veil (cross-page coloured overlay) ----------
+    function ensureVeil() {
+        let veil = document.getElementById('app-page-veil');
+        if (!veil) {
+            veil = document.createElement('div');
+            veil.id = 'app-page-veil';
+            veil.className = 'app-page-veil';
+            veil.setAttribute('aria-hidden', 'true');
+            // Put veil at the very top of body so it's painted with the first frame.
+            if (document.body.firstChild) {
+                document.body.insertBefore(veil, document.body.firstChild);
+            } else {
+                document.body.appendChild(veil);
+            }
+        }
+        return veil;
+    }
+
+    function setNavFlag() {
+        try { sessionStorage.setItem(NAV_FLAG, '1'); } catch (e) { /* ignore */ }
+    }
+
+    function clearNavFlag() {
+        try { sessionStorage.removeItem(NAV_FLAG); } catch (e) { /* ignore */ }
+    }
+
+    // Fade veil IN before leaving the page.
+    function leaveVeilIn() {
+        const veil = ensureVeil();
+        // Ensure the next opacity change is instantaneous — if the user clicks
+        // again while a fade-out is in progress, we must snap to opaque, not
+        // continue animating through the 0→1 transition.
+        veil.classList.remove('veil-fading-out');
+        document.documentElement.classList.add('app-leaving');
+    }
+
+    // Fade veil OUT after we arrive on the new page.
+    function enterVeilOut() {
+        const html = document.documentElement;
+        if (!html.classList.contains('app-navigating') && !html.classList.contains('app-leaving')) {
+            return;
+        }
+        const veil = ensureVeil();
+        // Two RAFs: first paint the opaque veil, THEN enable the fade-out
+        // transition and remove the trigger class. Without this, the veil
+        // either snaps to 0 (no animation) or never paints at opacity 1.
+        requestAnimationFrame(() => {
+            veil.classList.add('veil-fading-out');
+            requestAnimationFrame(() => {
+                html.classList.remove('app-navigating');
+                html.classList.remove('app-leaving');
+            });
+        });
+        // Clean up the helper class after the transition completes so a
+        // subsequent leaveVeilIn() snaps back to opaque without animating.
+        setTimeout(() => veil.classList.remove('veil-fading-out'), 600);
     }
 
     // ---------- Graceful logout ----------
@@ -57,8 +109,10 @@
 
         showToast(message, 'success', LOGOUT_DELAY_MS + 400);
 
-        // Slight delay so the toast is visible, then fade out and navigate
-        setTimeout(fadeOutBody, 120);
+        setTimeout(() => {
+            setNavFlag();
+            leaveVeilIn();
+        }, 120);
         setTimeout(() => {
             window.location.href = redirectTo;
         }, LOGOUT_DELAY_MS);
@@ -76,10 +130,17 @@
             return;
         }
 
-        fadeOutBody();
-        setTimeout(() => {
-            window.location.href = url;
-        }, FADE_OUT_MS);
+        // Set flag synchronously so the next page's inline head script can see it.
+        setNavFlag();
+        leaveVeilIn();
+        // Wait for the browser to actually paint the opaque veil before
+        // unloading. Without this, paint-hold may capture a frame where the
+        // veil hasn't been rendered yet → visible white/content flash.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.location.href = url;
+            });
+        });
     }
 
     // ---------- Auto-bind nav links for page-to-page transitions ----------
@@ -91,20 +152,37 @@
         if (anchor.target && anchor.target !== '_self') return false;
         if (anchor.hasAttribute('download')) return false;
         if (href.startsWith('http://') || href.startsWith('https://')) {
-            // External — skip
             try {
                 const u = new URL(href);
                 if (u.origin !== window.location.origin) return false;
             } catch (e) { return false; }
         }
-        // Strip query/hash to get pure path
         const path = href.split('?')[0].split('#')[0];
         if (!path) return false;
-        // Only fade if going to a different top-level page
         const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
         const targetPath = path.replace(/\/$/, '') || '/';
         if (targetPath === currentPath) return false;
         return PAGE_PATHS.includes(targetPath);
+    }
+
+    // ---------- Prefetch on hover/focus for snappier perceived nav ----------
+    const prefetched = new Set();
+    function prefetch(url) {
+        if (!url || prefetched.has(url)) return;
+        prefetched.add(url);
+        try {
+            const link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.href = url;
+            link.as = 'document';
+            document.head.appendChild(link);
+        } catch (e) { /* ignore */ }
+    }
+
+    function handleLinkHover(e) {
+        const anchor = e.target.closest && e.target.closest('a');
+        if (!anchor || !isPageToPageLink(anchor)) return;
+        prefetch(anchor.getAttribute('href'));
     }
 
     function handleLinkClick(e) {
@@ -169,21 +247,29 @@
         }
     }
 
-    // ---------- Page-load fade-in ----------
-    // CSS animation `appBodyEnter` runs automatically on every page load.
-    // No JS work needed for entry — keeping this for forward compatibility.
-
     // ---------- Restore body when coming back via bfcache ----------
     function handlePageShow(e) {
         if (e.persisted) {
-            // Browser restored from back/forward cache — clear leaving state
-            document.body.classList.remove('is-leaving');
+            document.documentElement.classList.remove('app-leaving');
+            document.documentElement.classList.remove('app-navigating');
+            clearNavFlag();
         }
     }
 
     // ---------- Boot ----------
     function boot() {
+        ensureVeil();
+
+        // If the previous page set the nav flag, we arrived via smoothNavigate
+        // — the inline head script will have added html.app-navigating already,
+        // so the veil is currently opaque. Fade it out now.
+        clearNavFlag();
+        enterVeilOut();
+
         document.addEventListener('click', handleLinkClick, true);
+        // Prefetch on hover/focus for snappier transitions.
+        document.addEventListener('mouseover', handleLinkHover, { passive: true });
+        document.addEventListener('focusin', handleLinkHover, { passive: true });
         window.addEventListener('pageshow', handlePageShow);
         injectBackgroundFoodIcons();
     }

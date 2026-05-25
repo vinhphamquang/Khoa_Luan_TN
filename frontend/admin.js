@@ -176,21 +176,48 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tabs logic
     const tabs = document.querySelectorAll('.admin-tab');
     const contents = document.querySelectorAll('.admin-tab-content');
-    
+    const TAB_LEAVE_MS = 180;
+    let _tabSwapTimer = null;
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
+            const targetId = tab.dataset.tab;
+            const targetEl = document.getElementById(targetId);
+            const currentEl = document.querySelector('.admin-tab-content:not(.hidden)');
+            if (!targetEl || currentEl === targetEl) {
+                // Still sync active state on the buttons in case they're out of sync
+                tabs.forEach(t => t.classList.toggle('active', t === tab));
+                return;
+            }
+
             tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.add('hidden'));
-            
             tab.classList.add('active');
-            document.getElementById(tab.dataset.tab).classList.remove('hidden');
-            
-            // Refresh data if needed based on tab activated
-            if(tab.dataset.tab === 'admin-stats') fetchAdminStats();
-            if(tab.dataset.tab === 'admin-foods') fetchAdminFoods();
-            if(tab.dataset.tab === 'admin-users') fetchAdminUsers();
-            if(tab.dataset.tab === 'admin-history') fetchAdminHistory();
-            if(tab.dataset.tab === 'admin-comments') fetchAdminComments();
+
+            if (_tabSwapTimer) { clearTimeout(_tabSwapTimer); _tabSwapTimer = null; }
+
+            const commit = () => {
+                contents.forEach(c => {
+                    c.classList.add('hidden');
+                    c.classList.remove('tab-leaving');
+                });
+                targetEl.classList.remove('hidden');
+
+                if (targetId === 'admin-stats') fetchAdminStats();
+                if (targetId === 'admin-foods') fetchAdminFoods();
+                if (targetId === 'admin-users') fetchAdminUsers();
+                if (targetId === 'admin-history') fetchAdminHistory();
+                if (targetId === 'admin-comments') fetchAdminComments();
+            };
+
+            if (currentEl) {
+                currentEl.classList.add('tab-leaving');
+                _tabSwapTimer = setTimeout(() => {
+                    _tabSwapTimer = null;
+                    commit();
+                }, TAB_LEAVE_MS);
+            } else {
+                commit();
+            }
         });
     });
 
@@ -1033,6 +1060,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateObj = d.time ? new Date(d.time) : null;
             const dateStr = dateObj ? dateObj.toLocaleString('vi-VN') : 'N/A';
             const fi = d.food_info; // may be null
+            const accuracyPct = d.accuracy ? Math.round(d.accuracy * 100) : null;
+            const escapeHtml = (s) => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const commentsHtml = (d.comments && d.comments.length)
+                ? d.comments.map(c => `
+                    <div class="hd-comment ${c.is_admin ? 'hd-comment-admin' : ''} ${c.parent_id ? 'hd-comment-reply' : ''}">
+                        <div class="hd-comment-head">
+                            <span class="hd-comment-user">
+                                <i class="fa-solid ${c.is_admin ? 'fa-user-shield' : 'fa-user'}"></i>
+                                ${escapeHtml(c.user_name)}${c.is_admin ? ' <span class="hd-admin-tag">Admin</span>' : ''}
+                            </span>
+                            <span class="hd-comment-time">${escapeHtml(c.time)}</span>
+                        </div>
+                        <div class="hd-comment-body">${escapeHtml(c.content)}</div>
+                    </div>`).join('')
+                : '<p style="color: var(--text-muted); font-size: 14px; margin: 0;">Chưa có bình luận nào.</p>';
 
             content.innerHTML = `
                 <div class="hd-header">
@@ -1062,11 +1106,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${d.food_name || 'Không xác định'}
                         </h2>
 
-                        <!-- User Rating Badge -->
+                        ${accuracyPct !== null ? `
+                        <!-- Accuracy Badge -->
                         <div class="hd-user-rating">
-                            <span class="hd-info-label">Đánh giá người dùng:</span>
-                            ${getRatingBadge(d.user_rating)}
-                        </div>
+                            <span class="hd-info-label">Độ chính xác AI:</span>
+                            <span class="rating-badge ${accuracyPct >= 80 ? 'rating-green' : accuracyPct >= 50 ? 'rating-yellow' : 'rating-none'}">
+                                <i class="fa-solid fa-bullseye"></i> ${accuracyPct}%
+                            </span>
+                        </div>` : ''}
 
                         <!-- User Info -->
                         <div class="hd-info-card">
@@ -1139,6 +1186,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="hd-info-card-title"><i class="fa-solid fa-circle-info"></i> Thông tin CSDL</div>
                             <p style="color: var(--text-muted); font-size: 14px;">Món ăn này chưa có trong cơ sở dữ liệu hệ thống.</p>
                         </div>`}
+
+                        <!-- Comments -->
+                        <div class="hd-info-card hd-comments-card">
+                            <div class="hd-info-card-title">
+                                <i class="fa-solid fa-comments"></i>
+                                Bình luận (${(d.comments || []).length})
+                            </div>
+                            <div class="hd-comments-list">${commentsHtml}</div>
+                        </div>
                     </div>
                 </div>
             `;
