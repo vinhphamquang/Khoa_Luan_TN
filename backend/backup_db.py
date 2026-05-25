@@ -32,8 +32,8 @@ cursor = conn.cursor(cursor_factory=RealDictCursor)
 # Thu tu backup (quan trong vi co foreign key)
 TABLES_ORDER = [
     'NguoiDung', 'MonAn', 'DinhDuong', 'CongThuc', 'NguyenLieu',
-    'ChiTietNguyenLieu', 'LichSu', 'HoSoSucKhoe', 'BinhLuan',
-    'ThongBao', 'KeHoachDinhDuong'
+    'ChiTietNguyenLieu', 'LichSu', 'HoSoSucKhoe', 'LichSuCanNang',
+    'BinhLuan', 'ThongBao', 'KeHoachDinhDuong'
 ]
 
 sql_lines = []
@@ -113,6 +113,17 @@ CREATE TABLE IF NOT EXISTS HoSoSucKhoe (
     CaloDuKien DECIMAL(10,2),
     NgayCapNhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS LichSuCanNang (
+    MaLichSuCN SERIAL PRIMARY KEY,
+    MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+    CanNang DECIMAL(5,2) NOT NULL,
+    ChieuCao DECIMAL(5,2),
+    BMI DECIMAL(5,2),
+    PhanLoaiBMI VARCHAR(30),
+    GhiChu TEXT,
+    ThoiGian TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_lscn_user_time ON LichSuCanNang(MaNguoiDung, ThoiGian DESC);
 CREATE TABLE IF NOT EXISTS BinhLuan (
     MaBinhLuan SERIAL PRIMARY KEY,
     MaLichSu INTEGER REFERENCES LichSu(MaLichSu) ON DELETE CASCADE,

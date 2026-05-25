@@ -186,9 +186,29 @@ try:
         )
     """)
     print("  [OK] Bang ThongBao")
-    
+
+    # 11. KeHoachDinhDuong (Nutrition Plans)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS KeHoachDinhDuong (
+            MaKeHoach SERIAL PRIMARY KEY,
+            MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+            NgayLuu TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CaloDuKien DECIMAL(10,2) DEFAULT 0,
+            TongCaloChon DECIMAL(10,2) DEFAULT 0,
+            BuaSang TEXT DEFAULT '',
+            BuaSangCalo DECIMAL(10,2) DEFAULT 0,
+            BuaTrua TEXT DEFAULT '',
+            BuaTruaCalo DECIMAL(10,2) DEFAULT 0,
+            BuaToi TEXT DEFAULT '',
+            BuaToiCalo DECIMAL(10,2) DEFAULT 0,
+            BuaPhu TEXT DEFAULT '',
+            BuaPhuCalo DECIMAL(10,2) DEFAULT 0
+        )
+    """)
+    print("  [OK] Bang KeHoachDinhDuong")
+
     conn.commit()
-    print("\n[OK] Da tao xong tat ca 10 bang!")
+    print("\n[OK] Da tao xong tat ca 12 bang!")
     
     # ============================================
     # TAO TAI KHOAN ADMIN MAC DINH
