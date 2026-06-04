@@ -722,6 +722,33 @@ def get_meal_plans(user_id):
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# ============================================
+# MARK FOOD AS EATEN
+# ============================================
+
+@app.route("/api/history/<int:history_id>/mark-eaten", methods=["POST"])
+def mark_food_eaten(history_id):
+    """Đánh dấu món ăn đã ăn - calo sẽ được tính vào kế hoạch dinh dưỡng"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE LichSu SET DaAn = TRUE WHERE MaLichSu = %s
+        """, (history_id,))
+        
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Không tìm thấy bản ghi'}), 404
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Đã đánh dấu món ăn đã ăn!'})
+        
+    except Exception as e:
+        print(f"[ERROR] mark_food_eaten: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route("/api/admin/users", methods=["GET"])
 def api_admin_get_users():
     return jsonify({"success": True, "users": get_all_users()})
@@ -1040,9 +1067,9 @@ def get_recommendation(user_id, calories):
         if plan:
             plan_total = float(plan['calodukien']) if plan['calodukien'] else 0
             
-            # Tính tổng calo đã ăn hôm nay (từ LichSu, KHÔNG tính lần hiện tại)
+            # Tính tổng calo đã ăn hôm nay (chỉ tính món đã đánh dấu DaAn = TRUE)
             cursor.execute("""
-                SELECT COALESCE(SUM(Calo), 0) as consumed
+                SELECT COALESCE(SUM(CASE WHEN DaAn = TRUE THEN Calo ELSE 0 END), 0) as consumed
                 FROM LichSu
                 WHERE MaNguoiDung = %s AND DATE(ThoiGian) = CURRENT_DATE
             """, (user_id,))

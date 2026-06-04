@@ -658,6 +658,24 @@ function showResult(data) {
     } else if (planBox) {
         planBox.style.display = 'none';
     }
+    // Show food action buttons (Đánh dấu đã ăn / Thử món khác)
+    const foodActionsEl = document.getElementById('analysis-food-actions');
+    const loggedForActions = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (foodActionsEl && loggedForActions && data.food_data && data.history_id) {
+        foodActionsEl.style.display = '';
+        // Reset button state
+        const markBtn = document.getElementById('btn-mark-eaten');
+        if (markBtn) {
+            markBtn.disabled = false;
+            markBtn.classList.remove('eaten');
+            markBtn.innerHTML = '<i class="fa-solid fa-utensils"></i><span>Đánh dấu đã ăn</span>';
+        }
+        // Store data for marking
+        window._currentFoodHistoryId = data.history_id;
+        window._currentFoodCalories = data.food_data.calories || 0;
+    } else if (foodActionsEl) {
+        foodActionsEl.style.display = 'none';
+    }
 
     // Initialize accordion functionality
     initAccordion();
@@ -684,6 +702,127 @@ function showResult(data) {
 
     // Scroll result into view
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---- MARK AS EATEN ----
+function markAsEaten() {
+    const historyId = window._currentFoodHistoryId;
+    if (!historyId) {
+        if (typeof window.appToast === 'function') {
+            window.appToast('Không có dữ liệu để đánh dấu', 'error');
+        }
+        return;
+    }
+
+    const btn = document.getElementById('btn-mark-eaten');
+    if (!btn || btn.disabled) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Đang xử lý...</span>';
+
+    fetch(`/api/history/${historyId}/mark-eaten`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Update button to "eaten" state
+            btn.classList.add('eaten');
+            btn.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Đã đánh dấu ăn ✓</span>';
+
+            // Update plan advice progress bar if visible
+            const planBox = document.getElementById('plan-advice-box');
+            if (planBox && planBox.style.display !== 'none') {
+                const foodCalo = window._currentFoodCalories || 0;
+                const consumedEl = document.getElementById('plan-consumed');
+                const fillEl = document.getElementById('plan-progress-fill');
+                const totalEl = document.getElementById('plan-total');
+
+                if (consumedEl && fillEl && totalEl) {
+                    const oldConsumed = parseInt(consumedEl.textContent) || 0;
+                    const newConsumed = oldConsumed + parseInt(foodCalo);
+                    const total = parseInt(totalEl.textContent) || 1;
+
+                    consumedEl.textContent = newConsumed;
+
+                    const newPct = Math.min(100, (newConsumed / total) * 100);
+                    fillEl.style.width = newPct + '%';
+
+                    // Remove food segment since it's now part of consumed
+                    const foodEl = document.getElementById('plan-progress-food');
+                    if (foodEl) {
+                        foodEl.style.width = '0%';
+                    }
+                }
+            }
+
+            if (typeof window.appToast === 'function') {
+                window.appToast('Đã đánh dấu món ăn đã ăn! Calo được cộng vào kế hoạch.', 'success', 3000);
+            }
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-utensils"></i><span>Đánh dấu đã ăn</span>';
+            if (typeof window.appToast === 'function') {
+                window.appToast(data.message || 'Lỗi khi đánh dấu', 'error');
+            }
+        }
+    })
+    .catch(err => {
+        console.error('Error marking as eaten:', err);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-utensils"></i><span>Đánh dấu đã ăn</span>';
+        if (typeof window.appToast === 'function') {
+            window.appToast('Lỗi kết nối server', 'error');
+        }
+    });
+}
+
+// ---- TRY ANOTHER FOOD ----
+function tryAnotherFood() {
+    // Hide result section
+    const resultSection = document.getElementById('result-section');
+    if (resultSection) resultSection.classList.add('hidden');
+
+    // Hide food action buttons
+    const foodActions = document.getElementById('analysis-food-actions');
+    if (foodActions) foodActions.style.display = 'none';
+
+    // Reset sys message
+    const sysMsg = document.getElementById('sys-msg');
+    if (sysMsg) {
+        sysMsg.textContent = '';
+        sysMsg.classList.remove('visible');
+    }
+
+    // Reset image preview
+    const previewContainer = document.getElementById('image-preview-container');
+    const uploadContent = document.getElementById('upload-content');
+    const fileInput = document.getElementById('file-input');
+    const previewImg = document.getElementById('preview-img');
+    const cameraSection = document.getElementById('camera-section');
+    const modeCameraBtn = document.getElementById('mode-camera-btn');
+
+    if (previewContainer) previewContainer.classList.add('hidden');
+    if (fileInput) fileInput.value = '';
+    if (previewImg) previewImg.src = '';
+
+    // Check current mode and restore appropriate view
+    if (modeCameraBtn && modeCameraBtn.classList.contains('btn-primary')) {
+        if (cameraSection) cameraSection.classList.remove('hidden');
+    } else {
+        if (uploadContent) uploadContent.classList.remove('hidden');
+    }
+
+    // Clear stored data
+    window._currentFoodHistoryId = null;
+    window._currentFoodCalories = null;
+
+    // Scroll back to upload zone
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 function initAccordion() {

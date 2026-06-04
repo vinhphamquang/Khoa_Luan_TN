@@ -115,6 +115,7 @@ try:
             DoChinhXac DECIMAL(5,2),
             ThoiGian TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             Calo DECIMAL(10,2) DEFAULT 0,
+            DaAn BOOLEAN DEFAULT FALSE,
             DanhGiaNguoiDung INTEGER,
             KhuyenNghiKeHoach TEXT
         )

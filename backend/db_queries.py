@@ -552,7 +552,7 @@ def get_user_food_stats(user_id):
         # 1. Calories theo từng ngày (30 ngày gần nhất)
         cursor.execute("""
             SELECT DATE(ThoiGian) as ngay,
-                   SUM(Calo) as tong_calo,
+                   SUM(CASE WHEN DaAn = TRUE THEN Calo ELSE 0 END) as tong_calo,
                    COUNT(*) as so_mon
             FROM LichSu
             WHERE MaNguoiDung = %s 
@@ -573,7 +573,7 @@ def get_user_food_stats(user_id):
         # 2. Calories theo tuần (4 tuần gần nhất)
         cursor.execute("""
             SELECT DATE_TRUNC('week', ThoiGian)::date as tuan,
-                   SUM(Calo) as tong_calo,
+                   SUM(CASE WHEN DaAn = TRUE THEN Calo ELSE 0 END) as tong_calo,
                    COUNT(*) as so_mon
             FROM LichSu
             WHERE MaNguoiDung = %s 
@@ -593,7 +593,7 @@ def get_user_food_stats(user_id):
         
         # 3. Tổng calories hôm nay
         cursor.execute("""
-            SELECT SUM(Calo) as tong_calo, COUNT(*) as so_mon
+            SELECT SUM(CASE WHEN DaAn = TRUE THEN Calo ELSE 0 END) as tong_calo, COUNT(*) as so_mon
             FROM LichSu
             WHERE MaNguoiDung = %s 
               AND DATE(ThoiGian) = CURRENT_DATE
