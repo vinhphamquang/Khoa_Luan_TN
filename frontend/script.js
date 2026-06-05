@@ -2395,18 +2395,6 @@ function updatePremiumUI() {
         }).catch(() => {});
     }
 
-    // Navbar upgrade button (for free users)
-    let navUpgrade = document.getElementById('nav-upgrade-btn');
-    if (!isPremium && !navUpgrade) {
-        const navLinks = document.getElementById('nav-links');
-        if (navLinks) {
-            const li = document.createElement('li');
-            li.innerHTML = '<a class="nav-link nav-upgrade-link" id="nav-upgrade-btn" href="#" onclick="showUpgradeModal();return false;"><i class="fa-solid fa-crown"></i> Nâng cấp</a>';
-            navLinks.appendChild(li);
-        }
-    } else if (isPremium && navUpgrade) {
-        navUpgrade.closest('li')?.remove();
-    }
 }
 
 // Khởi tạo Premium features khi trang load

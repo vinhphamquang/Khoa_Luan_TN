@@ -256,6 +256,47 @@
         }
     }
 
+    // ---------- Floating Upgrade Button ----------
+    function injectFloatingUpgradeButton() {
+        try {
+            const userJson = localStorage.getItem('smartfood_user');
+            if (!userJson) return;
+            const user = JSON.parse(userJson);
+            if (user && user.account_type === 'premium') return;
+            
+            if (document.getElementById('floating-upgrade-btn')) return;
+
+            const btn = document.createElement('a');
+            btn.id = 'floating-upgrade-btn';
+            btn.className = 'floating-upgrade-btn';
+            
+            // If on index, trigger modal. Else, navigate to /?upgrade=true
+            if (window.location.pathname === '/' || window.location.pathname === '') {
+                btn.href = '#';
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    if (typeof window.showUpgradeModal === 'function') {
+                        window.showUpgradeModal();
+                    } else {
+                        window.location.href = '/?upgrade=true';
+                    }
+                };
+            } else {
+                btn.href = '/?upgrade=true';
+            }
+            
+            btn.innerHTML = `
+                <div class="fub-glow"></div>
+                <div class="fub-content">
+                    <i class="fa-solid fa-crown"></i>
+                    <span>Nâng Cấp Premium</span>
+                </div>
+            `;
+            
+            document.body.appendChild(btn);
+        } catch (e) { /* ignore */ }
+    }
+
     // ---------- Boot ----------
     function boot() {
         ensureVeil();
@@ -272,6 +313,7 @@
         document.addEventListener('focusin', handleLinkHover, { passive: true });
         window.addEventListener('pageshow', handlePageShow);
         injectBackgroundFoodIcons();
+        injectFloatingUpgradeButton();
     }
 
     if (document.readyState === 'loading') {

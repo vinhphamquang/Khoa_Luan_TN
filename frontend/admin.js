@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nutritionLink = document.getElementById('nav-nutrition-link');
     if (nutritionLink) nutritionLink.style.display = '';
 
+
+
     // Mobile nav toggle
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');

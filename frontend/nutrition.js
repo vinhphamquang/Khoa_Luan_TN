@@ -14,8 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (loggedUser.role === 'admin') {
         const adminLink = document.getElementById('nav-admin-link');
-        if (adminLink) adminLink.style.display = '';
+        if (adminLink) {
+            adminLink.style.display = '';
+            adminLink.classList.remove('hidden');
+        }
     }
+
+
 
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
