@@ -3,7 +3,7 @@ import os
 import base64
 sys.path.append(os.path.dirname(__file__))
 
-from flask import Flask, request, jsonify, send_from_directory, send_file, make_response
+from flask import Flask, request, jsonify, send_from_directory, send_file, make_response, redirect
 from flask_cors import CORS
 from external_api import analyze_image
 from db_queries import (
@@ -19,10 +19,14 @@ from db_queries import (
     create_google_user, get_user_by_google_id, update_user_google_id,
     get_user_detail_admin, update_last_active, notify_admins,
     insert_comment, get_comments_by_history, get_all_comments_admin,
-    admin_reply_comment, delete_comment, get_comment_detail
+    admin_reply_comment, delete_comment, get_comment_detail,
+    check_user_quota, upgrade_user_account,
+    create_payment, update_payment_status, get_payment_by_order_id,
+    get_all_payments_admin, get_payment_stats_admin
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
+from momo_payment import create_momo_payment, verify_momo_signature, generate_order_id, PREMIUM_PRICE
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
@@ -96,9 +100,34 @@ def run_migrations():
             ALTER TABLE LichSu ADD COLUMN IF NOT EXISTS KhuyenNghiKeHoach TEXT DEFAULT NULL
         """)
         
+        # 8. Thêm cột LoaiTaiKhoan và NgayNangCap vào NguoiDung (Premium upgrade)
+        cursor.execute("""
+            ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS LoaiTaiKhoan VARCHAR(20) DEFAULT 'free'
+        """)
+        cursor.execute("""
+            ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS NgayNangCap TIMESTAMP DEFAULT NULL
+        """)
+        
+        # 9. Tạo bảng ThanhToan (Payment Transactions)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ThanhToan (
+                MaThanhToan SERIAL PRIMARY KEY,
+                MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+                MaDonHang VARCHAR(100) UNIQUE NOT NULL,
+                SoTien DECIMAL(15,2) NOT NULL,
+                GoiNangCap VARCHAR(50) DEFAULT 'premium',
+                TrangThai VARCHAR(20) DEFAULT 'pending',
+                PhuongThuc VARCHAR(20) DEFAULT 'momo',
+                MomoTransId VARCHAR(100),
+                ResponseData TEXT,
+                ThoiGianTao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ThoiGianCapNhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         conn.commit()
         conn.close()
-        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive, BinhLuan, KhuyenNghiKeHoach)")
+        print("[MIGRATION] Đã chạy migrations thành công (Calo, DanhGiaNguoiDung, ThongBao, GoogleId, LastActive, BinhLuan, KhuyenNghiKeHoach, LoaiTaiKhoan, ThanhToan)")
     except Exception as e:
         print(f"[MIGRATION WARNING] {e}")
 
@@ -237,7 +266,8 @@ def login():
             "id": user["MaNguoiDung"],
             "name": user["TenNguoiDung"],
             "email": user["Email"],
-            "role": user["VaiTro"]
+            "role": user["VaiTro"],
+            "account_type": user.get("LoaiTaiKhoan", "free")
         }
     })
 
@@ -278,6 +308,7 @@ def google_login():
                     "name": user["TenNguoiDung"],
                     "email": user["Email"],
                     "role": user["VaiTro"],
+                    "account_type": user.get("LoaiTaiKhoan", "free"),
                     "auth_provider": "google",
                     "picture": picture
                 }
@@ -297,6 +328,7 @@ def google_login():
                     "name": existing_user["TenNguoiDung"],
                     "email": existing_user["Email"],
                     "role": existing_user["VaiTro"],
+                    "account_type": existing_user.get("LoaiTaiKhoan", "free"),
                     "auth_provider": "google",
                     "picture": picture
                 }
@@ -1165,6 +1197,18 @@ def predict():
     if file.filename == '':
         return jsonify({"success": False, "message": "No file selected"}), 400
     
+    # Kiểm tra quota nhận diện cho free user
+    user_id_check = request.form.get("user_id")
+    if user_id_check and str(user_id_check).isdigit():
+        quota = check_user_quota(int(user_id_check))
+        if not quota['allowed']:
+            return jsonify({
+                'success': False,
+                'quota_exceeded': True,
+                'message': 'Bạn đã hết lượt nhận diện hôm nay. Nâng cấp Premium để sử dụng không giới hạn!',
+                'quota': quota
+            }), 429
+    
     try:
         image_bytes = file.read()
         
@@ -1355,6 +1399,160 @@ def predict():
             "message": f"Lỗi server khi phân tích: {str(e)}",
             "suggestion": "Vui lòng thử lại sau hoặc chọn ảnh khác."
         }), 500
+
+# ============================================
+# PREMIUM & PAYMENT ENDPOINTS
+# ============================================
+
+@app.route("/api/user/<int:user_id>/quota", methods=["GET"])
+def api_user_quota(user_id):
+    """Kiểm tra quota nhận diện của user"""
+    quota = check_user_quota(user_id)
+    return jsonify({"success": True, "quota": quota})
+
+@app.route("/api/payment/momo/create", methods=["POST"])
+def api_momo_create():
+    """Tạo đơn thanh toán MoMo để nâng cấp Premium"""
+    data = request.json
+    user_id = data.get("user_id")
+    
+    if not user_id:
+        return jsonify({"success": False, "message": "Thiếu user_id"}), 400
+    
+    # Kiểm tra user đã premium chưa
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "Không tìm thấy người dùng"}), 404
+    
+    if user.get("LoaiTaiKhoan") == "premium":
+        return jsonify({"success": False, "message": "Tài khoản đã là Premium"}), 400
+    
+    # Tạo order
+    order_id = generate_order_id(user_id)
+    amount = PREMIUM_PRICE
+    order_info = f"Nâng cấp Premium SmartFoodAI - {user.get('TenNguoiDung', '')}"
+    
+    # Xác định base URL
+    base_url = request.host_url.rstrip('/')
+    redirect_url = f"{base_url}/api/payment/momo/return"
+    ipn_url = f"{base_url}/api/payment/momo/callback"
+    
+    # Lưu payment vào DB
+    create_payment(user_id, order_id, amount)
+    
+    # Gọi MoMo API
+    result = create_momo_payment(order_id, amount, order_info, redirect_url, ipn_url)
+    
+    if result['success']:
+        return jsonify({
+            "success": True,
+            "payUrl": result['payUrl'],
+            "orderId": order_id,
+            "message": "Đang chuyển đến trang thanh toán MoMo"
+        })
+    else:
+        return jsonify({"success": False, "message": result['message']}), 500
+
+@app.route("/api/payment/momo/callback", methods=["POST"])
+def api_momo_callback():
+    """MoMo IPN callback (server-to-server)"""
+    try:
+        data = request.json
+        print(f"[MOMO CALLBACK] Received: {json.dumps(data, indent=2)}")
+        
+        # Verify signature
+        if not verify_momo_signature(data):
+            print("[MOMO CALLBACK] Invalid signature!")
+            return jsonify({"resultCode": 1, "message": "Invalid signature"}), 400
+        
+        order_id = data.get('orderId', '')
+        result_code = data.get('resultCode', -1)
+        trans_id = str(data.get('transId', ''))
+        
+        import json as json_module
+        response_data = json_module.dumps(data, ensure_ascii=False)
+        
+        if result_code == 0:
+            # Thanh toán thành công
+            update_payment_status(order_id, 'success', trans_id, response_data)
+            
+            # Nâng cấp tài khoản
+            payment = get_payment_by_order_id(order_id)
+            if payment:
+                user_id = payment['manguoidung']
+                upgrade_user_account(user_id)
+                
+                # Thông báo cho user
+                create_notification(
+                    user_id,
+                    "🎉 Chúc mừng! Tài khoản của bạn đã được nâng cấp lên Premium. Bạn có thể sử dụng tất cả tính năng không giới hạn!",
+                    None
+                )
+                
+                # Thông báo cho admin
+                user = get_user_by_id(user_id)
+                user_name = user.get('TenNguoiDung', 'Unknown') if user else 'Unknown'
+                notify_admins(
+                    f"💰 Thanh toán thành công! {user_name} đã nâng cấp Premium (50.000đ) - MoMo TransID: {trans_id}"
+                )
+                
+                print(f"[MOMO] User {user_id} upgraded to Premium!")
+        else:
+            # Thanh toán thất bại
+            update_payment_status(order_id, 'failed', trans_id, response_data)
+            print(f"[MOMO] Payment failed for order {order_id}: resultCode={result_code}")
+        
+        return jsonify({"resultCode": 0, "message": "OK"})
+        
+    except Exception as e:
+        print(f"[MOMO CALLBACK ERROR] {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"resultCode": 1, "message": str(e)}), 500
+
+@app.route("/api/payment/momo/return", methods=["GET"])
+def api_momo_return():
+    """Redirect sau khi user thanh toán xong trên MoMo"""
+    order_id = request.args.get('orderId', '')
+    result_code = request.args.get('resultCode', '-1')
+    
+    if result_code == '0':
+        # Thanh toán thành công
+        return redirect(f"/?payment=success&orderId={order_id}")
+    else:
+        return redirect(f"/?payment=failed&orderId={order_id}")
+
+@app.route("/api/payment/status/<order_id>", methods=["GET"])
+def api_payment_status(order_id):
+    """Kiểm tra trạng thái thanh toán"""
+    payment = get_payment_by_order_id(order_id)
+    if not payment:
+        return jsonify({"success": False, "message": "Không tìm thấy đơn thanh toán"}), 404
+    
+    return jsonify({
+        "success": True,
+        "payment": {
+            "order_id": payment['madonhang'],
+            "status": payment['trangthai'],
+            "amount": float(payment['sotien']),
+            "method": payment['phuongthuc'],
+            "created_at": payment['thoigiantao'].strftime('%Y-%m-%d %H:%M:%S') if payment.get('thoigiantao') else ''
+        }
+    })
+
+@app.route("/api/admin/payments", methods=["GET"])
+def api_admin_payments():
+    """Admin: Danh sách tất cả thanh toán"""
+    payments = get_all_payments_admin()
+    return jsonify({"success": True, "payments": payments})
+
+@app.route("/api/admin/payment-stats", methods=["GET"])
+def api_admin_payment_stats():
+    """Admin: Thống kê doanh thu"""
+    stats = get_payment_stats_admin()
+    return jsonify({"success": True, "stats": stats})
+
+import json
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

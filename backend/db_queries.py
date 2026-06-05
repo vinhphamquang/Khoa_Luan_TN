@@ -81,7 +81,7 @@ def get_user_by_email(email):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan
             FROM NguoiDung
             WHERE Email = %s
         """, (email,))
@@ -95,7 +95,8 @@ def get_user_by_email(email):
                 'TenNguoiDung': user['tennguoidung'],
                 'Email': user['email'],
                 'MatKhau': user['matkhau'],
-                'VaiTro': user['vaitro']
+                'VaiTro': user['vaitro'],
+                'LoaiTaiKhoan': user.get('loaitaikhoan', 'free') or 'free'
             }
         return None
     except Exception as e:
@@ -109,7 +110,7 @@ def get_user_by_id(user_id):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan
             FROM NguoiDung
             WHERE MaNguoiDung = %s
         """, (user_id,))
@@ -123,7 +124,8 @@ def get_user_by_id(user_id):
                 'TenNguoiDung': user['tennguoidung'],
                 'Email': user['email'],
                 'MatKhau': user['matkhau'],
-                'VaiTro': user['vaitro']
+                'VaiTro': user['vaitro'],
+                'LoaiTaiKhoan': user.get('loaitaikhoan', 'free') or 'free'
             }
         return None
     except Exception as e:
@@ -668,11 +670,11 @@ def get_all_users():
         
         cursor.execute("""
             SELECT n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy,
-                   n.GoogleId, n.LastActive,
+                   n.GoogleId, n.LastActive, n.LoaiTaiKhoan,
                    COUNT(l.MaLichSu) as analysis_count
             FROM NguoiDung n
             LEFT JOIN LichSu l ON n.MaNguoiDung = l.MaNguoiDung
-            GROUP BY n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy, n.GoogleId, n.LastActive
+            GROUP BY n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy, n.GoogleId, n.LastActive, n.LoaiTaiKhoan
             ORDER BY n.NgayDangKy DESC
         """)
         
@@ -689,7 +691,8 @@ def get_all_users():
                 'google_id': u.get('googleid') or None,
                 'auth_provider': 'google' if u.get('googleid') else 'local',
                 'last_active': u['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if u.get('lastactive') else None,
-                'analysis_count': u.get('analysis_count', 0) or 0
+                'analysis_count': u.get('analysis_count', 0) or 0,
+                'account_type': u.get('loaitaikhoan', 'free') or 'free'
             }
             for u in users
         ]
@@ -912,10 +915,22 @@ def get_system_stats():
         
         conn.close()
         
+        # Count premium users
+        try:
+            conn2 = get_db_connection()
+            cursor2 = get_db_cursor(conn2)
+            cursor2.execute("SELECT COUNT(*) as count FROM NguoiDung WHERE LoaiTaiKhoan = 'premium'")
+            premium_row = cursor2.fetchone()
+            premium_users = premium_row['count'] if premium_row else 0
+            conn2.close()
+        except:
+            premium_users = 0
+        
         return {
             'total_users': total_users,
             'total_foods': total_foods,
             'total_recognitions': total_scans,
+            'premium_users': premium_users,
             'comments': {
                 'total': total_comments,
                 'replied': total_comments - pending_comments,
@@ -2023,3 +2038,297 @@ def bulk_delete_history(history_ids):
     except Exception as e:
         print(f"Error bulk deleting history: {e}")
         return 0
+
+
+# ============================================
+# PREMIUM ACCOUNT & PAYMENT FUNCTIONS
+# ============================================
+
+def get_user_recognition_count_today(user_id):
+    """Đếm số lần nhận diện hôm nay của user"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM LichSu
+            WHERE MaNguoiDung = %s AND DATE(ThoiGian) = CURRENT_DATE
+        """, (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        return result['count'] if result else 0
+    except Exception as e:
+        print(f"Error get_user_recognition_count_today: {e}")
+        return 0
+
+
+def check_user_quota(user_id):
+    """Kiểm tra quota nhận diện của user"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        # Lấy loại tài khoản
+        cursor.execute("""
+            SELECT LoaiTaiKhoan FROM NguoiDung WHERE MaNguoiDung = %s
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return {
+                'allowed': False,
+                'account_type': 'free',
+                'is_premium': False,
+                'used_today': 0,
+                'remaining': 0,
+                'limit_per_day': 10,
+                'message': 'Không tìm thấy người dùng'
+            }
+        
+        account_type = user.get('loaitaikhoan', 'free') or 'free'
+        is_premium = account_type == 'premium'
+        
+        if is_premium:
+            conn.close()
+            return {
+                'allowed': True,
+                'account_type': 'premium',
+                'is_premium': True,
+                'used_today': 0,
+                'remaining': -1,  # unlimited
+                'limit_per_day': -1,
+                'message': 'Tài khoản Premium - Không giới hạn'
+            }
+        
+        # Free user - đếm số lần nhận diện hôm nay
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM LichSu
+            WHERE MaNguoiDung = %s AND DATE(ThoiGian) = CURRENT_DATE
+        """, (user_id,))
+        
+        result = cursor.fetchone()
+        used_today = result['count'] if result else 0
+        limit_per_day = 10
+        remaining = max(0, limit_per_day - used_today)
+        allowed = used_today < limit_per_day
+        
+        conn.close()
+        return {
+            'allowed': allowed,
+            'account_type': 'free',
+            'is_premium': False,
+            'used_today': used_today,
+            'remaining': remaining,
+            'limit_per_day': limit_per_day,
+            'message': f'Còn {remaining}/{limit_per_day} lượt hôm nay' if allowed else 'Đã hết lượt nhận diện hôm nay'
+        }
+    except Exception as e:
+        print(f"Error check_user_quota: {e}")
+        return {
+            'allowed': True,
+            'account_type': 'free',
+            'is_premium': False,
+            'used_today': 0,
+            'remaining': 10,
+            'limit_per_day': 10,
+            'message': 'Lỗi kiểm tra quota'
+        }
+
+
+def upgrade_user_account(user_id):
+    """Nâng cấp tài khoản lên Premium"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE NguoiDung 
+            SET LoaiTaiKhoan = 'premium', NgayNangCap = CURRENT_TIMESTAMP
+            WHERE MaNguoiDung = %s
+        """, (user_id,))
+        
+        conn.commit()
+        conn.close()
+        print(f"[PREMIUM] User {user_id} upgraded to Premium!")
+        return True
+    except Exception as e:
+        print(f"Error upgrade_user_account: {e}")
+        return False
+
+
+def create_payment(user_id, order_id, amount, package='premium'):
+    """Tạo bản ghi thanh toán mới"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO ThanhToan (MaNguoiDung, MaDonHang, SoTien, GoiNangCap)
+            VALUES (%s, %s, %s, %s)
+            RETURNING MaThanhToan
+        """, (user_id, order_id, amount, package))
+        
+        result = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error create_payment: {e}")
+        return None
+
+
+def update_payment_status(order_id, status, momo_trans_id=None, response_data=None):
+    """Cập nhật trạng thái thanh toán"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE ThanhToan 
+            SET TrangThai = %s, MomoTransId = %s, ResponseData = %s, 
+                ThoiGianCapNhat = CURRENT_TIMESTAMP
+            WHERE MaDonHang = %s
+        """, (status, momo_trans_id, response_data, order_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error update_payment_status: {e}")
+        return False
+
+
+def get_payment_by_order_id(order_id):
+    """Lấy thông tin thanh toán theo mã đơn hàng"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT * FROM ThanhToan WHERE MaDonHang = %s
+        """, (order_id,))
+        
+        payment = cursor.fetchone()
+        conn.close()
+        return payment
+    except Exception as e:
+        print(f"Error get_payment_by_order_id: {e}")
+        return None
+
+
+def get_all_payments_admin():
+    """Admin: Lấy danh sách tất cả thanh toán"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        cursor.execute("""
+            SELECT t.MaThanhToan, t.MaDonHang, t.SoTien, t.GoiNangCap,
+                   t.TrangThai, t.PhuongThuc, t.MomoTransId,
+                   t.ThoiGianTao, t.ThoiGianCapNhat,
+                   n.TenNguoiDung, n.Email
+            FROM ThanhToan t
+            LEFT JOIN NguoiDung n ON t.MaNguoiDung = n.MaNguoiDung
+            ORDER BY t.ThoiGianTao DESC
+            LIMIT 200
+        """)
+        
+        payments = cursor.fetchall()
+        conn.close()
+        
+        return [
+            {
+                'id': p['mathanhtoan'],
+                'order_id': p['madonhang'],
+                'amount': float(p['sotien']) if p['sotien'] else 0,
+                'package': p['goinangcap'],
+                'status': p['trangthai'],
+                'method': p['phuongthuc'],
+                'momo_trans_id': p.get('momotransid', ''),
+                'user_name': p.get('tennguoidung', 'Không rõ'),
+                'user_email': p.get('email', ''),
+                'created_at': p['thoigiantao'].strftime('%d/%m/%Y %H:%M') if p.get('thoigiantao') else '',
+                'updated_at': p['thoigiancapnhat'].strftime('%d/%m/%Y %H:%M') if p.get('thoigiancapnhat') else ''
+            }
+            for p in payments
+        ]
+    except Exception as e:
+        print(f"Error get_all_payments_admin: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+def get_payment_stats_admin():
+    """Admin: Thống kê doanh thu"""
+    try:
+        conn = get_db_connection()
+        cursor = get_db_cursor(conn)
+        
+        # Tổng doanh thu (chỉ tính success)
+        cursor.execute("""
+            SELECT COALESCE(SUM(SoTien), 0) as total_revenue,
+                   COUNT(*) FILTER (WHERE TrangThai = 'success') as success_count,
+                   COUNT(*) FILTER (WHERE TrangThai = 'pending') as pending_count,
+                   COUNT(*) FILTER (WHERE TrangThai = 'failed') as failed_count,
+                   COUNT(*) as total_payments
+            FROM ThanhToan
+        """)
+        stats = cursor.fetchone()
+        
+        # Số user Premium
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM NguoiDung WHERE LoaiTaiKhoan = 'premium'
+        """)
+        premium_row = cursor.fetchone()
+        premium_users = premium_row['count'] if premium_row else 0
+        
+        # Doanh thu chỉ tính thành công
+        cursor.execute("""
+            SELECT COALESCE(SUM(SoTien), 0) as revenue FROM ThanhToan WHERE TrangThai = 'success'
+        """)
+        rev_row = cursor.fetchone()
+        actual_revenue = float(rev_row['revenue']) if rev_row else 0
+        
+        # 5 giao dịch gần nhất
+        cursor.execute("""
+            SELECT t.MaDonHang, t.SoTien, t.TrangThai, t.ThoiGianTao,
+                   n.TenNguoiDung
+            FROM ThanhToan t
+            LEFT JOIN NguoiDung n ON t.MaNguoiDung = n.MaNguoiDung
+            ORDER BY t.ThoiGianTao DESC
+            LIMIT 5
+        """)
+        recent = []
+        for r in cursor.fetchall():
+            recent.append({
+                'order_id': r['madonhang'],
+                'amount': float(r['sotien']) if r['sotien'] else 0,
+                'status': r['trangthai'],
+                'user_name': r.get('tennguoidung', 'Không rõ'),
+                'created_at': r['thoigiantao'].strftime('%d/%m/%Y %H:%M') if r.get('thoigiantao') else ''
+            })
+        
+        conn.close()
+        
+        return {
+            'total_revenue': actual_revenue,
+            'total_payments': stats['total_payments'] if stats else 0,
+            'success_count': stats['success_count'] if stats else 0,
+            'pending_count': stats['pending_count'] if stats else 0,
+            'failed_count': stats['failed_count'] if stats else 0,
+            'premium_users': premium_users,
+            'recent_payments': recent
+        }
+    except Exception as e:
+        print(f"Error get_payment_stats_admin: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'total_revenue': 0, 'total_payments': 0,
+            'success_count': 0, 'pending_count': 0, 'failed_count': 0,
+            'premium_users': 0, 'recent_payments': []
+        }
+

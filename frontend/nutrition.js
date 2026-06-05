@@ -163,6 +163,9 @@ function displayResults(profile) {
     // Render detailed BMI assessment
     renderBmiAssessment(bmi, bmiCategory, bmiColor, profile.MucTieu);
 
+    // Apply premium lock on BMI assessment for free users
+    applyPremiumLocks();
+
     const targetCalo = profile.CaloDuKien;
     for (const [mealType, config] of Object.entries(MEAL_CONFIG)) {
         const mealCalo = Math.round(targetCalo * config.percent);
@@ -403,6 +406,9 @@ function renderFoodCards(container, suggestions, targetCalo, mealType) {
     }
     
     container.innerHTML = html;
+
+    // Apply premium restrictions on food suggestions
+    applyMealSuggestionLocks(container, mealType, suggestions.length);
     
     // Update daily summary after rendering
     updateDailySummary();
@@ -1168,3 +1174,106 @@ function renderWeightChart(history) {
         }
     });
 }
+
+// ============================================
+// PREMIUM ACCOUNT RESTRICTIONS
+// ============================================
+
+function isUserPremium() {
+    const user = JSON.parse(localStorage.getItem('smartfood_user'));
+    return user && user.account_type === 'premium';
+}
+
+function createLockOverlay(message, small = false) {
+    const overlay = document.createElement('div');
+    overlay.className = 'premium-lock-overlay';
+    overlay.innerHTML = `
+        <i class="fa-solid fa-lock lock-icon" style="font-size:${small ? '22px' : '28px'}"></i>
+        <span class="lock-text">${message}</span>
+        <button class="lock-cta" onclick="window.location.href='/?upgrade=true'">
+            <i class="fa-solid fa-crown"></i> Nâng cấp Premium
+        </button>
+    `;
+    return overlay;
+}
+
+function applyPremiumLocks() {
+    if (isUserPremium()) return;
+
+    // Lock BMI assessment detail
+    setTimeout(() => {
+        const bmiAssessment = document.getElementById('bmi-assessment-section');
+        if (bmiAssessment) {
+            // Keep BMI number visible but lock the detailed assessment
+            const detailCards = bmiAssessment.querySelectorAll('.bmi-detail-card, .bmi-recommendation-card, #bmi-goal-banner');
+            detailCards.forEach(card => {
+                if (!card.classList.contains('premium-lock-wrapper')) {
+                    card.classList.add('premium-lock-wrapper', 'locked');
+                    card.appendChild(createLockOverlay('Nâng cấp Premium để xem đánh giá thể trạng chi tiết', true));
+                }
+            });
+        }
+    }, 300);
+}
+
+function applyMealSuggestionLocks(container, mealType, totalCount) {
+    if (isUserPremium()) return;
+    
+    // For free users: only show first 3 suggestions, lock the rest
+    const moreList = document.getElementById(`more-${mealType}`);
+    if (moreList) {
+        const cards = moreList.querySelectorAll('.np-food-card');
+        // Free users can see max 2 more (total 3 with best match)
+        cards.forEach((card, index) => {
+            if (index >= 2) {
+                card.classList.add('premium-lock-wrapper', 'locked');
+                card.style.position = 'relative';
+                card.appendChild(createLockOverlay('Nâng cấp để xem thêm đề xuất', true));
+            }
+        });
+    }
+}
+
+// Add premium upgrade banner on nutrition page
+function addNutritionUpgradeBanner() {
+    if (isUserPremium()) return;
+    
+    const mainContainer = document.querySelector('.nutrition-container') || document.querySelector('main');
+    if (!mainContainer) return;
+    
+    // Check if banner already exists
+    if (document.getElementById('nutrition-upgrade-banner')) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'nutrition-upgrade-banner';
+    banner.className = 'nutrition-upgrade-banner';
+    banner.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;">
+            <span style="display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-crown" style="color:#f59e0b;"></i>
+                <strong>Tài khoản miễn phí</strong> — Một số tính năng bị giới hạn
+            </span>
+            <button onclick="window.location.href='/?upgrade=true'" style="
+                padding:6px 16px;border-radius:20px;border:none;
+                background:linear-gradient(135deg,#f59e0b,#d97706);
+                color:white;font-size:12px;font-weight:700;cursor:pointer;
+                font-family:inherit;transition:all 0.2s;
+            ">Nâng cấp Premium — 50.000đ</button>
+        </div>
+    `;
+    banner.style.cssText = `
+        background: rgba(245,158,11,0.06);
+        border: 1px solid rgba(245,158,11,0.2);
+        border-radius: 12px;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        text-align: center;
+        font-size: 14px;
+        color: var(--text-secondary);
+    `;
+    
+    mainContainer.prepend(banner);
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', addNutritionUpgradeBanner);

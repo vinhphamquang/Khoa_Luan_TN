@@ -2,7 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Admin page loaded!");
     const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
-    
+
     // Redirect if not admin
     if (!loggedUser || loggedUser.role !== 'admin') {
         window.location.href = '/';
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const countEl = document.getElementById('bulk-count');
         const listEl = document.getElementById('bulk-selected-list');
         const count = selectedFoodIds.size;
-        
+
         if (count > 0) {
             bar.classList.remove('hidden');
             countEl.textContent = `${count} món đã chọn`;
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Remove single item from bulk selection
-    window._removeBulkItem = function(id) {
+    window._removeBulkItem = function (id) {
         selectedFoodIds.delete(id);
         const cb = document.querySelector(`.food-row-checkbox[data-food-id="${id}"]`);
         if (cb) cb.checked = false;
@@ -207,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (targetId === 'admin-users') fetchAdminUsers();
                 if (targetId === 'admin-history') fetchAdminHistory();
                 if (targetId === 'admin-comments') fetchAdminComments();
+                if (targetId === 'admin-payments') fetchAdminPayments();
             };
 
             if (currentEl) {
@@ -247,21 +248,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    
+                    const workbook = XLSX.read(data, { type: 'array' });
+
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    const json = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                    
+
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
                     let startIndex = 0;
                     if (json.length > 0 && typeof json[0][0] === 'string' && json[0][0].toLowerCase().includes('tên')) {
                         startIndex = 1; // Bỏ qua header
                     }
-                    
+
                     // Nếu chỉ có 1 dòng rỗng mặc định thì xóa đi trước khi thêm từ Excel
                     const currentRows = ingsContainer.querySelectorAll('div');
                     if (currentRows.length === 1) {
@@ -286,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error("Lỗi đọc file Excel:", error);
                     alert("Có lỗi xảy ra khi đọc file Excel. Vui lòng đảm bảo file đúng định dạng.");
                 }
-                
+
                 uploadExcelInput.value = ''; // Reset input file
             };
             reader.readAsArrayBuffer(file);
@@ -297,9 +298,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('div');
         row.style.display = 'flex';
         row.style.gap = '10px';
-        
+
         const [name, qty] = value ? value.split(' — ') : ['', ''];
-        
+
         row.innerHTML = `
             <input type="text" class="form-input ing-name" placeholder="Tên nguyên liệu..." style="flex: 2" value="${name || ''}">
             <input type="text" class="form-input ing-qty" placeholder="Số lượng..." style="flex: 1" value="${qty || ''}">
@@ -315,19 +316,19 @@ document.addEventListener('DOMContentLoaded', () => {
             errDiv.classList.add('hidden');
 
             const id = document.getElementById('fa-id').value;
-            
+
             // Chỉ cho phép sửa, không cho thêm mới thủ công
             if (!id) {
                 errDiv.textContent = 'Không thể thêm món ăn thủ công. Món ăn được thêm tự động bởi AI khi người dùng nhận diện.';
                 errDiv.classList.remove('hidden');
                 return;
             }
-            
+
             const ings = [];
             ingsContainer.querySelectorAll('div').forEach(row => {
                 const n = row.querySelector('.ing-name').value.trim();
                 const q = row.querySelector('.ing-qty').value.trim();
-                if(n) ings.push({ TenNguyenLieu: n, SoLuong: q });
+                if (n) ings.push({ TenNguyenLieu: n, SoLuong: q });
             });
 
             const data = {
@@ -353,22 +354,22 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const url = id ? `/api/admin/foods/${id}` : '/api/admin/foods';
                 const method = id ? 'PUT' : 'POST';
-                
+
                 const res = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                
+
                 const responseData = await res.json();
-                if(responseData.success) {
+                if (responseData.success) {
                     adminModalOverlay.classList.add('hidden');
                     fetchAdminFoods();
                 } else {
                     errDiv.textContent = responseData.message || 'Lỗi lưu dữ liệu';
                     errDiv.classList.remove('hidden', 'success');
                 }
-            } catch(error) {
+            } catch (error) {
                 errDiv.textContent = 'Lỗi kết nối máy chủ';
                 errDiv.classList.remove('hidden', 'success');
             }
@@ -380,28 +381,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`/api/admin/foods/${id}`);
             const responseData = await res.json();
-            if(responseData.success) {
+            if (responseData.success) {
                 const f = responseData.food;
-                
+
                 // Support both uppercase (backend format) and lowercase (PostgreSQL format)
                 document.getElementById('fa-id').value = f.MaMonAn || f.mamonan || id;
                 document.getElementById('fa-name').value = f.TenMonAn || f.tenmonan || '';
                 document.getElementById('fa-cate').value = f.PhanLoai || f.phanloai || '';
                 document.getElementById('fa-desc').value = f.MoTa || f.mota || '';
                 document.getElementById('fa-deleted').value = (f.IsDeleted !== undefined ? f.IsDeleted : (f.isdeleted !== undefined ? f.isdeleted : 0));
-                
+
                 const nutrition = f.DinhDuong || f.dinhduong || {};
                 document.getElementById('fa-cal').value = nutrition.Calo || nutrition.calo || '';
                 document.getElementById('fa-pro').value = nutrition.Protein || nutrition.protein || '';
                 document.getElementById('fa-fat').value = nutrition.ChatBeo || nutrition.chatbeo || '';
                 document.getElementById('fa-car').value = nutrition.Carbohydrate || nutrition.carbohydrate || '';
-                
+
                 const recipe = f.CongThuc || f.congthuc || {};
                 document.getElementById('fa-instruct').value = recipe.HuongDan || recipe.huongdan || '';
-                
+
                 ingsContainer.innerHTML = '';
                 const ingredients = recipe.NguyenLieu || recipe.nguyenlieu || [];
-                if(ingredients && ingredients.length > 0) {
+                if (ingredients && ingredients.length > 0) {
                     ingredients.forEach(nl => {
                         const name = nl.TenNguyenLieu || nl.tennguyenlieu || '';
                         const amount = nl.SoLuong || nl.soluong || '';
@@ -416,54 +417,54 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert("Không tải được chi tiết món ăn!");
             }
-        } catch(e) { 
-            console.error('Edit food error:', e); 
-            alert("Lỗi kết nối máy chủ: " + e.message); 
+        } catch (e) {
+            console.error('Edit food error:', e);
+            alert("Lỗi kết nối máy chủ: " + e.message);
         }
     };
 
     window.deleteAdminFood = async (id) => {
-        if(!confirm('Bạn có chắc chắn muốn CHUYỂN VÀO THÙNG RÁC món ăn này? (Sẽ không còn hiện trên web cho User)')) return;
+        if (!confirm('Bạn có chắc chắn muốn CHUYỂN VÀO THÙNG RÁC món ăn này? (Sẽ không còn hiện trên web cho User)')) return;
         try {
             const res = await fetch(`/api/admin/foods/${id}`, { method: 'DELETE' });
             const r = await res.json();
-            if(r.success) fetchAdminFoods();
+            if (r.success) fetchAdminFoods();
             else alert(r.message);
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     };
 
     window.restoreAdminFood = async (id) => {
-        if(!confirm('Bạn muốn HOÀN TÁC (khôi phục) món ăn này để hiển thị lại trên web?')) return;
+        if (!confirm('Bạn muốn HOÀN TÁC (khôi phục) món ăn này để hiển thị lại trên web?')) return;
         try {
             const res = await fetch(`/api/admin/foods/${id}/restore`, { method: 'PUT' });
             const r = await res.json();
-            if(r.success) fetchAdminFoods();
+            if (r.success) fetchAdminFoods();
             else alert(r.message);
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     };
 
     window.hardDeleteAdminFood = async (id) => {
-        if(!confirm('⚠️ BẠN CÓ CHẮC MUỐN XÓA VĨNH VIỄN MÓN ĂN NÀY?\n\nHành động này KHÔNG THỂ HOÀN TÁC!\nTất cả dữ liệu dinh dưỡng, công thức, nguyên liệu liên quan sẽ bị xóa hoàn toàn.')) return;
-        if(!confirm('Xác nhận lần cuối: XÓA VĨNH VIỄN món ăn ID #' + id + '?')) return;
+        if (!confirm('⚠️ BẠN CÓ CHẮC MUỐN XÓA VĨNH VIỄN MÓN ĂN NÀY?\n\nHành động này KHÔNG THỂ HOÀN TÁC!\nTất cả dữ liệu dinh dưỡng, công thức, nguyên liệu liên quan sẽ bị xóa hoàn toàn.')) return;
+        if (!confirm('Xác nhận lần cuối: XÓA VĨNH VIỄN món ăn ID #' + id + '?')) return;
         try {
             const res = await fetch(`/api/admin/foods/${id}/hard-delete`, { method: 'DELETE' });
             const r = await res.json();
-            if(r.success) {
+            if (r.success) {
                 alert('✅ ' + r.message);
                 fetchAdminFoods();
             }
             else alert(r.message);
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     };
 
     window.deleteAdminUser = async (id) => {
-        if(!confirm('Bạn có chắc chắn muốn XÓA VĨNH VIỄN người dùng này?')) return;
+        if (!confirm('Bạn có chắc chắn muốn XÓA VĨNH VIỄN người dùng này?')) return;
         try {
             const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
             const r = await res.json();
-            if(r.success) fetchAdminUsers();
+            if (r.success) fetchAdminUsers();
             else alert(r.message);
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     };
 
     // Default fetch on load
@@ -474,29 +475,36 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/admin/stats');
             const data = await res.json();
-            if(data.success) {
+            if (data.success) {
                 document.getElementById('st-users').textContent = data.stats.total_users;
                 document.getElementById('st-foods').textContent = data.stats.total_foods;
                 document.getElementById('st-recs').textContent = data.stats.total_recognitions;
-                
+
+                // Premium stats
+                const stPremium = document.getElementById('st-premium');
+                if (stPremium) stPremium.textContent = data.stats.premium_users || 0;
+
+                // Fetch revenue for overview
+                fetchPaymentStatsOverview();
+
                 // Render Comment Stats
                 renderCommentStats(data.stats);
             }
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     function renderCommentStats(stats) {
         const comments = stats.comments || { total: 0, replied: 0, pending: 0 };
-        
+
         // Update values
         const csTotal = document.getElementById('cs-total');
         const csPending = document.getElementById('cs-pending');
         const csReplied = document.getElementById('cs-replied');
-        
+
         if (csTotal) csTotal.textContent = comments.total;
         if (csPending) csPending.textContent = comments.pending;
         if (csReplied) csReplied.textContent = comments.replied;
-        
+
         // Recent Comments
         const recentList = document.getElementById('recent-comments-list');
         const recentComments = stats.recent_comments || [];
@@ -532,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/admin/foods');
             const data = await res.json();
-            if(data.success) {
+            if (data.success) {
                 tb.innerHTML = '';
                 data.foods.forEach(f => {
                     const status = f.is_deleted ? '<span class="badge badge-danger">Đã khóa</span>' : '<span class="badge badge-success">Hiển thị</span>';
@@ -564,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             }
-        } catch(e) { console.error(e); tb.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
+        } catch (e) { console.error(e); tb.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
     }
 
     let allUsersData = [];
@@ -575,11 +583,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/admin/users');
             const data = await res.json();
-            if(data.success) {
+            if (data.success) {
                 allUsersData = data.users;
                 renderUsersTable();
             }
-        } catch(e) { console.error(e); tb.innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
+        } catch (e) { console.error(e); tb.innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Lỗi tải dữ liệu</td></tr>'; }
     }
 
     function getOnlineStatus(lastActive) {
@@ -663,8 +671,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? '<span class="badge badge-info"><i class="fa-brands fa-google"></i> Google</span>'
                     : '<span class="badge badge-info">User</span>';
 
+            const accountBadge = u.account_type === 'premium'
+                ? '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;font-size:10px;padding:2px 8px;margin-left:4px;"><i class="fa-solid fa-crown"></i> Premium</span>'
+                : '';
+
             const initial = (u.name || 'U').charAt(0).toUpperCase();
-            const avatarColors = ['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+            const avatarColors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
             const colorIdx = (u.id || 0) % avatarColors.length;
 
             const tr = document.createElement('tr');
@@ -676,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
                 <td style="font-weight: 600">${u.name}</td>
                 <td><span style="font-size: 13px; color: var(--text-secondary)">${u.email}</span></td>
-                <td>${roleBadge}</td>
+                <td>${roleBadge}${accountBadge}</td>
                 <td>
                     <span class="user-status-badge ${status.cls}">
                         <span class="status-dot"></span> ${status.text}
@@ -727,7 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const d = data.detail;
             const status = getOnlineStatus(d.last_active);
             const initial = (d.name || 'U').charAt(0).toUpperCase();
-            const avatarColors = ['#4CAF50','#2196F3','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+            const avatarColors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
             const colorIdx = (d.id || 0) % avatarColors.length;
 
             const authBadge = d.auth_provider === 'google'
@@ -862,7 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${healthHTML}
                 ${historyHTML}
             `;
-        } catch(e) {
+        } catch (e) {
             console.error('User detail error:', e);
             content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi khi tải chi tiết</p></div>';
         }
@@ -947,16 +959,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasImage = !!imgSrc;
             const dateObj = h.time ? new Date(h.time) : null;
             const dateStr = dateObj ? dateObj.toLocaleDateString('vi-VN') : '';
-            const timeStr = dateObj ? dateObj.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : '';
-            
+            const timeStr = dateObj ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+
             return `
             <div class="history-card" onclick="viewHistoryDetail(${h.id})">
                 <input type="checkbox" class="history-check" data-id="${h.id}" onclick="event.stopPropagation(); updateBulkSelection()">
                 <div class="history-card-img">
-                    ${hasImage 
-                        ? `<img src="${imgSrc}" alt="${h.food_name}" loading="lazy">` 
-                        : `<div class="history-card-no-img"><i class="fa-solid fa-image"></i></div>`
-                    }
+                    ${hasImage
+                    ? `<img src="${imgSrc}" alt="${h.food_name}" loading="lazy">`
+                    : `<div class="history-card-no-img"><i class="fa-solid fa-image"></i></div>`
+                }
                 </div>
                 <div class="history-card-body">
                     <h4 class="history-card-food">${h.food_name || 'Không xác định'}</h4>
@@ -996,10 +1008,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><input type="checkbox" class="history-check" data-id="${h.id}" onclick="updateBulkSelection()"></td>
                 <td>#${h.id}</td>
                 <td>
-                    ${imgSrc 
-                        ? `<img src="${imgSrc}" alt="" class="history-table-thumb" onclick="event.stopPropagation(); viewHistoryDetail(${h.id})">` 
-                        : `<span class="history-table-no-img"><i class="fa-solid fa-image-slash"></i></span>`
-                    }
+                    ${imgSrc
+                    ? `<img src="${imgSrc}" alt="" class="history-table-thumb" onclick="event.stopPropagation(); viewHistoryDetail(${h.id})">`
+                    : `<span class="history-table-no-img"><i class="fa-solid fa-image-slash"></i></span>`
+                }
                 </td>
                 <td>${h.user_name}</td>
                 <td style="font-weight:500; color:var(--primary-light)">${h.food_name}</td>
@@ -1026,13 +1038,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/admin/history');
             const data = await res.json();
-            if(data.success) {
+            if (data.success) {
                 allHistoryData = data.history;
                 const filter = (historySearchInput && historySearchInput.value.trim().toLowerCase()) || '';
                 renderHistoryViews(allHistoryData, filter);
             }
-        } catch(e) { 
-            console.error(e); 
+        } catch (e) {
+            console.error(e);
             grid.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải dữ liệu</p></div>';
         }
     }
@@ -1092,10 +1104,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="hd-layout">
                     <!-- Image Section -->
                     <div class="hd-image-section">
-                        ${imgSrc 
-                            ? `<div class="hd-image-wrap"><img src="${imgSrc}" alt="${d.food_name}" class="hd-image"></div>`
-                            : `<div class="hd-image-placeholder"><i class="fa-solid fa-camera"></i><span>Không có hình ảnh</span></div>`
-                        }
+                        ${imgSrc
+                    ? `<div class="hd-image-wrap"><img src="${imgSrc}" alt="${d.food_name}" class="hd-image"></div>`
+                    : `<div class="hd-image-placeholder"><i class="fa-solid fa-camera"></i><span>Không có hình ảnh</span></div>`
+                }
                     </div>
 
                     <!-- Info Section -->
@@ -1206,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newName = document.getElementById('hd-edit-name').value.trim();
                 const newCal = document.getElementById('hd-edit-cal').value;
                 const msgDiv = document.getElementById('hd-edit-msg');
-                
+
                 if (!newName) {
                     msgDiv.textContent = 'Tên món ăn không được trống';
                     msgDiv.className = 'hd-edit-msg hd-edit-error';
@@ -1223,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify({ food_name: newName, calories: newCal || null })
                     });
                     const result = await res.json();
-                    
+
                     if (result.success) {
                         msgDiv.textContent = '✅ ' + result.message;
                         msgDiv.className = 'hd-edit-msg hd-edit-success';
@@ -1233,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         msgDiv.textContent = '❌ ' + result.message;
                         msgDiv.className = 'hd-edit-msg hd-edit-error';
                     }
-                } catch(err) {
+                } catch (err) {
                     msgDiv.textContent = '❌ Lỗi kết nối server';
                     msgDiv.className = 'hd-edit-msg hd-edit-error';
                 }
@@ -1241,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu & Thông báo';
             });
-        } catch(e) {
+        } catch (e) {
             console.error('History detail error:', e);
             content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi khi tải chi tiết</p></div>';
         }
@@ -1251,23 +1263,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global: Xóa bản ghi lịch sử
 async function deleteHistoryRecord(historyId) {
     if (!confirm('Bạn có chắc muốn xóa bản ghi lịch sử này?')) return;
-    
+
     try {
         const res = await fetch(`/api/admin/history/${historyId}`, { method: 'DELETE' });
         const data = await res.json();
-        
+
         if (data.success) {
             // Close detail modal if open
             const overlay = document.getElementById('history-detail-overlay');
             if (overlay) overlay.classList.add('hidden');
-            
+
             // Trigger re-fetch
             document.dispatchEvent(new Event('refreshHistory'));
             alert('✅ ' + data.message);
         } else {
             alert('❌ ' + data.message);
         }
-    } catch(e) {
+    } catch (e) {
         console.error('Delete error:', e);
         alert('❌ Lỗi kết nối server');
     }
@@ -1279,9 +1291,9 @@ function updateBulkSelection() {
     const btn = document.getElementById('bulk-delete-btn');
     const allChecks = document.querySelectorAll('.history-check');
     const tableSelectAll = document.getElementById('table-select-all');
-    
+
     const count = checks.length;
-    
+
     if (btn) {
         btn.innerHTML = `<i class="fa-solid fa-trash-can"></i> Xóa (${count})`;
         if (count > 0) {
@@ -1294,7 +1306,7 @@ function updateBulkSelection() {
             btn.style.pointerEvents = 'none';
         }
     }
-    
+
     // Sync select-all checkbox
     const allChecked = allChecks.length > 0 && count === allChecks.length;
     if (tableSelectAll) tableSelectAll.checked = allChecked;
@@ -1313,16 +1325,16 @@ document.addEventListener('change', (e) => {
 document.addEventListener('click', async (e) => {
     const btn = e.target.closest('#bulk-delete-btn');
     if (!btn) return;
-    
+
     const checks = document.querySelectorAll('.history-check:checked');
     const ids = Array.from(checks).map(cb => parseInt(cb.dataset.id));
-    
+
     if (ids.length === 0) return;
     if (!confirm(`Bạn có chắc muốn xóa ${ids.length} bản ghi lịch sử?`)) return;
-    
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa...';
-    
+
     try {
         const res = await fetch('/api/admin/history/bulk-delete', {
             method: 'POST',
@@ -1330,7 +1342,7 @@ document.addEventListener('click', async (e) => {
             body: JSON.stringify({ ids })
         });
         const data = await res.json();
-        
+
         if (data.success) {
             document.dispatchEvent(new Event('refreshHistory'));
             updateBulkSelection();
@@ -1338,11 +1350,11 @@ document.addEventListener('click', async (e) => {
         } else {
             alert('❌ ' + data.message);
         }
-    } catch(e) {
+    } catch (e) {
         console.error('Bulk delete error:', e);
         alert('❌ Lỗi kết nối server');
     }
-    
+
     btn.disabled = false;
     updateBulkSelection();
 });
@@ -1409,7 +1421,7 @@ document.addEventListener('click', async (e) => {
 
             body.innerHTML = unread.map(n => {
                 const timeStr = n.time ? new Date(n.time).toLocaleString('vi-VN') : '';
-                
+
                 // Detect notification type for icon & target tab
                 let icon = 'fa-pen-to-square';
                 let targetTab = 'admin-history';
@@ -1424,7 +1436,7 @@ document.addEventListener('click', async (e) => {
                 } else if (n.content.includes('⚠️') || n.content.includes('Trung bình')) {
                     icon = 'fa-triangle-exclamation';
                 }
-                
+
                 return `
                     <div class="notif-item notif-unread" data-id="${n.id}" 
                          onclick="markAdminNotifRead(${n.id}, '${targetTab}', this)">
@@ -1453,7 +1465,7 @@ document.addEventListener('click', async (e) => {
         try {
             // 1. Mark as read on server
             await fetch(`/api/notifications/${notifId}/read`, { method: 'PUT' });
-            
+
             // 2. Animate removal
             if (el) {
                 el.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -1467,7 +1479,7 @@ document.addEventListener('click', async (e) => {
                     }
                 }, 300);
             }
-            
+
             // 3. Update badge
             const badge = document.getElementById('notif-badge');
             if (badge) {
@@ -1479,11 +1491,11 @@ document.addEventListener('click', async (e) => {
                     badge.style.display = 'none';
                 }
             }
-            
+
             // 4. Close dropdown
             const dropdown = document.getElementById('notif-dropdown');
             if (dropdown) dropdown.classList.add('hidden');
-            
+
             // 5. Navigate to target tab
             if (targetTab) {
                 const tabBtn = document.querySelector(`.admin-tab-btn[data-tab="${targetTab}"]`);
@@ -1503,11 +1515,11 @@ document.addEventListener('click', async (e) => {
 async function fetchAdminComments() {
     const listEl = document.getElementById('admin-comments-list');
     if (!listEl) return;
-    
+
     listEl.innerHTML = '<div class="history-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải...</span></div>';
-    
+
     const filter = document.getElementById('comment-filter-status')?.value || 'all';
-    
+
     try {
         const res = await fetch(`/api/admin/comments?status=${filter}`);
         const data = await res.json();
@@ -1523,17 +1535,17 @@ async function fetchAdminComments() {
 function renderAdminComments(comments) {
     const listEl = document.getElementById('admin-comments-list');
     if (!listEl) return;
-    
+
     if (!comments || comments.length === 0) {
         listEl.innerHTML = '<div class="history-empty"><i class="fa-solid fa-comments"></i><p>Chưa có bình luận nào</p></div>';
         return;
     }
-    
+
     listEl.innerHTML = comments.map(c => {
         const statusCls = c.status === 'replied' ? 'comment-status-replied' : 'comment-status-pending';
         const statusText = c.status === 'replied' ? 'Đã phản hồi' : 'Chưa phản hồi';
         const statusIcon = c.status === 'replied' ? 'fa-check-double' : 'fa-clock';
-        
+
         const repliesHTML = (c.replies || []).map(r => `
             <div class="admin-reply-item">
                 <div class="admin-reply-avatar">${r.is_admin ? '🛡️' : 'U'}</div>
@@ -1544,7 +1556,7 @@ function renderAdminComments(comments) {
                 </div>
             </div>
         `).join('');
-        
+
         return `
             <div class="admin-comment-card" data-id="${c.id}">
                 <div class="admin-comment-header">
@@ -1603,10 +1615,10 @@ window.submitAdminReply = async (commentId) => {
     const input = document.getElementById(`reply-input-${commentId}`);
     const content = input?.value.trim();
     if (!content) { alert('Vui lòng nhập nội dung phản hồi'); return; }
-    
+
     const adminUser = JSON.parse(localStorage.getItem('smartfood_user'));
     if (!adminUser) { alert('Vui lòng đăng nhập'); return; }
-    
+
     try {
         const res = await fetch(`/api/admin/comments/${commentId}/reply`, {
             method: 'POST',
@@ -1644,3 +1656,87 @@ window.deleteAdminComment = async (commentId) => {
 document.getElementById('comment-filter-status')?.addEventListener('change', () => {
     fetchAdminComments();
 });
+
+// ============================================
+// PAYMENTS TAB
+// ============================================
+
+function formatVND(amount) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+}
+
+async function fetchPaymentStatsOverview() {
+    try {
+        const res = await fetch('/api/admin/payment-stats');
+        const data = await res.json();
+        if (data.success) {
+            const stRevenue = document.getElementById('st-revenue');
+            if (stRevenue) stRevenue.textContent = formatVND(data.stats.total_revenue || 0);
+        }
+    } catch (e) { console.warn('Payment stats overview error:', e); }
+}
+
+async function fetchAdminPayments() {
+    const tb = document.getElementById('tb-payments');
+    if (!tb) return;
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+
+    try {
+        // Fetch stats and payments in parallel
+        const [statsRes, paymentsRes] = await Promise.all([
+            fetch('/api/admin/payment-stats'),
+            fetch('/api/admin/payments')
+        ]);
+        const statsData = await statsRes.json();
+        const paymentsData = await paymentsRes.json();
+
+        // Update payment stats
+        if (statsData.success) {
+            const s = statsData.stats;
+            const psRevenue = document.getElementById('ps-revenue');
+            const psSuccess = document.getElementById('ps-success');
+            const psPending = document.getElementById('ps-pending');
+            const psFailed = document.getElementById('ps-failed');
+
+            if (psRevenue) psRevenue.textContent = formatVND(s.total_revenue || 0);
+            if (psSuccess) psSuccess.textContent = s.success_count || 0;
+            if (psPending) psPending.textContent = s.pending_count || 0;
+            if (psFailed) psFailed.textContent = s.failed_count || 0;
+        }
+
+        // Render payments table
+        if (paymentsData.success && paymentsData.payments && paymentsData.payments.length > 0) {
+            tb.innerHTML = '';
+            paymentsData.payments.forEach(p => {
+                const statusMap = {
+                    'success': '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Thành công</span>',
+                    'pending': '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> Đang chờ</span>',
+                    'failed': '<span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> Thất bại</span>'
+                };
+                const statusBadge = statusMap[p.status] || `<span class="badge">${p.status}</span>`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code style="font-size:12px;background:rgba(0,0,0,0.05);padding:2px 6px;border-radius:4px;">${p.order_id}</code></td>
+                    <td style="font-weight:500">${p.user_name || 'N/A'}</td>
+                    <td style="font-weight:600;color:var(--primary)">${formatVND(p.amount)}</td>
+                    <td>
+                        <span style="display:inline-flex;align-items:center;gap:4px;">
+                            <img src="https://developers.momo.vn/v3/vi/assets/images/primary-c62e27d787daa93e4854a4be55f0e50e.png" alt="MoMo" style="height:16px;width:auto;">
+                            ${p.method || 'MoMo'}
+                        </span>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td><span style="font-size:12px;color:var(--text-muted)">${p.momo_trans_id || '—'}</span></td>
+                    <td><span style="font-size:12px;color:var(--text-muted)">${p.created_at || ''}</span></td>
+                `;
+                tb.appendChild(tr);
+            });
+        } else {
+            tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fa-solid fa-receipt" style="font-size:24px;display:block;margin-bottom:8px;"></i>Chưa có giao dịch nào</td></tr>';
+        }
+    } catch (e) {
+        console.error('Payment fetch error:', e);
+        tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:red;">Lỗi tải dữ liệu thanh toán</td></tr>';
+    }
+}

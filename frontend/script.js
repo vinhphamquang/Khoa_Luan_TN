@@ -372,6 +372,21 @@ function initAnalyzePage() {
     analyzeBtn.addEventListener('click', async () => {
         if (!currentFile) return;
 
+        // Kiểm tra quota trước khi phân tích
+        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+        if (loggedUser && loggedUser.account_type !== 'premium') {
+            try {
+                const quotaRes = await fetch(`/api/user/${loggedUser.id}/quota`);
+                const quotaData = await quotaRes.json();
+                if (quotaData.success && !quotaData.quota.allowed) {
+                    document.getElementById('quota-exceeded-modal').style.display = 'flex';
+                    return;
+                }
+                // Cập nhật quota counter
+                updateQuotaCounter(quotaData.quota);
+            } catch(e) { console.warn('Quota check failed:', e); }
+        }
+
         // Show loading
         previewContainer.classList.add('hidden');
         loading.classList.remove('hidden');
@@ -399,7 +414,6 @@ function initAnalyzePage() {
         const formData = new FormData();
         formData.append('file', currentFile);
         
-        const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
         if (loggedUser) {
             formData.append('user_id', loggedUser.id);
         }
@@ -424,13 +438,16 @@ function initAnalyzePage() {
             previewContainer.classList.remove('hidden');
 
             if (data.success) {
-                // Show appropriate message based on whether food was found in DB
-                if (data.found_in_db && !data.is_new) {
-                    console.log('✅ Món đã có trong CSDL');
-                } else if (data.is_new) {
-                    console.log('✨ Món mới vừa được thêm vào CSDL');
-                }
                 showResult(data);
+                // Cập nhật quota sau khi phân tích thành công
+                if (loggedUser && loggedUser.account_type !== 'premium') {
+                    fetch(`/api/user/${loggedUser.id}/quota`).then(r=>r.json()).then(q=>{
+                        if(q.success) updateQuotaCounter(q.quota);
+                    }).catch(()=>{});
+                }
+            } else if (data.quota_exceeded) {
+                // Hết lượt nhận diện
+                document.getElementById('quota-exceeded-modal').style.display = 'flex';
             } else if (data.is_food === false) {
                 // Hình ảnh không phải món ăn
                 showNotFoodError(data.message, data.suggestion);
@@ -2221,3 +2238,195 @@ function renderHistoryComments(comments, listEl) {
         });
     }
 })();
+
+// ============================================
+// PREMIUM ACCOUNT FUNCTIONS
+// ============================================
+
+// Cập nhật quota counter trên trang phân tích
+function updateQuotaCounter(quota) {
+    const counter = document.getElementById('quota-counter');
+    const text = document.getElementById('quota-text');
+    const upgradeBtn = document.getElementById('quota-upgrade-btn');
+    if (!counter || !text) return;
+
+    if (quota.is_premium) {
+        counter.style.display = 'flex';
+        counter.classList.add('premium');
+        counter.classList.remove('low');
+        text.innerHTML = '<i class="fa-solid fa-crown"></i> Premium — Không giới hạn';
+        if (upgradeBtn) upgradeBtn.style.display = 'none';
+    } else {
+        counter.style.display = 'flex';
+        counter.classList.remove('premium');
+        text.textContent = `Còn ${quota.remaining}/${quota.limit_per_day} lượt hôm nay`;
+        if (quota.remaining <= 3) {
+            counter.classList.add('low');
+        } else {
+            counter.classList.remove('low');
+        }
+        if (upgradeBtn) {
+            upgradeBtn.style.display = quota.remaining <= 5 ? 'inline-flex' : 'none';
+        }
+    }
+}
+
+// Hiển thị modal nâng cấp Premium
+function showUpgradeModal() {
+    document.getElementById('premium-upgrade-modal').style.display = 'flex';
+}
+
+// Bắt đầu thanh toán MoMo
+async function initiateUpgrade() {
+    const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (!loggedUser) {
+        alert('Vui lòng đăng nhập trước');
+        return;
+    }
+
+    // Đóng tất cả modal
+    document.querySelectorAll('.premium-modal-overlay').forEach(m => m.style.display = 'none');
+
+    // Show loading toast
+    if (typeof window.appToast === 'function') {
+        window.appToast('Đang tạo đơn thanh toán MoMo...', 'info', 5000);
+    }
+
+    try {
+        const res = await fetch('/api/payment/momo/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: loggedUser.id })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.payUrl) {
+            // Redirect to MoMo payment page
+            window.location.href = data.payUrl;
+        } else {
+            alert(data.message || 'Lỗi tạo đơn thanh toán');
+        }
+    } catch (err) {
+        console.error('Payment error:', err);
+        alert('Lỗi kết nối server. Vui lòng thử lại.');
+    }
+}
+
+// Xử lý kết quả thanh toán từ URL params
+function checkPaymentResult() {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    const orderId = params.get('orderId');
+
+    if (!payment) return;
+
+    const modal = document.getElementById('payment-result-modal');
+    const icon = document.getElementById('payment-result-icon');
+    const title = document.getElementById('payment-result-title');
+    const desc = document.getElementById('payment-result-desc');
+
+    if (payment === 'success') {
+        icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        icon.className = 'premium-modal-icon crown-icon';
+        title.textContent = '🎉 Nâng Cấp Thành Công!';
+        desc.textContent = 'Tài khoản của bạn đã được nâng cấp lên Premium. Bạn có thể sử dụng tất cả tính năng không giới hạn!';
+        
+        // Cập nhật localStorage
+        const user = JSON.parse(localStorage.getItem('smartfood_user'));
+        if (user) {
+            user.account_type = 'premium';
+            localStorage.setItem('smartfood_user', JSON.stringify(user));
+        }
+        
+        // Cập nhật UI
+        updatePremiumUI();
+    } else {
+        icon.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+        icon.className = 'premium-modal-icon quota-icon';
+        title.textContent = 'Thanh Toán Thất Bại';
+        desc.textContent = 'Giao dịch không thành công. Vui lòng thử lại hoặc liên hệ hỗ trợ.';
+    }
+
+    modal.style.display = 'flex';
+
+    // Remove payment params from URL
+    const url = new URL(window.location);
+    url.searchParams.delete('payment');
+    url.searchParams.delete('orderId');
+    window.history.replaceState({}, '', url);
+}
+
+function closePaymentResult() {
+    document.getElementById('payment-result-modal').style.display = 'none';
+}
+
+// Cập nhật UI dựa trên trạng thái Premium
+function updatePremiumUI() {
+    const user = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (!user) return;
+
+    const isPremium = user.account_type === 'premium';
+
+    // Profile badge
+    const badgeWrap = document.getElementById('profile-account-badge');
+    if (badgeWrap) {
+        if (isPremium) {
+            badgeWrap.innerHTML = '<span class="badge-premium"><i class="fa-solid fa-crown"></i> Premium</span>';
+        } else {
+            badgeWrap.innerHTML = '<button class="badge-free-upgrade" onclick="showUpgradeModal()"><i class="fa-solid fa-arrow-up-right-dots"></i> Nâng cấp Premium</button>';
+        }
+    }
+
+    // Quota counter
+    if (isPremium) {
+        const counter = document.getElementById('quota-counter');
+        if (counter) {
+            counter.style.display = 'flex';
+            counter.classList.add('premium');
+            const text = document.getElementById('quota-text');
+            if (text) text.innerHTML = '<i class="fa-solid fa-crown"></i> Premium — Không giới hạn';
+            const upgradeBtn = document.getElementById('quota-upgrade-btn');
+            if (upgradeBtn) upgradeBtn.style.display = 'none';
+        }
+    } else {
+        // Load quota from server
+        fetch(`/api/user/${user.id}/quota`).then(r=>r.json()).then(data => {
+            if (data.success) updateQuotaCounter(data.quota);
+        }).catch(() => {});
+    }
+
+    // Navbar upgrade button (for free users)
+    let navUpgrade = document.getElementById('nav-upgrade-btn');
+    if (!isPremium && !navUpgrade) {
+        const navLinks = document.getElementById('nav-links');
+        if (navLinks) {
+            const li = document.createElement('li');
+            li.innerHTML = '<a class="nav-link nav-upgrade-link" id="nav-upgrade-btn" href="#" onclick="showUpgradeModal();return false;"><i class="fa-solid fa-crown"></i> Nâng cấp</a>';
+            navLinks.appendChild(li);
+        }
+    } else if (isPremium && navUpgrade) {
+        navUpgrade.closest('li')?.remove();
+    }
+}
+
+// Khởi tạo Premium features khi trang load
+function initPremiumFeatures() {
+    checkPaymentResult();
+    
+    const user = JSON.parse(localStorage.getItem('smartfood_user'));
+    if (user) {
+        updatePremiumUI();
+    }
+
+    // Kiểm tra URL param upgrade=true
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgrade') === 'true') {
+        showUpgradeModal();
+        const url = new URL(window.location);
+        url.searchParams.delete('upgrade');
+        window.history.replaceState({}, '', url);
+    }
+}
+
+// Gọi khi DOM ready
+document.addEventListener('DOMContentLoaded', initPremiumFeatures);

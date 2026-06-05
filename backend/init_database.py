@@ -208,8 +208,26 @@ try:
     """)
     print("  [OK] Bang KeHoachDinhDuong")
 
+    # 12. ThanhToan (Payment Transactions)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ThanhToan (
+            MaThanhToan SERIAL PRIMARY KEY,
+            MaNguoiDung INTEGER REFERENCES NguoiDung(MaNguoiDung) ON DELETE CASCADE,
+            MaDonHang VARCHAR(100) UNIQUE NOT NULL,
+            SoTien DECIMAL(15,2) NOT NULL,
+            GoiNangCap VARCHAR(50) DEFAULT 'premium',
+            TrangThai VARCHAR(20) DEFAULT 'pending',
+            PhuongThuc VARCHAR(20) DEFAULT 'momo',
+            MomoTransId VARCHAR(100),
+            ResponseData TEXT,
+            ThoiGianTao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ThoiGianCapNhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    print("  [OK] Bang ThanhToan")
+
     conn.commit()
-    print("\n[OK] Da tao xong tat ca 12 bang!")
+    print("\n[OK] Da tao xong tat ca 13 bang!")
     
     # ============================================
     # TAO TAI KHOAN ADMIN MAC DINH

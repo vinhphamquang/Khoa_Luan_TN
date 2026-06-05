@@ -1,20 +1,37 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#e8f5ec">
     <style>
-        html { background-color: #e8f5ec; }
-        body { background-color: #e8f5ec; }
+        html {
+            background-color: #e8f5ec;
+        }
+
+        body {
+            background-color: #e8f5ec;
+        }
+
         .app-page-veil {
-            position: fixed; inset: 0; z-index: 99998;
-            background-color: #e8f5ec; pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99998;
+            background-color: #e8f5ec;
+            pointer-events: none;
             opacity: 0;
         }
+
         html.app-navigating .app-page-veil,
-        html.app-leaving .app-page-veil { opacity: 1; pointer-events: auto; }
-        .app-page-veil.veil-fading-out { transition: opacity 0.34s ease; }
+        html.app-leaving .app-page-veil {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .app-page-veil.veil-fading-out {
+            transition: opacity 0.34s ease;
+        }
     </style>
     <script>
         (function () {
@@ -28,11 +45,13 @@
     <title>Admin Dashboard - Smart Food Analysis</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css?v=5">
     <link rel="stylesheet" href="/static/admin_append.css?v=9">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
+
 <body>
     <!-- Cross-page veil: opaque overlay matching page bg, fades out when ready -->
     <div id="app-page-veil" class="app-page-veil" aria-hidden="true"></div>
@@ -79,11 +98,13 @@
                                 </button>
                             </div>
                             <div class="notif-dropdown-body" id="notif-dropdown-body">
-                                <div class="notif-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có thông báo</p></div>
+                                <div class="notif-empty"><i class="fa-solid fa-bell-slash"></i>
+                                    <p>Chưa có thông báo</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <a href="/#profile" class="nav-link" id="nav-user-name" style="cursor: pointer;">
                         <i class="fa-solid fa-user"></i> <span id="display-username">Admin</span>
                     </a>
@@ -105,7 +126,8 @@
                 <div class="admin-hero-content">
                     <div class="admin-hero-badge"><i class="fa-solid fa-shield-halved"></i> Bảng Quản Trị</div>
                     <h2 class="admin-hero-title">Xin chào, <span class="gradient-text">Admin</span> 👋</h2>
-                    <p class="admin-hero-desc">Quản lý toàn bộ dữ liệu hệ thống nhận diện món ăn từ bảng điều khiển này.</p>
+                    <p class="admin-hero-desc">Quản lý toàn bộ dữ liệu hệ thống nhận diện món ăn từ bảng điều khiển này.
+                    </p>
                 </div>
             </div>
 
@@ -125,6 +147,9 @@
                 <button class="admin-tab" data-tab="admin-comments">
                     <i class="fa-solid fa-comments"></i><span>Phản Hồi</span>
                 </button>
+                <button class="admin-tab" data-tab="admin-payments">
+                    <i class="fa-solid fa-credit-card"></i><span>Thanh Toán</span>
+                </button>
             </div>
 
             <!-- TAB: Tổng Quan -->
@@ -138,7 +163,8 @@
                             <span class="admin-stat-label">Tổng Món Ăn</span>
                             <span class="admin-stat-value" id="st-foods">--</span>
                         </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(76,175,80,0.15), transparent);"></div>
+                        <div class="admin-stat-accent"
+                            style="background: linear-gradient(135deg, rgba(76,175,80,0.15), transparent);"></div>
                     </div>
                     <div class="admin-stat-card">
                         <div class="admin-stat-icon" style="background: linear-gradient(135deg, #06b6d4, #67e8f9);">
@@ -148,7 +174,8 @@
                             <span class="admin-stat-label">Người Dùng</span>
                             <span class="admin-stat-value" id="st-users">--</span>
                         </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(6,182,212,0.15), transparent);"></div>
+                        <div class="admin-stat-accent"
+                            style="background: linear-gradient(135deg, rgba(6,182,212,0.15), transparent);"></div>
                     </div>
                     <div class="admin-stat-card">
                         <div class="admin-stat-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
@@ -158,7 +185,30 @@
                             <span class="admin-stat-label">Lượt Nhận Diện</span>
                             <span class="admin-stat-value" id="st-recs">--</span>
                         </div>
-                        <div class="admin-stat-accent" style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
+                        <div class="admin-stat-accent"
+                            style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <span class="admin-stat-label">Premium Users</span>
+                            <span class="admin-stat-value" id="st-premium">--</span>
+                        </div>
+                        <div class="admin-stat-accent"
+                            style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+                            <i class="fa-solid fa-money-bill-wave"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <span class="admin-stat-label">Doanh Thu</span>
+                            <span class="admin-stat-value" id="st-revenue">--</span>
+                        </div>
+                        <div class="admin-stat-accent"
+                            style="background: linear-gradient(135deg, rgba(139,92,246,0.15), transparent);"></div>
                     </div>
                 </div>
 
@@ -167,7 +217,7 @@
                     <h3 class="comments-overview-title">
                         <i class="fa-solid fa-comments"></i> Tổng Hợp Bình Luận Phản Hồi
                     </h3>
-                    
+
                     <!-- Comment Stats Cards -->
                     <div class="comment-stats-grid">
                         <div class="comment-stat-card comment-stat-total">
@@ -209,9 +259,11 @@
                     <div class="admin-panel-header">
                         <div>
                             <h3><i class="fa-solid fa-utensils"></i> Quản Lý Món Ăn</h3>
-                            <p>Món ăn được thêm tự động bởi AI khi người dùng nhận diện. Admin chỉ sửa, khóa hoặc xóa.</p>
+                            <p>Món ăn được thêm tự động bởi AI khi người dùng nhận diện. Admin chỉ sửa, khóa hoặc xóa.
+                            </p>
                         </div>
-                        <div class="ai-auto-badge" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); border-radius: 50px; font-size: 14px; font-weight: 600; color: var(--primary);">
+                        <div class="ai-auto-badge"
+                            style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); border-radius: 50px; font-size: 14px; font-weight: 600; color: var(--primary);">
                             <i class="fa-solid fa-robot"></i> Tự động bởi AI
                         </div>
                     </div>
@@ -241,7 +293,15 @@
                     </div>
                     <div class="table-responsive">
                         <table class="admin-table">
-                            <thead><tr><th>ID</th><th>Tên Món</th><th>Phân Loại</th><th>Trạng Thái</th><th>Thao Tác</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tên Món</th>
+                                    <th>Phân Loại</th>
+                                    <th>Trạng Thái</th>
+                                    <th>Thao Tác</th>
+                                </tr>
+                            </thead>
                             <tbody id="tb-foods"></tbody>
                         </table>
                     </div>
@@ -262,7 +322,8 @@
                     <div class="user-filter-bar">
                         <div class="user-search-wrap">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="user-search-input" class="form-input" placeholder="Tìm theo tên, email...">
+                            <input type="text" id="user-search-input" class="form-input"
+                                placeholder="Tìm theo tên, email...">
                         </div>
                         <div class="user-filter-controls">
                             <select id="user-role-filter" class="form-input user-filter-select">
@@ -281,16 +342,18 @@
                     </div>
                     <div class="table-responsive">
                         <table class="admin-table">
-                            <thead><tr>
-                                <th>Avatar</th>
-                                <th>Tên</th>
-                                <th>Email</th>
-                                <th>Vai Trò</th>
-                                <th>Trạng Thái</th>
-                                <th>Phân Tích</th>
-                                <th>Đăng Ký</th>
-                                <th>Thao Tác</th>
-                            </tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Avatar</th>
+                                    <th>Tên</th>
+                                    <th>Email</th>
+                                    <th>Vai Trò</th>
+                                    <th>Trạng Thái</th>
+                                    <th>Phân Tích</th>
+                                    <th>Đăng Ký</th>
+                                    <th>Thao Tác</th>
+                                </tr>
+                            </thead>
                             <tbody id="tb-users"></tbody>
                         </table>
                     </div>
@@ -299,8 +362,11 @@
 
             <!-- USER DETAIL MODAL -->
             <div id="user-detail-overlay" class="modal-overlay hidden">
-                <div id="user-detail-modal" class="glass-card modal-box" style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
-                    <button class="modal-close" onclick="document.getElementById('user-detail-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+                <div id="user-detail-modal" class="glass-card modal-box"
+                    style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
+                    <button class="modal-close"
+                        onclick="document.getElementById('user-detail-overlay').classList.add('hidden')"><i
+                            class="fa-solid fa-times"></i></button>
                     <div id="user-detail-content">
                         <div class="history-loading">
                             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -324,10 +390,12 @@
                     <div class="history-filter-bar" id="history-filter-bar">
                         <div class="history-search-wrap">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="history-search-input" class="form-input" placeholder="Tìm theo tên món, người dùng...">
+                            <input type="text" id="history-search-input" class="form-input"
+                                placeholder="Tìm theo tên món, người dùng...">
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <button class="btn-bulk-delete" id="bulk-delete-btn" disabled style="opacity: 0.4; pointer-events: none;">
+                            <button class="btn-bulk-delete" id="bulk-delete-btn" disabled
+                                style="opacity: 0.4; pointer-events: none;">
                                 <i class="fa-solid fa-trash-can"></i>
                                 Xóa (<span id="bulk-count">0</span>)
                             </button>
@@ -353,7 +421,19 @@
                     <!-- Table View (hidden by default) -->
                     <div id="history-table-view" class="table-responsive" style="display: none;">
                         <table class="admin-table">
-                            <thead><tr><th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th><th>ID</th><th>Ảnh</th><th>Người Dùng</th><th>Món Nhận Diện</th><th>Calo</th><th>Bình Luận</th><th>Thời Gian</th><th>Thao Tác</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th>
+                                    <th>ID</th>
+                                    <th>Ảnh</th>
+                                    <th>Người Dùng</th>
+                                    <th>Món Nhận Diện</th>
+                                    <th>Calo</th>
+                                    <th>Bình Luận</th>
+                                    <th>Thời Gian</th>
+                                    <th>Thao Tác</th>
+                                </tr>
+                            </thead>
                             <tbody id="tb-history"></tbody>
                         </table>
                     </div>
@@ -369,7 +449,8 @@
                             <p>Xem và phản hồi bình luận của người dùng về kết quả nhận diện</p>
                         </div>
                         <div class="comment-filter-wrap">
-                            <select id="comment-filter-status" class="form-input" style="width: auto; padding: 8px 16px; font-size: 13px;">
+                            <select id="comment-filter-status" class="form-input"
+                                style="width: auto; padding: 8px 16px; font-size: 13px;">
                                 <option value="all">Tất cả</option>
                                 <option value="pending">Chưa phản hồi</option>
                                 <option value="replied">Đã phản hồi</option>
@@ -384,38 +465,133 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAB: Thanh Toán -->
+            <div id="admin-payments" class="admin-tab-content hidden">
+                <div class="admin-panel">
+                    <div class="admin-panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-credit-card"></i> Quản Lý Thanh Toán</h3>
+                            <p>Theo dõi giao dịch nâng cấp Premium qua MoMo</p>
+                        </div>
+                    </div>
+                    <!-- Payment Stats -->
+                    <div class="admin-stats-grid" id="payment-stats-grid" style="margin-bottom: 20px;">
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                                <i class="fa-solid fa-money-bill-trend-up"></i>
+                            </div>
+                            <div class="admin-stat-info">
+                                <span class="admin-stat-label">Tổng Doanh Thu</span>
+                                <span class="admin-stat-value" id="ps-revenue">0đ</span>
+                            </div>
+                            <div class="admin-stat-accent"
+                                style="background: linear-gradient(135deg, rgba(34,197,94,0.15), transparent);"></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                            <div class="admin-stat-info">
+                                <span class="admin-stat-label">Thành Công</span>
+                                <span class="admin-stat-value" id="ps-success">0</span>
+                            </div>
+                            <div class="admin-stat-accent"
+                                style="background: linear-gradient(135deg, rgba(59,130,246,0.15), transparent);"></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
+                                <i class="fa-solid fa-clock"></i>
+                            </div>
+                            <div class="admin-stat-info">
+                                <span class="admin-stat-label">Đang Chờ</span>
+                                <span class="admin-stat-value" id="ps-pending">0</span>
+                            </div>
+                            <div class="admin-stat-accent"
+                                style="background: linear-gradient(135deg, rgba(245,158,11,0.15), transparent);"></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon" style="background: linear-gradient(135deg, #ef4444, #f87171);">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </div>
+                            <div class="admin-stat-info">
+                                <span class="admin-stat-label">Thất Bại</span>
+                                <span class="admin-stat-value" id="ps-failed">0</span>
+                            </div>
+                            <div class="admin-stat-accent"
+                                style="background: linear-gradient(135deg, rgba(239,68,68,0.15), transparent);"></div>
+                        </div>
+                    </div>
+                    <!-- Payments Table -->
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã GD</th>
+                                    <th>Người Dùng</th>
+                                    <th>Số Tiền</th>
+                                    <th>Phương Thức</th>
+                                    <th>Trạng Thái</th>
+                                    <th>MoMo Trans ID</th>
+                                    <th>Thời Gian</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tb-payments"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
     <!-- ========== ADMIN FOOD MODAL (Chỉ chỉnh sửa, không thêm mới) ========== -->
     <div id="admin-modal-overlay" class="modal-overlay hidden">
-        <div id="admin-food-modal" class="glass-card modal-box" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <button class="modal-close" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
-            <h2 class="section-title" id="food-modal-title" style="font-size: 24px; text-align: center; margin-bottom: 20px;">Sửa Món Ăn</h2>
+        <div id="admin-food-modal" class="glass-card modal-box"
+            style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close"
+                onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')"><i
+                    class="fa-solid fa-times"></i></button>
+            <h2 class="section-title" id="food-modal-title"
+                style="font-size: 24px; text-align: center; margin-bottom: 20px;">Sửa Món Ăn</h2>
             <!-- Thông báo AI -->
-            <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
+            <div
+                style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
                 <i class="fa-solid fa-robot" style="color: var(--primary); font-size: 18px;"></i>
-                <span>Món ăn được thêm tự động khi người dùng nhận diện qua AI. Admin có thể chỉnh sửa thông tin tại đây.</span>
+                <span>Món ăn được thêm tự động khi người dùng nhận diện qua AI. Admin có thể chỉnh sửa thông tin tại
+                    đây.</span>
             </div>
             <form id="food-admin-form">
                 <input type="hidden" id="fa-id">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group"><label>Tên Món Ăn</label><input type="text" id="fa-name" required class="form-input"></div>
-                    <div class="form-group"><label>Phân Loại</label><input type="text" id="fa-cate" class="form-input"></div>
-                    <div class="form-group" style="grid-column: span 2;"><label>Mô Tả</label><textarea id="fa-desc" class="form-input" rows="2"></textarea></div>
-                    <div class="form-group"><label>Calo (kcal)</label><input type="number" step="0.1" id="fa-cal" class="form-input"></div>
-                    <div class="form-group"><label>Protein (g)</label><input type="number" step="0.1" id="fa-pro" class="form-input"></div>
-                    <div class="form-group"><label>Chất Béo (g)</label><input type="number" step="0.1" id="fa-fat" class="form-input"></div>
-                    <div class="form-group"><label>Carbohydrate (g)</label><input type="number" step="0.1" id="fa-car" class="form-input"></div>
+                    <div class="form-group"><label>Tên Món Ăn</label><input type="text" id="fa-name" required
+                            class="form-input"></div>
+                    <div class="form-group"><label>Phân Loại</label><input type="text" id="fa-cate" class="form-input">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Mô Tả</label><textarea id="fa-desc"
+                            class="form-input" rows="2"></textarea></div>
+                    <div class="form-group"><label>Calo (kcal)</label><input type="number" step="0.1" id="fa-cal"
+                            class="form-input"></div>
+                    <div class="form-group"><label>Protein (g)</label><input type="number" step="0.1" id="fa-pro"
+                            class="form-input"></div>
+                    <div class="form-group"><label>Chất Béo (g)</label><input type="number" step="0.1" id="fa-fat"
+                            class="form-input"></div>
+                    <div class="form-group"><label>Carbohydrate (g)</label><input type="number" step="0.1" id="fa-car"
+                            class="form-input"></div>
                 </div>
-                <div class="form-group" style="margin-top: 15px;"><label>Hướng Dẫn Nấu</label><textarea id="fa-instruct" class="form-input" rows="3"></textarea></div>
+                <div class="form-group" style="margin-top: 15px;"><label>Hướng Dẫn Nấu</label><textarea id="fa-instruct"
+                        class="form-input" rows="3"></textarea></div>
                 <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center;">
+                    <div
+                        style="display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center;">
                         <label>Nguyên Liệu</label>
                         <div style="display: flex; gap: 8px;">
                             <input type="file" id="fa-upload-excel" accept=".xlsx, .xls, .csv" style="display: none;">
-                            <button type="button" id="btn-upload-excel" class="btn btn-outline" style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-file-excel"></i> Tải Excel</button>
-                            <button type="button" id="fa-add-ing" class="btn btn-outline" style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-plus"></i> Thêm</button>
+                            <button type="button" id="btn-upload-excel" class="btn btn-outline"
+                                style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-file-excel"></i> Tải
+                                Excel</button>
+                            <button type="button" id="fa-add-ing" class="btn btn-outline"
+                                style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-plus"></i>
+                                Thêm</button>
                         </div>
                     </div>
                     <div id="fa-ingredients" style="display: flex; flex-direction: column; gap: 8px;"></div>
@@ -428,8 +604,10 @@
                 </div>
                 <div id="fa-error" class="form-error hidden"></div>
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')">Hủy</button>
-                    <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Lưu Thay Đổi</button>
+                    <button type="button" class="btn btn-ghost" style="flex: 1;"
+                        onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')">Hủy</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Lưu Thay
+                        Đổi</button>
                 </div>
             </form>
         </div>
@@ -437,8 +615,11 @@
 
     <!-- ========== HISTORY DETAIL MODAL ========== -->
     <div id="history-detail-overlay" class="modal-overlay hidden">
-        <div id="history-detail-modal" class="glass-card modal-box" style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
-            <button class="modal-close" onclick="document.getElementById('history-detail-overlay').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+        <div id="history-detail-modal" class="glass-card modal-box"
+            style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
+            <button class="modal-close"
+                onclick="document.getElementById('history-detail-overlay').classList.add('hidden')"><i
+                    class="fa-solid fa-times"></i></button>
             <div id="history-detail-content">
                 <div class="history-loading">
                     <i class="fa-solid fa-spinner fa-spin"></i>
@@ -452,4 +633,5 @@
     <script src="/static/transitions.js?v=4"></script>
     <script src="/static/admin.js?v=10"></script>
 </body>
+
 </html>
