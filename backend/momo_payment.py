@@ -8,15 +8,16 @@ import uuid
 import json
 import requests
 import time
+import os
 
 # ============================================
 # MOMO SANDBOX CONFIG
 # ============================================
 MOMO_CONFIG = {
-    'partner_code': 'MOMO',
-    'access_key': 'F8BBA842ECF85',
-    'secret_key': 'K951B6PE1waDMi640xX08PD3vg6EkVlz',
-    'api_endpoint': 'https://test-payment.momo.vn/v2/gateway/api/create',
+    'partner_code': os.environ.get('MOMO_PARTNER_CODE', 'MOMO'),
+    'access_key': os.environ.get('MOMO_ACCESS_KEY', 'F8BBA842ECF85'),
+    'secret_key': os.environ.get('MOMO_SECRET_KEY', 'K951B6PE1waDMi640xX08PD3vg6EkVlz'),
+    'api_endpoint': os.environ.get('MOMO_API_ENDPOINT', 'https://test-payment.momo.vn/v2/gateway/api/create'),
 }
 
 PREMIUM_PRICE = 50000  # 50.000 VNĐ

@@ -1209,14 +1209,12 @@ function applyPremiumLocks() {
     setTimeout(() => {
         const bmiAssessment = document.getElementById('bmi-assessment-section');
         if (bmiAssessment) {
-            // Keep BMI number visible but lock the detailed assessment
-            const detailCards = bmiAssessment.querySelectorAll('.bmi-detail-card, .bmi-recommendation-card, #bmi-goal-banner');
-            detailCards.forEach(card => {
-                if (!card.classList.contains('premium-lock-wrapper')) {
-                    card.classList.add('premium-lock-wrapper', 'locked');
-                    card.appendChild(createLockOverlay('Nâng cấp Premium để xem đánh giá thể trạng chi tiết', true));
-                }
-            });
+            // Lock the entire grid
+            const grid = bmiAssessment.querySelector('.np-bmi-grid');
+            if (grid && !grid.classList.contains('premium-lock-wrapper')) {
+                grid.classList.add('premium-lock-wrapper', 'locked');
+                grid.appendChild(createLockOverlay('Nâng cấp Premium để xem đánh giá thể trạng chi tiết', false));
+            }
         }
     }, 300);
 }

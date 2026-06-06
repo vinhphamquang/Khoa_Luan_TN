@@ -20,7 +20,7 @@ from db_queries import (
     get_user_detail_admin, update_last_active, notify_admins,
     insert_comment, get_comments_by_history, get_all_comments_admin,
     admin_reply_comment, delete_comment, get_comment_detail,
-    check_user_quota, upgrade_user_account,
+    check_user_quota, upgrade_user_account, update_user_account_type,
     create_payment, update_payment_status, get_payment_by_order_id,
     get_all_payments_admin, get_payment_stats_admin
 )
@@ -107,6 +107,10 @@ def run_migrations():
         cursor.execute("""
             ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS NgayNangCap TIMESTAMP DEFAULT NULL
         """)
+        cursor.execute("""
+            ALTER TABLE NguoiDung ADD COLUMN IF NOT EXISTS NgayHetHanPremium TIMESTAMP DEFAULT NULL
+        """)
+
         
         # 9. Tạo bảng ThanhToan (Payment Transactions)
         cursor.execute("""
@@ -158,6 +162,14 @@ def admin_page():
 @app.route("/nutrition")
 def nutrition_page():
     return serve_html_no_cache("nutrition.html")
+
+@app.route("/thanh-toan")
+def thanh_toan_page():
+    return serve_html_no_cache("thanh-toan.html")
+
+@app.route("/dat-hang-thanh-cong")
+def dat_hang_thanh_cong_page():
+    return serve_html_no_cache("dat-hang-thanh-cong.html")
 
 @app.route("/static/<path:path>")
 def serve_static(path):
@@ -790,6 +802,14 @@ def api_admin_delete_user(user_id):
     if delete_user(user_id): return jsonify({"success": True, "message": "Xóa người dùng thành công"})
     return jsonify({"success": False, "message": "Lỗi khi xóa người dùng"}), 500
 
+@app.route("/api/admin/users/<int:user_id>/account-type", methods=["PUT"])
+def api_admin_update_account_type(user_id):
+    data = request.json
+    account_type = data.get('account_type', 'free')
+    if update_user_account_type(user_id, account_type):
+        return jsonify({"success": True, "message": f"Đã chuyển đổi thành tài khoản {account_type}"})
+    return jsonify({"success": False, "message": "Lỗi khi cập nhật tài khoản"}), 500
+
 @app.route("/api/admin/users/<int:user_id>/detail", methods=["GET"])
 def api_admin_user_detail(user_id):
     """Xem chi tiết user: info + health + history"""
@@ -1410,6 +1430,25 @@ def api_user_quota(user_id):
     quota = check_user_quota(user_id)
     return jsonify({"success": True, "quota": quota})
 
+@app.route("/api/user/<int:user_id>/info", methods=["GET"])
+def api_user_info(user_id):
+    """Lấy thông tin profile user"""
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "Không tìm thấy người dùng"}), 404
+        
+    return jsonify({
+        "success": True, 
+        "user": {
+            "id": user.get('MaNguoiDung'),
+            "name": user.get('TenNguoiDung'),
+            "email": user.get('Email'),
+            "role": user.get('VaiTro'),
+            "account_type": user.get('LoaiTaiKhoan', 'free'),
+            "remaining_days": user.get('RemainingDays', 0)
+        }
+    })
+
 @app.route("/api/payment/momo/create", methods=["POST"])
 def api_momo_create():
     """Tạo đơn thanh toán MoMo để nâng cấp Premium"""
@@ -1515,12 +1554,26 @@ def api_momo_return():
     """Redirect sau khi user thanh toán xong trên MoMo"""
     order_id = request.args.get('orderId', '')
     result_code = request.args.get('resultCode', '-1')
+    trans_id = request.args.get('transId', '')
+    
+    import json as json_module
+    response_data = json_module.dumps(dict(request.args), ensure_ascii=False)
     
     if result_code == '0':
-        # Thanh toán thành công
-        return redirect(f"/?payment=success&orderId={order_id}")
+        # Thanh toán thành công (xử lý ngay ở đây cho môi trường localhost vì IPN có thể không chạy được)
+        payment = get_payment_by_order_id(order_id)
+        if payment and payment['trangthai'] == 'pending':
+            update_payment_status(order_id, 'success', trans_id, response_data)
+            upgrade_user_account(payment['manguoidung'])
+            
+        return redirect(f"/?payment=success&orderId={order_id}&resultCode={result_code}")
     else:
-        return redirect(f"/?payment=failed&orderId={order_id}")
+        # Nếu thất bại
+        payment = get_payment_by_order_id(order_id)
+        if payment and payment['trangthai'] == 'pending':
+            update_payment_status(order_id, 'failed', trans_id, response_data)
+            
+        return redirect(f"/dat-hang-thanh-cong?payment=failed&orderId={order_id}&resultCode={result_code}")
 
 @app.route("/api/payment/status/<order_id>", methods=["GET"])
 def api_payment_status(order_id):

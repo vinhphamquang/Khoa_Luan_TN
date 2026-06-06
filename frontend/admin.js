@@ -469,6 +469,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error(e); }
     };
 
+    window.calculateExpiry = (upgradeDateStr) => {
+        if (!upgradeDateStr) return '--';
+        try {
+            // upgradeDateStr is 'YYYY-MM-DD HH:mm:ss'
+            const d = new Date(upgradeDateStr.replace(' ', 'T'));
+            d.setDate(d.getDate() + 30); // 30 days expiry
+            return d.toLocaleDateString('vi-VN');
+        } catch (e) {
+            return '--';
+        }
+    };
+
     // Default fetch on load
     fetchAdminStats();
 
@@ -840,7 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
             content.innerHTML = `
                 <div class="ud-header">
                     <div class="ud-avatar-lg" style="background: ${avatarColors[colorIdx]};">${initial}</div>
-                    <div class="ud-header-info">
+                    <div class="ud-header-info" style="flex: 1;">
                         <h2 class="ud-name">${d.name}</h2>
                         <div class="ud-meta">
                             <span>${d.email}</span>
@@ -848,6 +860,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="user-status-badge ${status.cls}"><span class="status-dot"></span> ${status.text}</span>
                         </div>
                     </div>
+                    ${d.account_type === 'premium' && d.upgrade_date ? `
+                    <div class="ud-actions">
+                        <div class="premium-expiry-badge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <i class="fa-solid fa-crown"></i>
+                            Hạn Premium: ${calculateExpiry(d.upgrade_date)}
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
 
                 <div class="ud-stats-row">

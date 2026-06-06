@@ -636,6 +636,9 @@
                             <div id="profile-account-badge" class="account-badge-wrap"></div>
                             <h3 id="profile-page-name">Tên Người Dùng</h3>
                             <p id="profile-page-email">email@example.com</p>
+                            <p id="profile-premium-days" style="color: var(--c-fat); font-weight: bold; font-size: 14px; margin-top: 5px; display: none;">
+                                <i class="fa-solid fa-hourglass-half"></i> Còn lại: <span>0</span> ngày
+                            </p>
                         </div>
 
                         <hr class="profile-divider">
@@ -1049,7 +1052,7 @@
             </div>
             <div class="upgrade-price-tag">
                 <span class="price-amount">50.000đ</span>
-                <span class="price-period">Vĩnh viễn</span>
+                <span class="price-period">Sử dụng 30 ngày</span>
             </div>
             <button class="btn-upgrade-momo" onclick="initiateUpgrade()">
                 <img src="https://developers.momo.vn/v3/vi/assets/images/primary-c62e27d787daa93e4854a4be55f0e50e.png"
@@ -1090,7 +1093,7 @@
                     <div class="plan-header-tag premium-tag">Khuyên Dùng</div>
                     <h3><i class="fa-solid fa-crown"></i> Premium</h3>
                     <div class="plan-price">50.000<span>đ</span></div>
-                    <div class="plan-period">Một lần • Vĩnh viễn</div>
+                    <div class="plan-period">Thời hạn 30 ngày</div>
                     <ul class="plan-features">
                         <li><i class="fa-solid fa-check"></i> Nhận diện <strong>không giới hạn</strong></li>
                         <li><i class="fa-solid fa-check"></i> Đánh giá thể trạng đầy đủ</li>
@@ -1114,10 +1117,24 @@
                 <i class="fa-solid fa-circle-check"></i>
             </div>
             <h2 id="payment-result-title">Thanh Toán Thành Công!</h2>
-            <p class="premium-modal-desc" id="payment-result-desc">Tài khoản của bạn đã được nâng cấp lên Premium.</p>
+            <p class="premium-modal-desc" id="payment-result-desc">Cảm ơn bạn. Tài khoản của bạn đã được nâng cấp lên <strong>Premium</strong>.</p>
+            
+            <div id="payment-success-details" style="display:none; text-align: left; background: rgba(34, 197, 94, 0.05); padding: 15px; border-radius: 12px; margin: 15px 0;">
+                <h4 style="margin-bottom: 10px; color: var(--primary-dark); font-size: 15px;"><i class="fa-solid fa-unlock-keyhole"></i> Đã mở khóa các đặc quyền:</h4>
+                <ul style="list-style: none; padding-left: 0; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+                    <li style="margin-bottom: 6px;"><i class="fa-solid fa-check" style="color: var(--primary); width: 20px;"></i> Nhận diện món ăn <strong>không giới hạn</strong></li>
+                    <li style="margin-bottom: 6px;"><i class="fa-solid fa-check" style="color: var(--primary); width: 20px;"></i> Phân tích dinh dưỡng chuyên sâu chi tiết</li>
+                    <li style="margin-bottom: 6px;"><i class="fa-solid fa-check" style="color: var(--primary); width: 20px;"></i> Đề xuất món ăn thông minh vô hạn</li>
+                    <li style="margin-bottom: 6px;"><i class="fa-solid fa-check" style="color: var(--primary); width: 20px;"></i> Kế hoạch dinh dưỡng cá nhân hóa</li>
+                </ul>
+                <div style="font-weight: 600; font-size: 14px; color: var(--text-main); border-top: 1px dashed var(--glass-border); padding-top: 10px;">
+                    <i class="fa-regular fa-clock" style="color: #f59e0b;"></i> Thời gian sử dụng: <span style="color: var(--primary-dark);">30 ngày</span>
+                </div>
+            </div>
+
             <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:15px;"
                 onclick="closePaymentResult()">
-                <i class="fa-solid fa-check"></i> Tiếp Tục Sử Dụng
+                <i class="fa-solid fa-check"></i> Bắt Đầu Trải Nghiệm Ngay
             </button>
         </div>
     </div>

@@ -81,7 +81,7 @@ def get_user_by_email(email):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan, NgayHetHanPremium
             FROM NguoiDung
             WHERE Email = %s
         """, (email,))
@@ -90,13 +90,27 @@ def get_user_by_email(email):
         conn.close()
         
         if user:
+            # Check expiration
+            loai_tk = user.get('loaitaikhoan', 'free') or 'free'
+            ngay_het_han = user.get('ngayhethanpremium')
+            remaining_days = 0
+            
+            if loai_tk == 'premium' and ngay_het_han:
+                from datetime import datetime
+                now = datetime.now()
+                if ngay_het_han > now:
+                    remaining_days = (ngay_het_han - now).days
+                else:
+                    loai_tk = 'free' # Should ideally update DB here too, but for read-only it's fine
+                    
             return {
                 'MaNguoiDung': user['manguoidung'],
                 'TenNguoiDung': user['tennguoidung'],
                 'Email': user['email'],
                 'MatKhau': user['matkhau'],
                 'VaiTro': user['vaitro'],
-                'LoaiTaiKhoan': user.get('loaitaikhoan', 'free') or 'free'
+                'LoaiTaiKhoan': loai_tk,
+                'RemainingDays': remaining_days
             }
         return None
     except Exception as e:
@@ -110,7 +124,7 @@ def get_user_by_id(user_id):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, LoaiTaiKhoan, NgayHetHanPremium
             FROM NguoiDung
             WHERE MaNguoiDung = %s
         """, (user_id,))
@@ -119,13 +133,28 @@ def get_user_by_id(user_id):
         conn.close()
         
         if user:
+            # Check expiration
+            loai_tk = user.get('loaitaikhoan', 'free') or 'free'
+            ngay_het_han = user.get('ngayhethanpremium')
+            remaining_days = 0
+            
+            if loai_tk == 'premium' and ngay_het_han:
+                from datetime import datetime
+                now = datetime.now()
+                if ngay_het_han > now:
+                    remaining_days = (ngay_het_han - now).days
+                else:
+                    loai_tk = 'free' # Temporary downgrade in memory
+                    
             return {
                 'MaNguoiDung': user['manguoidung'],
                 'TenNguoiDung': user['tennguoidung'],
                 'Email': user['email'],
                 'MatKhau': user['matkhau'],
                 'VaiTro': user['vaitro'],
-                'LoaiTaiKhoan': user.get('loaitaikhoan', 'free') or 'free'
+                'LoaiTaiKhoan': loai_tk,
+                'RemainingDays': remaining_days,
+                'NgayHetHanPremium': ngay_het_han
             }
         return None
     except Exception as e:
@@ -187,7 +216,7 @@ def get_user_by_google_id(google_id):
         cursor = get_db_cursor(conn)
         
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, GoogleId
+            SELECT MaNguoiDung, TenNguoiDung, Email, MatKhau, VaiTro, GoogleId, LoaiTaiKhoan, NgayHetHanPremium
             FROM NguoiDung
             WHERE GoogleId = %s
         """, (google_id,))
@@ -196,13 +225,28 @@ def get_user_by_google_id(google_id):
         conn.close()
         
         if user:
+            # Check expiration
+            loai_tk = user.get('loaitaikhoan', 'free') or 'free'
+            ngay_het_han = user.get('ngayhethanpremium')
+            remaining_days = 0
+            
+            if loai_tk == 'premium' and ngay_het_han:
+                from datetime import datetime
+                now = datetime.now()
+                if ngay_het_han > now:
+                    remaining_days = (ngay_het_han - now).days
+                else:
+                    loai_tk = 'free' # Temporary downgrade in memory
+                    
             return {
                 'MaNguoiDung': user['manguoidung'],
                 'TenNguoiDung': user['tennguoidung'],
                 'Email': user['email'],
                 'MatKhau': user['matkhau'],
                 'VaiTro': user['vaitro'],
-                'GoogleId': user.get('googleid')
+                'GoogleId': user.get('googleid'),
+                'LoaiTaiKhoan': loai_tk,
+                'RemainingDays': remaining_days
             }
         return None
     except Exception as e:
@@ -670,11 +714,11 @@ def get_all_users():
         
         cursor.execute("""
             SELECT n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy,
-                   n.GoogleId, n.LastActive, n.LoaiTaiKhoan,
+                   n.GoogleId, n.LastActive, n.LoaiTaiKhoan, n.NgayNangCap,
                    COUNT(l.MaLichSu) as analysis_count
             FROM NguoiDung n
             LEFT JOIN LichSu l ON n.MaNguoiDung = l.MaNguoiDung
-            GROUP BY n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy, n.GoogleId, n.LastActive, n.LoaiTaiKhoan
+            GROUP BY n.MaNguoiDung, n.TenNguoiDung, n.Email, n.VaiTro, n.NgayDangKy, n.GoogleId, n.LastActive, n.LoaiTaiKhoan, n.NgayNangCap
             ORDER BY n.NgayDangKy DESC
         """)
         
@@ -692,7 +736,8 @@ def get_all_users():
                 'auth_provider': 'google' if u.get('googleid') else 'local',
                 'last_active': u['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if u.get('lastactive') else None,
                 'analysis_count': u.get('analysis_count', 0) or 0,
-                'account_type': u.get('loaitaikhoan', 'free') or 'free'
+                'account_type': u.get('loaitaikhoan', 'free') or 'free',
+                'upgrade_date': u['ngaynangcap'].strftime('%Y-%m-%d %H:%M:%S') if u.get('ngaynangcap') else None
             }
             for u in users
         ]
@@ -710,7 +755,7 @@ def get_user_detail_admin(user_id):
         
         # 1. Thông tin user
         cursor.execute("""
-            SELECT MaNguoiDung, TenNguoiDung, Email, VaiTro, NgayDangKy, GoogleId, LastActive
+            SELECT MaNguoiDung, TenNguoiDung, Email, VaiTro, NgayDangKy, GoogleId, LastActive, LoaiTaiKhoan, NgayNangCap
             FROM NguoiDung
             WHERE MaNguoiDung = %s
         """, (user_id,))
@@ -772,7 +817,9 @@ def get_user_detail_admin(user_id):
             'role': user['vaitro'],
             'created_at': user['ngaydangky'].strftime('%Y-%m-%d %H:%M:%S') if user['ngaydangky'] else '',
             'auth_provider': 'google' if user.get('googleid') else 'local',
-            'last_active': user['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if user.get('lastactive') else None,
+            'last_active': user['lastactive'].strftime('%Y-%m-%d %H:%M:%S') if user['lastactive'] else None,
+            'account_type': user.get('loaitaikhoan', 'free') or 'free',
+            'upgrade_date': user['ngaynangcap'].strftime('%Y-%m-%d %H:%M:%S') if user['ngaynangcap'] else None,
             'stats': {
                 'total_analyses': stats['total_analyses'] if stats else 0,
                 'avg_calories': round(float(stats['avg_calories']), 1) if stats and stats['avg_calories'] else 0,
@@ -2071,7 +2118,7 @@ def check_user_quota(user_id):
         
         # Lấy loại tài khoản
         cursor.execute("""
-            SELECT LoaiTaiKhoan FROM NguoiDung WHERE MaNguoiDung = %s
+            SELECT LoaiTaiKhoan, NgayHetHanPremium FROM NguoiDung WHERE MaNguoiDung = %s
         """, (user_id,))
         
         user = cursor.fetchone()
@@ -2088,6 +2135,18 @@ def check_user_quota(user_id):
             }
         
         account_type = user.get('loaitaikhoan', 'free') or 'free'
+        ngay_het_han = user.get('ngayhethanpremium')
+        
+        # Check expiration
+        if account_type == 'premium' and ngay_het_han:
+            from datetime import datetime
+            now = datetime.now()
+            if ngay_het_han <= now:
+                # Expired! Downgrade
+                cursor.execute("UPDATE NguoiDung SET LoaiTaiKhoan = 'free' WHERE MaNguoiDung = %s", (user_id,))
+                conn.commit()
+                account_type = 'free'
+                
         is_premium = account_type == 'premium'
         
         if is_premium:
@@ -2145,7 +2204,9 @@ def upgrade_user_account(user_id):
         
         cursor.execute("""
             UPDATE NguoiDung 
-            SET LoaiTaiKhoan = 'premium', NgayNangCap = CURRENT_TIMESTAMP
+            SET LoaiTaiKhoan = 'premium', 
+                NgayNangCap = CURRENT_TIMESTAMP,
+                NgayHetHanPremium = CURRENT_TIMESTAMP + INTERVAL '30 days'
             WHERE MaNguoiDung = %s
         """, (user_id,))
         
@@ -2331,4 +2392,31 @@ def get_payment_stats_admin():
             'success_count': 0, 'pending_count': 0, 'failed_count': 0,
             'premium_users': 0, 'recent_payments': []
         }
+
+def update_user_account_type(user_id, account_type):
+    """Chuyển đổi loại tài khoản (free/premium)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if account_type == 'premium':
+            cursor.execute("""
+                UPDATE NguoiDung 
+                SET LoaiTaiKhoan = 'premium', NgayNangCap = CURRENT_TIMESTAMP
+                WHERE MaNguoiDung = %s
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                UPDATE NguoiDung 
+                SET LoaiTaiKhoan = 'free', NgayNangCap = NULL
+                WHERE MaNguoiDung = %s
+            """, (user_id,))
+            
+        conn.commit()
+        conn.close()
+        print(f"[ACCOUNT] User {user_id} account type changed to {account_type}")
+        return True
+    except Exception as e:
+        print(f"Error update_user_account_type: {e}")
+        return False
 

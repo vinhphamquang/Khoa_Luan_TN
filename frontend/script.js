@@ -1312,6 +1312,32 @@ async function initProfilePage() {
         avatarCircle.innerHTML = '<i class="fa-solid fa-user"></i>';
     }
 
+    // Fetch user info for premium remaining days
+    try {
+        const infoRes = await fetch('/api/user/' + loggedUser.id + '/info');
+        const infoData = await infoRes.json();
+        if (infoData.success && infoData.user) {
+            // Update local storage if account type changed
+            if (infoData.user.account_type !== loggedUser.account_type) {
+                loggedUser.account_type = infoData.user.account_type;
+                localStorage.setItem('smartfood_user', JSON.stringify(loggedUser));
+                updatePremiumUI();
+            }
+
+            const daysEl = document.getElementById('profile-premium-days');
+            if (daysEl) {
+                if (infoData.user.account_type === 'premium') {
+                    daysEl.style.display = 'block';
+                    daysEl.querySelector('span').textContent = infoData.user.remaining_days;
+                } else {
+                    daysEl.style.display = 'none';
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi lấy thông tin user:", e);
+    }
+
     // Load Health Profile
     try {
         const hpRes = await fetch('/api/health-profile/' + loggedUser.id);
@@ -2329,8 +2355,11 @@ function checkPaymentResult() {
         icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
         icon.className = 'premium-modal-icon crown-icon';
         title.textContent = '🎉 Nâng Cấp Thành Công!';
-        desc.textContent = 'Tài khoản của bạn đã được nâng cấp lên Premium. Bạn có thể sử dụng tất cả tính năng không giới hạn!';
+        desc.textContent = 'Cảm ơn bạn. Tài khoản của bạn đã được nâng cấp lên Premium.';
         
+        const details = document.getElementById('payment-success-details');
+        if (details) details.style.display = 'block';
+
         // Cập nhật localStorage
         const user = JSON.parse(localStorage.getItem('smartfood_user'));
         if (user) {
@@ -2340,11 +2369,17 @@ function checkPaymentResult() {
         
         // Cập nhật UI
         updatePremiumUI();
+
+        // Chạy hiệu ứng pháo hoa
+        setTimeout(triggerConfetti, 100);
+
     } else {
         icon.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
         icon.className = 'premium-modal-icon quota-icon';
         title.textContent = 'Thanh Toán Thất Bại';
         desc.textContent = 'Giao dịch không thành công. Vui lòng thử lại hoặc liên hệ hỗ trợ.';
+        const details = document.getElementById('payment-success-details');
+        if (details) details.style.display = 'none';
     }
 
     modal.style.display = 'flex';
@@ -2353,7 +2388,46 @@ function checkPaymentResult() {
     const url = new URL(window.location);
     url.searchParams.delete('payment');
     url.searchParams.delete('orderId');
+    url.searchParams.delete('resultCode');
     window.history.replaceState({}, '', url);
+}
+
+function triggerConfetti() {
+    const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
+    
+    for (let i = 0; i < 60; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.position = 'fixed';
+        confetti.style.width = '10px';
+        confetti.style.height = '10px';
+        confetti.style.zIndex = '99999';
+        
+        // Random styles
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.top = '-10px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Random animation variables
+        const duration = Math.random() * 3 + 2;
+        const delay = Math.random() * 1;
+        
+        confetti.animate([
+            { transform: `translate3d(0, 0, 0) rotate(0deg)`, opacity: 1 },
+            { transform: `translate3d(${Math.random() * 200 - 100}px, 100vh, 0) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+        ], {
+            duration: duration * 1000,
+            delay: delay * 1000,
+            easing: 'cubic-bezier(.37,0,.63,1)',
+            fill: 'forwards'
+        });
+        
+        document.body.appendChild(confetti);
+        
+        setTimeout(() => {
+            confetti.remove();
+        }, (duration + delay) * 1000);
+    }
 }
 
 function closePaymentResult() {
