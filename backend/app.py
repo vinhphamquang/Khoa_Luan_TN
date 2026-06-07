@@ -1449,6 +1449,11 @@ def api_user_info(user_id):
         }
     })
 
+@app.route("/mock-momo")
+def mock_momo_page():
+    """Trang giả lập cổng thanh toán MoMo"""
+    return serve_html_no_cache("mock-momo.html")
+
 @app.route("/api/payment/momo/create", methods=["POST"])
 def api_momo_create():
     """Tạo đơn thanh toán MoMo để nâng cấp Premium"""
@@ -1469,28 +1474,23 @@ def api_momo_create():
     # Tạo order
     order_id = generate_order_id(user_id)
     amount = PREMIUM_PRICE
-    order_info = f"Nâng cấp Premium SmartFoodAI - {user.get('TenNguoiDung', '')}"
     
     # Xác định base URL
     base_url = request.host_url.rstrip('/')
-    redirect_url = f"{base_url}/api/payment/momo/return"
-    ipn_url = f"{base_url}/api/payment/momo/callback"
     
     # Lưu payment vào DB
     create_payment(user_id, order_id, amount)
     
-    # Gọi MoMo API
-    result = create_momo_payment(order_id, amount, order_info, redirect_url, ipn_url)
+    # ==== MOCK MOMO PAYMENT PAGE ====
+    import urllib.parse
+    mock_url = f"{base_url}/mock-momo?orderId={order_id}&amount={amount}"
     
-    if result['success']:
-        return jsonify({
-            "success": True,
-            "payUrl": result['payUrl'],
-            "orderId": order_id,
-            "message": "Đang chuyển đến trang thanh toán MoMo"
-        })
-    else:
-        return jsonify({"success": False, "message": result['message']}), 500
+    return jsonify({
+        "success": True,
+        "payUrl": mock_url,
+        "orderId": order_id,
+        "message": "Đang chuyển đến trang thanh toán MoMo giả lập"
+    })
 
 @app.route("/api/payment/momo/callback", methods=["POST"])
 def api_momo_callback():
