@@ -372,8 +372,21 @@ function initAnalyzePage() {
     analyzeBtn.addEventListener('click', async () => {
         if (!currentFile) return;
 
-        // Kiểm tra quota trước khi phân tích
         const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+
+        // Kiểm tra quota cho khách vãng lai
+        if (!loggedUser) {
+            let guestCount = parseInt(localStorage.getItem('guest_analysis_count')) || 0;
+            if (guestCount >= 5) {
+                alert('Bạn đã sử dụng hết 5 lượt phân tích dành cho khách vãng lai.\nVui lòng đăng nhập hoặc đăng ký để tiếp tục sử dụng miễn phí!');
+                document.getElementById('auth-modal').classList.remove('hidden');
+                return;
+            }
+            localStorage.setItem('guest_analysis_count', guestCount + 1);
+            updatePremiumUI();
+        }
+
+        // Kiểm tra quota trước khi phân tích (cho user thường)
         if (loggedUser && loggedUser.account_type !== 'premium') {
             try {
                 const quotaRes = await fetch(`/api/user/${loggedUser.id}/quota`);
@@ -2437,7 +2450,23 @@ function closePaymentResult() {
 // Cập nhật UI dựa trên trạng thái Premium
 function updatePremiumUI() {
     const user = JSON.parse(localStorage.getItem('smartfood_user'));
-    if (!user) return;
+    
+    if (!user) {
+        const counter = document.getElementById('quota-counter');
+        const text = document.getElementById('quota-text');
+        const upgradeBtn = document.getElementById('quota-upgrade-btn');
+        if (counter && text) {
+            let guestCount = parseInt(localStorage.getItem('guest_analysis_count')) || 0;
+            let remaining = Math.max(0, 5 - guestCount);
+            counter.style.display = 'flex';
+            counter.classList.remove('premium');
+            text.textContent = `Dùng thử: còn ${remaining}/5 lượt`;
+            if (upgradeBtn) {
+                upgradeBtn.style.display = 'none';
+            }
+        }
+        return;
+    }
 
     const isPremium = user.account_type === 'premium';
 
@@ -2476,9 +2505,7 @@ function initPremiumFeatures() {
     checkPaymentResult();
     
     const user = JSON.parse(localStorage.getItem('smartfood_user'));
-    if (user) {
-        updatePremiumUI();
-    }
+    updatePremiumUI();
 
     // Kiểm tra URL param upgrade=true
     const params = new URLSearchParams(window.location.search);
