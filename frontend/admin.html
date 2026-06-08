@@ -212,6 +212,14 @@
                     </div>
                 </div>
 
+                <!-- Top Foods Section -->
+                <div class="top-foods-section glass-card" style="margin-top: 20px; padding: 20px;">
+                    <h3 style="margin-bottom: 15px;"><i class="fa-solid fa-fire" style="color: #ef4444;"></i> Top Món Ăn Được Nhận Diện Nhiều Nhất</h3>
+                    <div id="top-foods-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="history-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải...</span></div>
+                    </div>
+                </div>
+
                 <!-- Comments Overview Section -->
                 <div class="comments-overview-section" id="comments-overview-section">
                     <h3 class="comments-overview-title">
@@ -394,11 +402,6 @@
                                 placeholder="Tìm theo tên món, người dùng...">
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <button class="btn-bulk-delete" id="bulk-delete-btn" disabled
-                                style="opacity: 0.4; pointer-events: none;">
-                                <i class="fa-solid fa-trash-can"></i>
-                                Xóa (<span id="bulk-count">0</span>)
-                            </button>
                             <div class="history-view-toggle">
                                 <button class="view-btn active" data-view="grid" title="Dạng lưới">
                                     <i class="fa-solid fa-grid-2"></i>
@@ -423,7 +426,6 @@
                         <table class="admin-table">
                             <thead>
                                 <tr>
-                                    <th><input type="checkbox" class="bulk-checkbox" id="table-select-all"></th>
                                     <th>ID</th>
                                     <th>Ảnh</th>
                                     <th>Người Dùng</th>
@@ -543,75 +545,6 @@
             </div>
         </div>
     </section>
-
-    <!-- ========== ADMIN FOOD MODAL (Chỉ chỉnh sửa, không thêm mới) ========== -->
-    <div id="admin-modal-overlay" class="modal-overlay hidden">
-        <div id="admin-food-modal" class="glass-card modal-box"
-            style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <button class="modal-close"
-                onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')"><i
-                    class="fa-solid fa-times"></i></button>
-            <h2 class="section-title" id="food-modal-title"
-                style="font-size: 24px; text-align: center; margin-bottom: 20px;">Sửa Món Ăn</h2>
-            <!-- Thông báo AI -->
-            <div
-                style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
-                <i class="fa-solid fa-robot" style="color: var(--primary); font-size: 18px;"></i>
-                <span>Món ăn được thêm tự động khi người dùng nhận diện qua AI. Admin có thể chỉnh sửa thông tin tại
-                    đây.</span>
-            </div>
-            <form id="food-admin-form">
-                <input type="hidden" id="fa-id">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group"><label>Tên Món Ăn</label><input type="text" id="fa-name" required
-                            class="form-input"></div>
-                    <div class="form-group"><label>Phân Loại</label><input type="text" id="fa-cate" class="form-input">
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;"><label>Mô Tả</label><textarea id="fa-desc"
-                            class="form-input" rows="2"></textarea></div>
-                    <div class="form-group"><label>Calo (kcal)</label><input type="number" step="0.1" id="fa-cal"
-                            class="form-input"></div>
-                    <div class="form-group"><label>Protein (g)</label><input type="number" step="0.1" id="fa-pro"
-                            class="form-input"></div>
-                    <div class="form-group"><label>Chất Béo (g)</label><input type="number" step="0.1" id="fa-fat"
-                            class="form-input"></div>
-                    <div class="form-group"><label>Carbohydrate (g)</label><input type="number" step="0.1" id="fa-car"
-                            class="form-input"></div>
-                </div>
-                <div class="form-group" style="margin-top: 15px;"><label>Hướng Dẫn Nấu</label><textarea id="fa-instruct"
-                        class="form-input" rows="3"></textarea></div>
-                <div class="form-group">
-                    <div
-                        style="display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center;">
-                        <label>Nguyên Liệu</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="file" id="fa-upload-excel" accept=".xlsx, .xls, .csv" style="display: none;">
-                            <button type="button" id="btn-upload-excel" class="btn btn-outline"
-                                style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-file-excel"></i> Tải
-                                Excel</button>
-                            <button type="button" id="fa-add-ing" class="btn btn-outline"
-                                style="padding: 2px 8px; font-size: 13px;"><i class="fa-solid fa-plus"></i>
-                                Thêm</button>
-                        </div>
-                    </div>
-                    <div id="fa-ingredients" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                </div>
-                <div class="form-group"><label>Trạng Thái</label>
-                    <select id="fa-deleted" class="form-input">
-                        <option value="0">Đang hiển thị</option>
-                        <option value="1">Đã khóa (Soft Delete)</option>
-                    </select>
-                </div>
-                <div id="fa-error" class="form-error hidden"></div>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button type="button" class="btn btn-ghost" style="flex: 1;"
-                        onclick="document.getElementById('admin-modal-overlay').classList.add('hidden')">Hủy</button>
-                    <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Lưu Thay
-                        Đổi</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- ========== HISTORY DETAIL MODAL ========== -->
     <div id="history-detail-overlay" class="modal-overlay hidden">

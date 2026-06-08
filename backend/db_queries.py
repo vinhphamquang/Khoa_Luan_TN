@@ -424,6 +424,13 @@ def insert_food_full(food_data):
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Prevent duplicate
+        cursor.execute("SELECT MaMonAn FROM MonAn WHERE LOWER(TenMonAn) = LOWER(%s) AND IsDeleted = 0", (food_data['TenMonAn'],))
+        if cursor.fetchone():
+            print(f"[SKIP] Món '{food_data['TenMonAn']}' đã tồn tại trong database.")
+            conn.close()
+            return False
+        
         # Insert MonAn
         cursor.execute("""
             INSERT INTO MonAn (TenMonAn, MoTa, PhanLoai)
@@ -972,6 +979,24 @@ def get_system_stats():
             conn2.close()
         except:
             premium_users = 0
+            
+        # Top foods recognized
+        top_foods = []
+        try:
+            conn3 = get_db_connection()
+            cursor3 = get_db_cursor(conn3)
+            cursor3.execute("""
+                SELECT TenMonAn, COUNT(*) as count 
+                FROM LichSu 
+                GROUP BY TenMonAn 
+                ORDER BY count DESC 
+                LIMIT 10
+            """)
+            for r in cursor3.fetchall():
+                top_foods.append({'name': r['tenmonan'], 'count': r['count']})
+            conn3.close()
+        except:
+            pass
         
         return {
             'total_users': total_users,
@@ -984,7 +1009,8 @@ def get_system_stats():
                 'pending': pending_comments,
                 'total_replies': total_replies
             },
-            'recent_comments': recent_comments
+            'recent_comments': recent_comments,
+            'top_foods': top_foods
         }
     except Exception as e:
         print(f"Error: {e}")
@@ -993,7 +1019,8 @@ def get_system_stats():
         return {
             'total_users': 0, 'total_foods': 0, 'total_recognitions': 0,
             'comments': {'total': 0, 'replied': 0, 'pending': 0, 'total_replies': 0},
-            'recent_comments': []
+            'recent_comments': [],
+            'top_foods': []
         }
 
 def get_all_history_admin():
@@ -2284,6 +2311,35 @@ def get_all_payments_admin():
     try:
         conn = get_db_connection()
         cursor = get_db_cursor(conn)
+        
+        # Auto-expire pending payments older than 15 minutes
+        cursor.execute("""
+            UPDATE ThanhToan
+            SET TrangThai = 'failed', ThoiGianCapNhat = CURRENT_TIMESTAMP
+            WHERE TrangThai = 'pending' 
+              AND ThoiGianTao < CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+            RETURNING MaThanhToan, MaDonHang, MaNguoiDung
+        """)
+        expired_payments = cursor.fetchall()
+        
+        if expired_payments:
+            cursor.execute("SELECT MaNguoiDung FROM NguoiDung WHERE VaiTro = 'admin'")
+            admins = cursor.fetchall()
+            for p in expired_payments:
+                # Thông báo cho admin
+                for a in admins:
+                    cursor.execute("""
+                        INSERT INTO ThongBao (MaNguoiDung, NoiDung)
+                        VALUES (%s, %s)
+                    """, (a['manguoidung'], f"Giao dịch thanh toán {p['madonhang']} quá hạn 15 phút và đã tự động bị hủy."))
+                
+                # Thông báo cho người dùng
+                if p['manguoidung']:
+                    cursor.execute("""
+                        INSERT INTO ThongBao (MaNguoiDung, NoiDung)
+                        VALUES (%s, %s)
+                    """, (p['manguoidung'], f"Đơn hàng {p['madonhang']} của bạn đã bị hủy do quá hạn thanh toán 15 phút."))
+            conn.commit()
         
         cursor.execute("""
             SELECT t.MaThanhToan, t.MaDonHang, t.SoTien, t.GoiNangCap,

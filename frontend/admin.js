@@ -224,206 +224,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Food Modal Logic (edit only - food is added automatically by AI)
-    const adminModalOverlay = document.getElementById('admin-modal-overlay');
-    const foodForm = document.getElementById('food-admin-form');
-    const btnAddIng = document.getElementById('fa-add-ing');
-    const ingsContainer = document.getElementById('fa-ingredients');
+    // Removed Food Modal Logic
 
-    if (btnAddIng) {
-        btnAddIng.addEventListener('click', () => {
-            addIngredientRow('');
-        });
-    }
 
-    // Excel Upload Logic
-    const btnUploadExcel = document.getElementById('btn-upload-excel');
-    const uploadExcelInput = document.getElementById('fa-upload-excel');
-
-    if (btnUploadExcel && uploadExcelInput) {
-        btnUploadExcel.addEventListener('click', () => {
-            uploadExcelInput.click();
-        });
-
-        uploadExcelInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-
-                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    let startIndex = 0;
-                    if (json.length > 0 && typeof json[0][0] === 'string' && json[0][0].toLowerCase().includes('tên')) {
-                        startIndex = 1; // Bỏ qua header
-                    }
-
-                    // Nếu chỉ có 1 dòng rỗng mặc định thì xóa đi trước khi thêm từ Excel
-                    const currentRows = ingsContainer.querySelectorAll('div');
-                    if (currentRows.length === 1) {
-                        const nameInput = currentRows[0].querySelector('.ing-name');
-                        const qtyInput = currentRows[0].querySelector('.ing-qty');
-                        if (!nameInput.value.trim() && !qtyInput.value.trim()) {
-                            ingsContainer.innerHTML = '';
-                        }
-                    }
-
-                    for (let i = startIndex; i < json.length; i++) {
-                        const row = json[i];
-                        if (row && row.length > 0) {
-                            const name = row[0] || '';
-                            const qty = row[1] || '';
-                            if (name) {
-                                addIngredientRow(`${name} — ${qty}`);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Lỗi đọc file Excel:", error);
-                    alert("Có lỗi xảy ra khi đọc file Excel. Vui lòng đảm bảo file đúng định dạng.");
-                }
-
-                uploadExcelInput.value = ''; // Reset input file
-            };
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    function addIngredientRow(value) {
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.gap = '10px';
-
-        const [name, qty] = value ? value.split(' — ') : ['', ''];
-
-        row.innerHTML = `
-            <input type="text" class="form-input ing-name" placeholder="Tên nguyên liệu..." style="flex: 2" value="${name || ''}">
-            <input type="text" class="form-input ing-qty" placeholder="Số lượng..." style="flex: 1" value="${qty || ''}">
-            <button type="button" class="btn-icon delete" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
-        `;
-        ingsContainer.appendChild(row);
-    }
-
-    if (foodForm) {
-        foodForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const errDiv = document.getElementById('fa-error');
-            errDiv.classList.add('hidden');
-
-            const id = document.getElementById('fa-id').value;
-
-            // Chỉ cho phép sửa, không cho thêm mới thủ công
-            if (!id) {
-                errDiv.textContent = 'Không thể thêm món ăn thủ công. Món ăn được thêm tự động bởi AI khi người dùng nhận diện.';
-                errDiv.classList.remove('hidden');
-                return;
-            }
-
-            const ings = [];
-            ingsContainer.querySelectorAll('div').forEach(row => {
-                const n = row.querySelector('.ing-name').value.trim();
-                const q = row.querySelector('.ing-qty').value.trim();
-                if (n) ings.push({ TenNguyenLieu: n, SoLuong: q });
-            });
-
-            const data = {
-                TenMonAn: document.getElementById('fa-name').value,
-                PhanLoai: document.getElementById('fa-cate').value,
-                MoTa: document.getElementById('fa-desc').value,
-                IsDeleted: document.getElementById('fa-deleted').value,
-                DinhDuong: {
-                    Calo: document.getElementById('fa-cal').value || 0,
-                    Protein: document.getElementById('fa-pro').value || 0,
-                    ChatBeo: document.getElementById('fa-fat').value || 0,
-                    Carbohydrate: document.getElementById('fa-car').value || 0,
-                    Vitamin: ''
-                },
-                CongThuc: {
-                    HuongDan: document.getElementById('fa-instruct').value,
-                    ThoiGianNau: 30, // Default estimate
-                    KhauPhan: 1,
-                    NguyenLieu: ings
-                }
-            };
-
-            try {
-                const url = id ? `/api/admin/foods/${id}` : '/api/admin/foods';
-                const method = id ? 'PUT' : 'POST';
-
-                const res = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                const responseData = await res.json();
-                if (responseData.success) {
-                    adminModalOverlay.classList.add('hidden');
-                    fetchAdminFoods();
-                } else {
-                    errDiv.textContent = responseData.message || 'Lỗi lưu dữ liệu';
-                    errDiv.classList.remove('hidden', 'success');
-                }
-            } catch (error) {
-                errDiv.textContent = 'Lỗi kết nối máy chủ';
-                errDiv.classList.remove('hidden', 'success');
-            }
-        });
-    }
 
     // Global Edit/Delete Handlers
-    window.editAdminFood = async (id) => {
-        try {
-            const res = await fetch(`/api/admin/foods/${id}`);
-            const responseData = await res.json();
-            if (responseData.success) {
-                const f = responseData.food;
-
-                // Support both uppercase (backend format) and lowercase (PostgreSQL format)
-                document.getElementById('fa-id').value = f.MaMonAn || f.mamonan || id;
-                document.getElementById('fa-name').value = f.TenMonAn || f.tenmonan || '';
-                document.getElementById('fa-cate').value = f.PhanLoai || f.phanloai || '';
-                document.getElementById('fa-desc').value = f.MoTa || f.mota || '';
-                document.getElementById('fa-deleted').value = (f.IsDeleted !== undefined ? f.IsDeleted : (f.isdeleted !== undefined ? f.isdeleted : 0));
-
-                const nutrition = f.DinhDuong || f.dinhduong || {};
-                document.getElementById('fa-cal').value = nutrition.Calo || nutrition.calo || '';
-                document.getElementById('fa-pro').value = nutrition.Protein || nutrition.protein || '';
-                document.getElementById('fa-fat').value = nutrition.ChatBeo || nutrition.chatbeo || '';
-                document.getElementById('fa-car').value = nutrition.Carbohydrate || nutrition.carbohydrate || '';
-
-                const recipe = f.CongThuc || f.congthuc || {};
-                document.getElementById('fa-instruct').value = recipe.HuongDan || recipe.huongdan || '';
-
-                ingsContainer.innerHTML = '';
-                const ingredients = recipe.NguyenLieu || recipe.nguyenlieu || [];
-                if (ingredients && ingredients.length > 0) {
-                    ingredients.forEach(nl => {
-                        const name = nl.TenNguyenLieu || nl.tennguyenlieu || '';
-                        const amount = nl.SoLuong || nl.soluong || '';
-                        addIngredientRow(`${name} — ${amount}`);
-                    });
-                } else {
-                    addIngredientRow('');
-                }
-
-                document.getElementById('food-modal-title').textContent = 'Sửa Món Ăn (ID: ' + id + ')';
-                adminModalOverlay.classList.remove('hidden');
-            } else {
-                alert("Không tải được chi tiết món ăn!");
-            }
-        } catch (e) {
-            console.error('Edit food error:', e);
-            alert("Lỗi kết nối máy chủ: " + e.message);
-        }
-    };
 
     window.deleteAdminFood = async (id) => {
         if (!confirm('Bạn có chắc chắn muốn CHUYỂN VÀO THÙNG RÁC món ăn này? (Sẽ không còn hiện trên web cho User)')) return;
@@ -503,6 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Render Comment Stats
                 renderCommentStats(data.stats);
+
+                // Render Top Foods
+                renderTopFoods(data.stats.top_foods);
             }
         } catch (e) { console.error(e); }
     }
@@ -546,6 +354,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function renderTopFoods(topFoods) {
+        const listEl = document.getElementById('top-foods-list');
+        if (!listEl) return;
+        
+        if (!topFoods || topFoods.length === 0) {
+            listEl.innerHTML = '<p class="rating-empty">Chưa có dữ liệu nhận diện món ăn</p>';
+            return;
+        }
+        
+        listEl.innerHTML = topFoods.map((item, index) => {
+            let badgeClass = 'badge-info';
+            if (index === 0) badgeClass = 'badge-success';
+            if (index === 1) badgeClass = 'badge-warning';
+            
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: bold; color: var(--text-muted); width: 20px;">#${index + 1}</span>
+                        <span style="font-weight: 600;">${item.name}</span>
+                    </div>
+                    <span class="badge ${badgeClass}"><i class="fa-solid fa-camera"></i> ${item.count} lượt</span>
+                </div>
+            `;
+        }).join('');
+    }
+
     async function fetchAdminFoods() {
         const tb = document.getElementById('tb-foods');
         tb.innerHTML = '<tr><td colspan="5" style="text-align:center"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
@@ -567,7 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${status}</td>
                             <td>
                                 <div class="action-btns">
-                                    <button class="btn-icon" title="Sửa" onclick="editAdminFood(${f.id})"><i class="fa-solid fa-pen"></i></button>
                                     ${!f.is_deleted ? `<button class="btn-icon delete" title="Khóa (Soft Delete)" onclick="deleteAdminFood(${f.id})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.id})"><i class="fa-solid fa-rotate-left"></i></button>`}
                                     <button class="btn-icon delete" title="Xóa vĩnh viễn" onclick="hardDeleteAdminFood(${f.id})" style="color: #ef4444;"><i class="fa-solid fa-trash"></i></button>
                                     <label class="bulk-select-label" title="Chọn để xóa nhiều">
@@ -967,27 +800,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderHistoryGrid(data) {
         const grid = document.getElementById('history-grid-view');
-        if (data.length === 0) {
+        if (!data || data.length === 0) {
             grid.innerHTML = `
                 <div class="history-empty">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    <p>Chưa có lịch sử nhận diện nào</p>
-                </div>`;
+                    <i class="fa-solid fa-folder-open"></i>
+                    <p>Không có dữ liệu lịch sử</p>
+                </div>
+            `;
             return;
         }
 
         grid.innerHTML = data.map(h => {
             const imgSrc = getImageSrc(h.image);
-            const hasImage = !!imgSrc;
             const dateObj = h.time ? new Date(h.time) : null;
             const dateStr = dateObj ? dateObj.toLocaleDateString('vi-VN') : '';
-            const timeStr = dateObj ? dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
 
             return `
             <div class="history-card" onclick="viewHistoryDetail(${h.id})">
-                <input type="checkbox" class="history-check" data-id="${h.id}" onclick="event.stopPropagation(); updateBulkSelection()">
                 <div class="history-card-img">
-                    ${hasImage
+                    ${imgSrc
                     ? `<img src="${imgSrc}" alt="${h.food_name}" loading="lazy">`
                     : `<div class="history-card-no-img"><i class="fa-solid fa-image"></i></div>`
                 }
@@ -996,38 +827,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h4 class="history-card-food">${h.food_name || 'Không xác định'}</h4>
                     <div class="history-card-meta">
                         <span class="history-card-user">
-                            <i class="fa-solid fa-user"></i> ${h.user_name}
+                            <i class="fa-solid fa-user"></i> ${h.user_name || 'Ẩn danh'}
                         </span>
                         ${h.calories ? `<span class="history-card-cal"><i class="fa-solid fa-fire-flame-curved"></i> ${Math.round(h.calories)} kcal</span>` : ''}
                     </div>
                     <div class="history-card-rating">${getCommentBadge(h.comment_count)}</div>
                     <div class="history-card-time">
-                        <i class="fa-regular fa-clock"></i> ${dateStr} ${timeStr}
+                        <i class="fa-regular fa-clock"></i> ${dateStr}
                     </div>
                 </div>
                 <div class="history-card-hover-hint">
                     <i class="fa-solid fa-eye"></i> Xem chi tiết
                 </div>
-                <button class="history-card-delete" title="Xóa" onclick="event.stopPropagation(); deleteHistoryRecord(${h.id})">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
             </div>`;
         }).join('');
     }
 
     function renderHistoryTable(data) {
         const tb = document.getElementById('tb-history');
-        if (data.length === 0) {
-            tb.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color: var(--text-muted);">Không có dữ liệu</td></tr>';
+        if (!data || data.length === 0) {
+            tb.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: var(--text-muted);">Không có dữ liệu</td></tr>';
             return;
         }
+
         tb.innerHTML = data.map(h => {
             const imgSrc = getImageSrc(h.image);
             const dateObj = h.time ? new Date(h.time) : null;
             const dateStr = dateObj ? dateObj.toLocaleString('vi-VN') : '';
+
             return `
-            <tr>
-                <td><input type="checkbox" class="history-check" data-id="${h.id}" onclick="updateBulkSelection()"></td>
+            <tr style="cursor: pointer" onclick="viewHistoryDetail(${h.id})">
                 <td>#${h.id}</td>
                 <td>
                     ${imgSrc
@@ -1035,18 +864,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     : `<span class="history-table-no-img"><i class="fa-solid fa-image-slash"></i></span>`
                 }
                 </td>
-                <td>${h.user_name}</td>
-                <td style="font-weight:500; color:var(--primary-light)">${h.food_name}</td>
-                <td>${h.calories ? Math.round(h.calories) + ' kcal' : '--'}</td>
+                <td style="font-weight: 500">${h.user_name || 'Ẩn danh'}</td>
+                <td style="font-weight: 600; color: var(--text-main);">${h.food_name || 'Không xác định'}</td>
+                <td>${h.calories ? `<span class="badge badge-warning" style="font-size: 11px;">${Math.round(h.calories)} kcal</span>` : '-'}</td>
                 <td>${getCommentBadge(h.comment_count)}</td>
-                <td><span style="font-size: 13px; color: var(--text-muted);">${dateStr}</span></td>
+                <td style="font-size: 13px; color: var(--text-muted);">${dateStr}</td>
                 <td>
-                    <button class="btn-icon" title="Xem chi tiết" onclick="viewHistoryDetail(${h.id})">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="btn-icon btn-icon-danger" title="Xóa" onclick="deleteHistoryRecord(${h.id})">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
+                    <div class="action-btns" onclick="event.stopPropagation()">
+                        <button class="btn-icon" title="Xem chi tiết" onclick="viewHistoryDetail(${h.id})">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>`;
         }).join('');
@@ -1070,9 +898,6 @@ document.addEventListener('DOMContentLoaded', () => {
             grid.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải dữ liệu</p></div>';
         }
     }
-
-    // Listen for refresh event (from global deleteHistoryRecord)
-    document.addEventListener('refreshHistory', () => fetchAdminHistory());
 
     // Detail modal
     window.viewHistoryDetail = async (historyId) => {
@@ -1117,9 +942,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="hd-badge"><i class="fa-solid fa-receipt"></i> Chi Tiết Nhận Diện #${d.id}</div>
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <span class="hd-time"><i class="fa-regular fa-clock"></i> ${dateStr}</span>
-                        <button class="btn-admin-delete" onclick="deleteHistoryRecord(${d.id})" title="Xóa bản ghi">
-                            <i class="fa-solid fa-trash-can"></i> Xóa
-                        </button>
                     </div>
                 </div>
 
@@ -1168,24 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>` : ''}
                         </div>
 
-                        <!-- Admin Edit Form -->
-                        <div class="hd-info-card hd-edit-card">
-                            <div class="hd-info-card-title"><i class="fa-solid fa-pen-to-square"></i> Chỉnh sửa thông tin</div>
-                            <div class="hd-edit-form">
-                                <div class="hd-edit-group">
-                                    <label>Tên món ăn</label>
-                                    <input type="text" id="hd-edit-name" class="hd-edit-input" value="${(d.food_name || '').replace(/"/g, '&quot;')}">
-                                </div>
-                                <div class="hd-edit-group">
-                                    <label>Calo (kcal)</label>
-                                    <input type="number" id="hd-edit-cal" class="hd-edit-input" value="${d.calories ? Math.round(d.calories) : ''}" placeholder="VD: 350">
-                                </div>
-                                <button class="btn-admin-save" id="hd-edit-save" data-id="${d.id}">
-                                    <i class="fa-solid fa-floppy-disk"></i> Lưu & Thông báo
-                                </button>
-                                <div class="hd-edit-msg hidden" id="hd-edit-msg"></div>
-                            </div>
-                        </div>
+
 
                         <!-- Detailed Nutrition from DB -->
                         ${fi ? `
@@ -1232,153 +1037,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
-
-            // Attach save handler
-            const saveBtn = document.getElementById('hd-edit-save');
-            saveBtn?.addEventListener('click', async () => {
-                const hId = saveBtn.dataset.id;
-                const newName = document.getElementById('hd-edit-name').value.trim();
-                const newCal = document.getElementById('hd-edit-cal').value;
-                const msgDiv = document.getElementById('hd-edit-msg');
-
-                if (!newName) {
-                    msgDiv.textContent = 'Tên món ăn không được trống';
-                    msgDiv.className = 'hd-edit-msg hd-edit-error';
-                    return;
-                }
-
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
-
-                try {
-                    const res = await fetch(`/api/admin/history/${hId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ food_name: newName, calories: newCal || null })
-                    });
-                    const result = await res.json();
-
-                    if (result.success) {
-                        msgDiv.textContent = '✅ ' + result.message;
-                        msgDiv.className = 'hd-edit-msg hd-edit-success';
-                        // Refresh history list
-                        fetchAdminHistory();
-                    } else {
-                        msgDiv.textContent = '❌ ' + result.message;
-                        msgDiv.className = 'hd-edit-msg hd-edit-error';
-                    }
-                } catch (err) {
-                    msgDiv.textContent = '❌ Lỗi kết nối server';
-                    msgDiv.className = 'hd-edit-msg hd-edit-error';
-                }
-
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu & Thông báo';
-            });
         } catch (e) {
             console.error('History detail error:', e);
             content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi khi tải chi tiết</p></div>';
         }
     };
-});
-
-// Global: Xóa bản ghi lịch sử
-async function deleteHistoryRecord(historyId) {
-    if (!confirm('Bạn có chắc muốn xóa bản ghi lịch sử này?')) return;
-
-    try {
-        const res = await fetch(`/api/admin/history/${historyId}`, { method: 'DELETE' });
-        const data = await res.json();
-
-        if (data.success) {
-            // Close detail modal if open
-            const overlay = document.getElementById('history-detail-overlay');
-            if (overlay) overlay.classList.add('hidden');
-
-            // Trigger re-fetch
-            document.dispatchEvent(new Event('refreshHistory'));
-            alert('✅ ' + data.message);
-        } else {
-            alert('❌ ' + data.message);
-        }
-    } catch (e) {
-        console.error('Delete error:', e);
-        alert('❌ Lỗi kết nối server');
-    }
-}
-
-// Global: Cập nhật nút xóa hàng loạt
-function updateBulkSelection() {
-    const checks = document.querySelectorAll('.history-check:checked');
-    const btn = document.getElementById('bulk-delete-btn');
-    const allChecks = document.querySelectorAll('.history-check');
-    const tableSelectAll = document.getElementById('table-select-all');
-
-    const count = checks.length;
-
-    if (btn) {
-        btn.innerHTML = `<i class="fa-solid fa-trash-can"></i> Xóa (${count})`;
-        if (count > 0) {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-        } else {
-            btn.disabled = true;
-            btn.style.opacity = '0.4';
-            btn.style.pointerEvents = 'none';
-        }
-    }
-
-    // Sync select-all checkbox
-    const allChecked = allChecks.length > 0 && count === allChecks.length;
-    if (tableSelectAll) tableSelectAll.checked = allChecked;
-}
-
-// Select all handler (table header checkbox)
-document.addEventListener('change', (e) => {
-    if (e.target.id === 'table-select-all') {
-        const checked = e.target.checked;
-        document.querySelectorAll('.history-check').forEach(cb => { cb.checked = checked; });
-        updateBulkSelection();
-    }
-});
-
-// Bulk delete button
-document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('#bulk-delete-btn');
-    if (!btn) return;
-
-    const checks = document.querySelectorAll('.history-check:checked');
-    const ids = Array.from(checks).map(cb => parseInt(cb.dataset.id));
-
-    if (ids.length === 0) return;
-    if (!confirm(`Bạn có chắc muốn xóa ${ids.length} bản ghi lịch sử?`)) return;
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa...';
-
-    try {
-        const res = await fetch('/api/admin/history/bulk-delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            document.dispatchEvent(new Event('refreshHistory'));
-            updateBulkSelection();
-            alert('✅ ' + data.message);
-        } else {
-            alert('❌ ' + data.message);
-        }
-    } catch (e) {
-        console.error('Bulk delete error:', e);
-        alert('❌ Lỗi kết nối server');
-    }
-
-    btn.disabled = false;
-    updateBulkSelection();
 });
 
 // ============================================
