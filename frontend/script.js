@@ -1098,9 +1098,7 @@ function initAuth() {
             
             if (data.success) {
                 localStorage.setItem('smartfood_user', JSON.stringify(data.user));
-                modalOverlay.classList.add('hidden');
-                checkLoginState();
-                loginForm.reset();
+                window.location.href = '/';
             } else {
                 errDiv.textContent = data.message;
                 errDiv.classList.remove('hidden', 'success');
