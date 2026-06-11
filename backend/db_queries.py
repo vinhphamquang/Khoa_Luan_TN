@@ -2253,8 +2253,8 @@ def create_payment(user_id, order_id, amount, package='premium'):
         cursor = conn.cursor()
         
         cursor.execute("""
-            INSERT INTO ThanhToan (MaNguoiDung, MaDonHang, SoTien, GoiNangCap)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO ThanhToan (MaNguoiDung, MaDonHang, SoTien, GoiNangCap, PhuongThuc)
+            VALUES (%s, %s, %s, %s, 'payos')
             RETURNING MaThanhToan
         """, (user_id, order_id, amount, package))
         

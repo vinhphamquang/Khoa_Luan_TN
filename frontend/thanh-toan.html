@@ -22,8 +22,8 @@
             --text-muted: #9ca3af;
             --glass-bg: rgba(255, 255, 255, 0.85);
             --glass-border: rgba(34, 197, 94, 0.2);
-            --momo-color: #a50064;
-            --momo-gradient: linear-gradient(135deg, #a50064, #d82d8b);
+            --momo-color: #111;
+            --momo-gradient: linear-gradient(135deg, #222, #444);
         }
 
         * {
@@ -317,7 +317,7 @@
 
             <div class="package-card">
                 <div class="package-name">Gói Premium Vĩnh Viễn</div>
-                <div class="package-price">50.000 <span>VNĐ</span></div>
+                <div class="package-price">2.000 <span>VNĐ</span></div>
                 <ul class="feature-list">
                     <li><i class="fa-solid fa-check-circle"></i> Nhận diện món ăn không giới hạn</li>
                     <li><i class="fa-solid fa-check-circle"></i> Tư vấn dinh dưỡng chuyên sâu</li>
@@ -333,8 +333,8 @@
                         <i class="fa-solid fa-wallet"></i>
                     </div>
                     <div class="momo-text">
-                        <h4>Ví MoMo</h4>
-                        <p>Thanh toán siêu tốc, an toàn</p>
+                        <h4>PayOS</h4>
+                        <p>Thanh toán siêu tốc, an toàn qua VietQR</p>
                     </div>
                     <div class="momo-check">
                         <i class="fa-solid fa-circle-check"></i>
@@ -343,7 +343,7 @@
             </div>
 
             <button id="btn-pay" class="btn-pay">
-                <i class="fa-solid fa-shield-halved"></i> Thanh toán bằng MoMo
+                <i class="fa-solid fa-credit-card"></i> Thanh toán bằng PayOS
             </button>
             
             <a href="/" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại trang chủ</a>
@@ -376,7 +376,7 @@
                 btnPay.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo giao dịch...';
 
                 try {
-                    const response = await fetch('/api/payment/momo/create', {
+                    const response = await fetch('/api/payment/payos/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -386,19 +386,19 @@
 
                     const data = await response.json();
 
-                    if (data.success && data.payUrl) {
-                        // Chuyển hướng sang trang MoMo
-                        window.location.href = data.payUrl;
+                    if (data.success && data.checkoutUrl) {
+                        // Chuyển hướng sang trang PayOS
+                        window.location.href = data.checkoutUrl;
                     } else {
                         alert(data.message || 'Lỗi tạo giao dịch thanh toán.');
                         btnPay.disabled = false;
-                        btnPay.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Thanh toán bằng MoMo';
+                        btnPay.innerHTML = '<i class="fa-solid fa-credit-card"></i> Thanh toán bằng PayOS';
                     }
                 } catch (error) {
                     console.error('Lỗi thanh toán:', error);
                     alert('Lỗi kết nối máy chủ. Vui lòng thử lại sau.');
                     btnPay.disabled = false;
-                    btnPay.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Thanh toán bằng MoMo';
+                    btnPay.innerHTML = '<i class="fa-solid fa-credit-card"></i> Thanh toán bằng PayOS';
                 }
             });
         });

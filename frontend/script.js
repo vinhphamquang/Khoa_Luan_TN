@@ -2313,7 +2313,7 @@ function showUpgradeModal() {
     document.getElementById('premium-upgrade-modal').style.display = 'flex';
 }
 
-// Bắt đầu thanh toán MoMo
+// Bắt đầu thanh toán PayOS
 async function initiateUpgrade() {
     const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
     if (!loggedUser) {
@@ -2326,20 +2326,20 @@ async function initiateUpgrade() {
 
     // Show loading toast
     if (typeof window.appToast === 'function') {
-        window.appToast('Đang tạo đơn thanh toán MoMo...', 'info', 5000);
+        window.appToast('Đang tạo đơn thanh toán PayOS...', 'info', 5000);
     }
 
     try {
-        const res = await fetch('/api/payment/momo/create', {
+        const res = await fetch('/api/payment/payos/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: loggedUser.id })
         });
         const data = await res.json();
         
-        if (data.success && data.payUrl) {
-            // Redirect to MoMo payment page
-            window.location.href = data.payUrl;
+        if (data.success && data.checkoutUrl) {
+            // Redirect to PayOS payment page
+            window.location.href = data.checkoutUrl;
         } else {
             alert(data.message || 'Lỗi tạo đơn thanh toán');
         }

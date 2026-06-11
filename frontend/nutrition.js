@@ -1261,7 +1261,7 @@ function addNutritionUpgradeBanner() {
                 background:linear-gradient(135deg,#f59e0b,#d97706);
                 color:white;font-size:12px;font-weight:700;cursor:pointer;
                 font-family:inherit;transition:all 0.2s;
-            ">Nâng cấp Premium — 50.000đ</button>
+            ">Nâng cấp Premium — 2.000đ</button>
         </div>
     `;
     banner.style.cssText = `

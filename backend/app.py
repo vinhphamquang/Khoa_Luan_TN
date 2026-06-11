@@ -26,7 +26,7 @@ from db_queries import (
 )
 from ai_generator import generate_food_data_vietnamese
 from food_translator import translate_food_name, get_search_variants
-from momo_payment import create_momo_payment, verify_momo_signature, generate_order_id, PREMIUM_PRICE
+from payos_payment import create_payos_payment, verify_payos_webhook, generate_order_id, PREMIUM_PRICE
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
@@ -1449,14 +1449,9 @@ def api_user_info(user_id):
         }
     })
 
-@app.route("/mock-momo")
-def mock_momo_page():
-    """Trang giả lập cổng thanh toán MoMo"""
-    return serve_html_no_cache("mock-momo.html")
-
-@app.route("/api/payment/momo/create", methods=["POST"])
-def api_momo_create():
-    """Tạo đơn thanh toán MoMo để nâng cấp Premium"""
+@app.route("/api/payment/payos/create", methods=["POST"])
+def api_payos_create():
+    """Tạo đơn thanh toán PayOS để nâng cấp Premium"""
     data = request.json
     user_id = data.get("user_id")
     
@@ -1475,43 +1470,130 @@ def api_momo_create():
     order_id = generate_order_id(user_id)
     amount = PREMIUM_PRICE
     
-    # Xác định base URL
-    base_url = request.host_url.rstrip('/')
-    
     # Lưu payment vào DB
     create_payment(user_id, order_id, amount)
     
-    # ==== MOCK MOMO PAYMENT PAGE ====
-    import urllib.parse
-    mock_url = f"{base_url}/mock-momo?orderId={order_id}&amount={amount}"
+    # Xác định base URL
+    base_url = request.host_url.rstrip('/')
+    return_url = f"{base_url}/api/payment/payos/return?orderCode={order_id}"
+    cancel_url = f"{base_url}/api/payment/payos/cancel?orderCode={order_id}"
     
-    return jsonify({
-        "success": True,
-        "payUrl": mock_url,
-        "orderId": order_id,
-        "message": "Đang chuyển đến trang thanh toán MoMo giả lập"
-    })
+    # Gọi hàm create từ payos_payment
+    result = create_payos_payment(
+        order_id=order_id, 
+        amount=amount, 
+        description="Nâng cấp Premium", 
+        return_url=return_url, 
+        cancel_url=cancel_url
+    )
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 500
 
-@app.route("/api/payment/momo/callback", methods=["POST"])
-def api_momo_callback():
-    """MoMo IPN callback (server-to-server)"""
+@app.route("/api/payment/payos/return", methods=["GET"])
+def api_payos_return():
+    """Xử lý redirect từ PayOS (Dùng làm fallback thay cho webhook khi chạy ở localhost)"""
+    from flask import redirect
+    order_id = request.args.get("orderCode")
+    if not order_id:
+        return redirect("/?payment=failed")
+        
     try:
-        data = request.json
-        print(f"[MOMO CALLBACK] Received: {json.dumps(data, indent=2)}")
+        from payos_payment import payos_client
+        link_info = payos_client.getPaymentLinkInformation(order_id)
         
-        # Verify signature
-        if not verify_momo_signature(data):
-            print("[MOMO CALLBACK] Invalid signature!")
-            return jsonify({"resultCode": 1, "message": "Invalid signature"}), 400
+        if getattr(link_info, "status", None) == "PAID":
+            payment = get_payment_by_order_id(order_id)
+            # Kiểm tra nếu thanh toán chưa được update bởi webhook
+            if payment and payment['trangthai'] != 'success':
+                trans_id = ''
+                if hasattr(link_info, "transactions") and link_info.transactions:
+                    trans_id = str(getattr(link_info.transactions[0], "reference", ""))
+                
+                import json as json_module
+                response_data = ""
+                if hasattr(link_info, "model_dump_json"):
+                    response_data = link_info.model_dump_json()
+                elif hasattr(link_info, "dict"):
+                    response_data = json_module.dumps(link_info.dict(), ensure_ascii=False)
+                
+                update_payment_status(order_id, 'success', trans_id, response_data)
+                
+                # Nâng cấp tài khoản
+                user_id = payment['manguoidung']
+                upgrade_user_account(user_id)
+                
+                # Thông báo
+                create_notification(
+                    user_id,
+                    "🎉 Chúc mừng! Tài khoản của bạn đã được nâng cấp lên Premium. Bạn có thể sử dụng tất cả tính năng không giới hạn!",
+                    None
+                )
+                
+                # Thông báo cho admin
+                user = get_user_by_id(user_id)
+                user_name = user.get('TenNguoiDung', 'Unknown') if user else 'Unknown'
+                notify_admins(
+                    f"💰 Thanh toán thành công! {user_name} đã nâng cấp Premium - PayOS OrderCode: {order_id}"
+                )
+                
+        # Trở về trang chủ, trigger frontend JS
+        return redirect(f"/?payment=success&orderCode={order_id}")
+    except Exception as e:
+        print(f"[PAYOS RETURN ERROR] {e}")
+        from flask import redirect
+        return redirect("/?payment=failed")
+
+@app.route("/api/payment/payos/cancel", methods=["GET"])
+def api_payos_cancel():
+    """Xử lý redirect khi người dùng hủy thanh toán từ PayOS"""
+    from flask import redirect
+    order_id = request.args.get("orderCode")
+    if not order_id:
+        return redirect("/?payment=failed")
         
-        order_id = data.get('orderId', '')
-        result_code = data.get('resultCode', -1)
-        trans_id = str(data.get('transId', ''))
+    try:
+        payment = get_payment_by_order_id(order_id)
+        if payment and payment['trangthai'] == 'pending':
+            update_payment_status(order_id, 'failed', '', 'User cancelled payment')
+            
+            # Thông báo cho admin
+            user_id = payment['manguoidung']
+            user = get_user_by_id(user_id)
+            user_name = user.get('TenNguoiDung', 'Unknown') if user else 'Unknown'
+            notify_admins(
+                f"❌ Khách hàng hủy thanh toán! {user_name} đã hủy giao dịch nâng cấp Premium - PayOS OrderCode: {order_id}"
+            )
+            
+        return redirect(f"/?payment=failed&orderCode={order_id}")
+    except Exception as e:
+        print(f"[PAYOS CANCEL ERROR] {e}")
+        from flask import redirect
+        return redirect("/?payment=failed")
+
+@app.route("/api/payment/payos/webhook", methods=["POST"])
+def api_payos_webhook():
+    """PayOS Webhook"""
+    try:
+        webhook_body = request.json
+        print(f"[PAYOS WEBHOOK] Received: {json.dumps(webhook_body)}")
+        
+        # Verify webhook
+        is_valid, data = verify_payos_webhook(webhook_body)
+        
+        if not is_valid or not data:
+            return jsonify({"success": False, "message": "Invalid webhook"}), 400
+            
+        order_id = str(data.orderCode)
+        trans_id = str(data.transactionDateTime) if hasattr(data, 'transactionDateTime') else ''
         
         import json as json_module
-        response_data = json_module.dumps(data, ensure_ascii=False)
+        response_data = json_module.dumps(webhook_body, ensure_ascii=False)
         
-        if result_code == 0:
+        # Theo docs PayOS: success hoặc mã lỗi tương ứng
+        if data.code == "00": 
             # Thanh toán thành công
             update_payment_status(order_id, 'success', trans_id, response_data)
             
@@ -1532,48 +1614,16 @@ def api_momo_callback():
                 user = get_user_by_id(user_id)
                 user_name = user.get('TenNguoiDung', 'Unknown') if user else 'Unknown'
                 notify_admins(
-                    f"💰 Thanh toán thành công! {user_name} đã nâng cấp Premium (50.000đ) - MoMo TransID: {trans_id}"
+                    f"💰 Thanh toán thành công! {user_name} đã nâng cấp Premium - PayOS OrderCode: {order_id}"
                 )
-                
-                print(f"[MOMO] User {user_id} upgraded to Premium!")
         else:
-            # Thanh toán thất bại
             update_payment_status(order_id, 'failed', trans_id, response_data)
-            print(f"[MOMO] Payment failed for order {order_id}: resultCode={result_code}")
-        
-        return jsonify({"resultCode": 0, "message": "OK"})
+            
+        return jsonify({"success": True, "message": "Webhook processed"}), 200
         
     except Exception as e:
-        print(f"[MOMO CALLBACK ERROR] {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"resultCode": 1, "message": str(e)}), 500
-
-@app.route("/api/payment/momo/return", methods=["GET"])
-def api_momo_return():
-    """Redirect sau khi user thanh toán xong trên MoMo"""
-    order_id = request.args.get('orderId', '')
-    result_code = request.args.get('resultCode', '-1')
-    trans_id = request.args.get('transId', '')
-    
-    import json as json_module
-    response_data = json_module.dumps(dict(request.args), ensure_ascii=False)
-    
-    if result_code == '0':
-        # Thanh toán thành công (xử lý ngay ở đây cho môi trường localhost vì IPN có thể không chạy được)
-        payment = get_payment_by_order_id(order_id)
-        if payment and payment['trangthai'] == 'pending':
-            update_payment_status(order_id, 'success', trans_id, response_data)
-            upgrade_user_account(payment['manguoidung'])
-            
-        return redirect(f"/?payment=success&orderId={order_id}&resultCode={result_code}")
-    else:
-        # Nếu thất bại
-        payment = get_payment_by_order_id(order_id)
-        if payment and payment['trangthai'] == 'pending':
-            update_payment_status(order_id, 'failed', trans_id, response_data)
-            
-        return redirect(f"/dat-hang-thanh-cong?payment=failed&orderId={order_id}&resultCode={result_code}")
+        print(f"[PAYOS WEBHOOK ERROR] {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route("/api/payment/status/<order_id>", methods=["GET"])
 def api_payment_status(order_id):

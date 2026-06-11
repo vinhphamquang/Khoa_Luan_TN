@@ -1407,8 +1407,8 @@ async function fetchAdminPayments() {
                     <td style="font-weight:600;color:var(--primary)">${formatVND(p.amount)}</td>
                     <td>
                         <span style="display:inline-flex;align-items:center;gap:4px;">
-                            <img src="https://developers.momo.vn/v3/vi/assets/images/primary-c62e27d787daa93e4854a4be55f0e50e.png" alt="MoMo" style="height:16px;width:auto;">
-                            ${p.method || 'MoMo'}
+                            <i class="fa-solid fa-credit-card" style="margin-right: 5px;"></i>
+                            ${p.method === 'payos' ? 'PayOS' : (p.method || 'PayOS')}
                         </span>
                     </td>
                     <td>${statusBadge}</td>
