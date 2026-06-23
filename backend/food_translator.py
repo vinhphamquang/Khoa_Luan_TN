@@ -263,8 +263,8 @@ def translate_food_name(english_name: str) -> str:
         english_name: Tên món ăn bằng tiếng Anh
         
     Returns:
-        Tên món ăn bằng tiếng Việt (nếu có trong dictionary)
-        Hoặc tên gốc (nếu không tìm thấy)
+        Tên món ăn bằng tiếng Việt (nếu có trong dictionary hoặc dịch bằng AI)
+        Hoặc tên gốc (nếu không tìm thấy và AI không khả dụng)
     """
     if not english_name:
         return english_name
@@ -276,6 +276,13 @@ def translate_food_name(english_name: str) -> str:
     if english_lower in FOOD_TRANSLATION:
         vietnamese_name = FOOD_TRANSLATION[english_lower]
         print(f"[TRANSLATE] '{english_name}' -> '{vietnamese_name}'")
+        return vietnamese_name
+    
+    # Thử thay underscore bằng space
+    english_spaced = english_lower.replace("_", " ")
+    if english_spaced in FOOD_TRANSLATION:
+        vietnamese_name = FOOD_TRANSLATION[english_spaced]
+        print(f"[TRANSLATE] '{english_name}' -> '{vietnamese_name}' (underscore variant)")
         return vietnamese_name
     
     # Thử tìm partial match - chấm điểm để chọn kết quả tốt nhất
@@ -294,13 +301,76 @@ def translate_food_name(english_name: str) -> str:
             best_match = viet_value
             best_score = score
     
-    if best_match:
+    if best_match and best_score >= 6:  # Yêu cầu score tối thiểu để tránh match sai
         print(f"[TRANSLATE] '{english_name}' -> '{best_match}' (best partial match, score={best_score})")
         return best_match
     
-    # Không tìm thấy, giữ nguyên tên gốc
-    print(f"[TRANSLATE] '{english_name}' -> Giu nguyen (khong tim thay ban dich)")
-    return english_name
+    # Fallback: Dùng Gemini AI để dịch
+    ai_translated = translate_food_name_ai(english_name)
+    if ai_translated:
+        return ai_translated
+    
+    # Không tìm thấy, giữ nguyên tên gốc nhưng format đẹp hơn
+    formatted = english_name.replace("_", " ").strip().title()
+    print(f"[TRANSLATE] '{english_name}' -> '{formatted}' (formatted original, khong tim thay ban dich)")
+    return formatted
+
+
+def translate_food_name_ai(english_name: str) -> str:
+    """
+    Sử dụng Gemini AI để dịch tên món ăn khi dictionary không có.
+    Chỉ dịch TÊN, không cần thông tin khác.
+    
+    Args:
+        english_name: Tên món ăn tiếng Anh
+        
+    Returns:
+        Tên tiếng Việt có dấu, hoặc None nếu lỗi
+    """
+    import os
+    import requests
+    
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        print(f"[TRANSLATE AI] Không có GEMINI_API_KEY, bỏ qua AI translation")
+        return None
+    
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        
+        prompt = f"""Dịch tên món ăn sau sang tiếng Việt CÓ DẤU. Chỉ trả về tên tiếng Việt, không giải thích.
+
+Tên gốc: "{english_name}"
+
+Quy tắc:
+- Nếu là món Việt Nam (ví dụ: pho_bo, banh_mi, bun_cha), trả về tên tiếng Việt có dấu đầy đủ
+- Nếu là món quốc tế phổ biến (pizza, sushi, hamburger), giữ tên gốc hoặc dùng tên phổ biến ở VN
+- Viết hoa chữ cái đầu mỗi từ
+- CHỈ trả về tên món ăn, KHÔNG có dấu ngoặc kép, KHÔNG giải thích thêm"""
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 50}
+        }
+        
+        response = requests.post(url, json=payload, timeout=8)
+        
+        if response.status_code == 200:
+            data = response.json()
+            result = data['candidates'][0]['content']['parts'][0]['text'].strip()
+            # Loại bỏ dấu ngoặc kép nếu có
+            result = result.strip('"').strip("'").strip()
+            
+            if result and len(result) < 100:  # Sanity check
+                print(f"[TRANSLATE AI] '{english_name}' -> '{result}'")
+                return result
+        
+        print(f"[TRANSLATE AI] Gemini API lỗi {response.status_code}")
+        return None
+        
+    except Exception as e:
+        print(f"[TRANSLATE AI] Exception: {e}")
+        return None
 
 def get_search_variants(food_name: str) -> list:
     """
