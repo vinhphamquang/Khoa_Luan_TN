@@ -54,7 +54,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/style.css?v=6">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -1031,7 +1031,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="/static/transitions.js?v=4"></script>
-    <script src="/static/script.js?v=4"></script>
+    <script src="/static/script.js?v=5"></script>
     <!-- ========== PREMIUM MODALS ========== -->
     <!-- Quota Exceeded Modal -->
     <div id="quota-exceeded-modal" class="premium-modal-overlay" style="display:none">
@@ -1104,6 +1104,28 @@
                         Thanh Toán qua PayOS
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nutrition Plan Reminder Modal -->
+    <div id="nutrition-reminder-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-box nutrition-reminder-box">
+            <button class="modal-close" id="nutrition-reminder-close"><i class="fa-solid fa-times"></i></button>
+            <div class="nutrition-reminder-icon">
+                <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+            <h2 class="section-title" style="font-size: 22px; text-align: center; margin-bottom: 10px;">Tạo Kế Hoạch Dinh Dưỡng</h2>
+            <p style="text-align: center; color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
+                Bạn chưa tạo kế hoạch dinh dưỡng cho hôm nay. Hãy thiết lập hồ sơ sức khỏe để nhận đề xuất thực đơn phù hợp với mục tiêu của bạn!
+            </p>
+            <div style="display: flex; gap: 12px; flex-direction: column;">
+                <button class="btn btn-primary" id="nutrition-reminder-go" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-arrow-right"></i> Đồng Ý, Tạo Kế Hoạch
+                </button>
+                <button class="btn btn-outline" id="nutrition-reminder-skip" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-xmark"></i> Bỏ Qua, Tiếp Tục Phân Tích
+                </button>
             </div>
         </div>
     </div>
