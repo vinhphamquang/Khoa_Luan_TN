@@ -231,20 +231,26 @@ def recognize_food_gemini(image_bytes: bytes):
             "parts": [
                 {"text": """Bạn là chuyên gia nhận diện món ăn. Phân tích hình ảnh này và trả về JSON.
 
-**QUY TẮC QUAN TRỌNG:**
+**BƯỚC 1 — BẮT BUỘC KIỂM TRA TRƯỚC TIÊN: ĐÂY CÓ PHẢI MÓN ĂN KHÔNG?**
 
-1. **KIỂM TRA ĐÂY CÓ PHẢI MÓN ĂN KHÔNG:**
-   - Nếu hình ảnh KHÔNG chứa món ăn/thức ăn/đồ uống (ví dụ: người, động vật, đồ vật, phong cảnh, xe cộ, văn bản, logo, tài liệu, điện thoại, máy tính, quần áo, cây cối không phải rau/quả), đặt is_food = false.
-   - Chỉ đặt is_food = true khi hình ảnh THỰC SỰ chứa món ăn đã chế biến, thực phẩm, hoặc đồ uống.
+Đây là bước QUAN TRỌNG NHẤT. Hãy xác định chủ thể chính (subject) trong ảnh:
+- Nếu chủ thể chính là NGƯỜI (selfie, chân dung, ảnh nhóm, ảnh chụp người dù có đồ ăn ở góc nhỏ) → is_food = false
+- Nếu chủ thể chính là ĐỘNG VẬT (chó, mèo, chim...) → is_food = false
+- Nếu chủ thể chính là ĐỒ VẬT (điện thoại, máy tính, xe, quần áo, sách, tài liệu, logo, giày dép...) → is_food = false
+- Nếu chủ thể chính là PHONG CẢNH, KIẾN TRÚC, CÂY CỐI (không phải rau/quả/thực phẩm) → is_food = false
+- Nếu chủ thể chính là VĂN BẢN, ẢNH CHỤP MÀN HÌNH, BIỂU ĐỒ → is_food = false
+- CHỈ đặt is_food = true khi CHỦ THỂ CHÍNH của ảnh là MÓN ĂN ĐÃ CHẾ BIẾN, THỰC PHẨM, hoặc ĐỒ UỐNG chiếm phần lớn diện tích ảnh.
 
-2. **NẾU LÀ MÓN ĂN, NHẬN DIỆN CỤ THỂ:**
+Lưu ý: Ảnh có người cầm đồ ăn nhưng người chiếm phần lớn ảnh → is_food = false. Ảnh phải FOCUS vào đồ ăn thì mới đặt is_food = true.
+
+**BƯỚC 2 — NẾU LÀ MÓN ĂN (is_food = true), NHẬN DIỆN CỤ THỂ:**
    - Tên tiếng Việt phải CÓ DẤU đầy đủ (ví dụ: "Phở Bò", "Bánh Mì", "Bún Bò Huế")
    - Nhận diện nguyên liệu chính nhìn thấy được (cá, tôm, thịt heo, gà, bò, đậu hũ, rau) để đặt tên cụ thể nhất
    - Với món Việt: dùng tên tiếng Việt có dấu (Phở Bò, Cơm Tấm Sườn, Bánh Xèo, Canh Chua Cá...)
    - Với món quốc tế: dùng tên phổ biến tại Việt Nam (Pizza, Sushi, Hamburger, Mì Ý...)
    - Với canh/soup Việt: nhận diện CỤ THỂ loại canh (Canh Chua Cá, Canh Khổ Qua Nhồi Thịt, Canh Bí Đao...) — KHÔNG chỉ ghi "Canh" hay "Soup"
 
-3. **TỰ ĐÁNH GIÁ ĐỘ TIN CẬY (confidence):**
+**BƯỚC 3 — TỰ ĐÁNH GIÁ ĐỘ TIN CẬY (confidence):**
    - 0.9 - 1.0: Rất chắc chắn, nhìn rõ ràng
    - 0.7 - 0.89: Khá chắc chắn nhưng có thể nhầm với món tương tự
    - 0.5 - 0.69: Không chắc lắm, hình ảnh mờ hoặc góc chụp khó
@@ -352,6 +358,11 @@ def analyze_image(image_bytes: bytes):
     if GEMINI_API_KEY:
         food_name_vi, food_name_en, confidence_gemini, err = recognize_food_gemini(image_bytes)
         print(f"[DEBUG] Gemini => vi='{food_name_vi}', en='{food_name_en}', confidence={confidence_gemini}")
+        
+        # QUAN TRỌNG: Nếu Gemini xác nhận KHÔNG PHẢI MÓN ĂN → trả về ngay, KHÔNG fallback
+        if food_name_vi == "NOT_FOOD":
+            print(f"[DEBUG] Gemini confirmed NOT_FOOD → returning immediately, no fallback")
+            return "NOT_FOOD", None, 0.99, None
         
         if food_name_vi and confidence_gemini > 0.5:
             return food_name_vi, food_name_en, confidence_gemini, None
@@ -615,6 +626,9 @@ def analyze_image_with_retry(image_bytes: bytes, skip_api: str = ""):
     # 1. Thử Gemini (nếu không bị skip)
     if "gemini" not in skip_api_lower and GEMINI_API_KEY:
         food_name_vi, food_name_en, confidence, err = recognize_food_gemini(image_bytes)
+        # Nếu Gemini xác nhận KHÔNG PHẢI MÓN ĂN → trả về ngay
+        if food_name_vi == "NOT_FOOD":
+            return "NOT_FOOD", None, 0.99, None
         if food_name_vi and confidence > 0.5:
             return food_name_vi, food_name_en, confidence, None
         if err:

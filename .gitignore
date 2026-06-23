@@ -38,6 +38,9 @@ env/
 *.sqlite3
 food_recognition.db
 
+# Backups
+backend/backups/
+
 # IDE
 .vscode/
 .idea/

@@ -1218,6 +1218,60 @@ def get_dish_info(food_name):
             "message": f"Lỗi server: {str(e)}"
         }), 500
 
+def _is_english_text(text):
+    """Kiểm tra nhanh xem text có phải tiếng Anh không (dựa trên ký tự ASCII)"""
+    if not text or len(text) < 10:
+        return False
+    # Đếm ký tự ASCII (a-z, A-Z)
+    ascii_count = sum(1 for c in text if c.isascii() and c.isalpha())
+    total_alpha = sum(1 for c in text if c.isalpha())
+    if total_alpha == 0:
+        return False
+    # Nếu > 80% là ký tự ASCII → khả năng cao là tiếng Anh
+    ratio = ascii_count / total_alpha
+    # Kiểm tra thêm: có chứa từ tiếng Anh phổ biến không
+    english_words = ['the', 'this', 'that', 'with', 'and', 'for', 'you', 'are', 'from', 
+                     'recipe', 'make', 'want', 'add', 'free', 'servings', 'calories',
+                     'ingredients', 'cook', 'minutes', 'might', 'should', 'gluten']
+    text_lower = text.lower()
+    has_english_words = any(f' {w} ' in f' {text_lower} ' for w in english_words)
+    return ratio > 0.85 and has_english_words
+
+def _translate_description_to_vietnamese(food_name, description):
+    """Dịch mô tả món ăn từ tiếng Anh sang tiếng Việt bằng Gemini"""
+    import os
+    import requests as req
+    
+    if not description or not _is_english_text(description):
+        return description
+    
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        return description
+    
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        prompt = f"""Dịch mô tả sau về món ăn "{food_name}" sang tiếng Việt tự nhiên, ngắn gọn (2-3 câu).
+CHỈ trả về bản dịch tiếng Việt, KHÔNG giải thích thêm, KHÔNG thêm dấu ngoặc kép.
+
+Mô tả gốc: "{description[:300]}"
+"""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200}
+        }
+        response = req.post(url, json=payload, timeout=8)
+        if response.status_code == 200:
+            data = response.json()
+            result = data['candidates'][0]['content']['parts'][0]['text'].strip().strip('"').strip("'")
+            if result and len(result) < 500:
+                print(f"[TRANSLATE DESC] '{description[:50]}...' -> '{result[:50]}...'")
+                return result
+    except Exception as e:
+        print(f"[TRANSLATE DESC ERROR] {e}")
+    
+    return description
+
 @app.route("/predict", methods=["POST"])
 def predict():
     if 'file' not in request.files:
@@ -1418,14 +1472,22 @@ def predict():
             cong_thuc = food_data.get("CongThuc") or {}
             nguyen_lieu = cong_thuc.get("NguyenLieu") or []
             
+            # Dịch mô tả sang tiếng Việt nếu đang là tiếng Anh
+            raw_desc = food_data.get("MoTa", "")
+            description_vi = _translate_description_to_vietnamese(food_name_vietnamese, raw_desc)
+            
+            # Dịch hướng dẫn nấu sang tiếng Việt nếu đang là tiếng Anh
+            raw_instructions = cong_thuc.get("HuongDan", "")
+            instructions_vi = _translate_description_to_vietnamese(food_name_vietnamese, raw_instructions)
+            
             response_data["food_data"] = {
                 "name": food_data.get("TenMonAn", food_name_vietnamese),
-                "description": food_data.get("MoTa", ""),
+                "description": description_vi,
                 "calories": dinh_duong.get("Calo", "--"),
                 "proteins": dinh_duong.get("Protein", "--"),
                 "carbs": dinh_duong.get("Carbohydrate", "--"),
                 "fats": dinh_duong.get("ChatBeo", "--"),
-                "recipe_instructions": cong_thuc.get("HuongDan", ""),
+                "recipe_instructions": instructions_vi,
                 "recipe_time": cong_thuc.get("ThoiGianNau", ""),
                 "ingredients": nguyen_lieu
             }
