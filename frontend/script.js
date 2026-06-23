@@ -66,6 +66,11 @@ function handleHashChange() {
     if(hash === 'profile') {
         initProfilePage();
     }
+
+    // Show nutrition plan reminder on analyze page for logged-in users
+    if(hash === 'analyze') {
+        checkNutritionPlanReminder();
+    }
 }
 
 window.addEventListener('hashchange', handleHashChange);
@@ -1850,6 +1855,62 @@ function renderProfilePlans(container, plans) {
     container.innerHTML = html;
 }
 
+
+// ---- NUTRITION PLAN REMINDER ----
+async function checkNutritionPlanReminder() {
+    const loggedUser = JSON.parse(localStorage.getItem('smartfood_user'));
+    console.log('[NutritionReminder] Checking... user:', loggedUser);
+    if (!loggedUser) return;
+
+    // Check if dismissed today — resets automatically each new day
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const dismissedKey = `nutrition_reminder_dismissed_${today}`;
+    console.log('[NutritionReminder] today:', today, 'dismissedKey:', dismissedKey, 'dismissed:', localStorage.getItem(dismissedKey));
+    if (localStorage.getItem(dismissedKey)) return;
+
+    try {
+        const res = await fetch(`/api/meal-plans/${loggedUser.id}`);
+        const data = await res.json();
+        console.log('[NutritionReminder] API response:', data);
+        if (data.success && data.plans) {
+            // Show reminder if user has NO plan created today
+            const hasPlanToday = data.plans.some(p => p.date && p.date.startsWith(today));
+            console.log('[NutritionReminder] hasPlanToday:', hasPlanToday, 'plans count:', data.plans.length);
+            if (!hasPlanToday) {
+                showNutritionReminder(dismissedKey);
+            }
+        }
+    } catch (e) {
+        console.warn('[NutritionReminder] Check failed:', e);
+    }
+}
+
+function showNutritionReminder(dismissedKey) {
+    const modal = document.getElementById('nutrition-reminder-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const closeBtn = document.getElementById('nutrition-reminder-close');
+    const goBtn = document.getElementById('nutrition-reminder-go');
+    const skipBtn = document.getElementById('nutrition-reminder-skip');
+
+    const dismiss = () => {
+        modal.classList.add('hidden');
+        localStorage.setItem(dismissedKey, '1');
+    };
+
+    closeBtn?.addEventListener('click', dismiss, { once: true });
+    skipBtn?.addEventListener('click', dismiss, { once: true });
+    goBtn?.addEventListener('click', () => {
+        dismiss();
+        window.location.href = '/nutrition';
+    }, { once: true });
+
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) dismiss();
+    }, { once: true });
+}
 
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', () => {
