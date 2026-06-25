@@ -286,9 +286,6 @@
                                 <span class="bulk-count" id="bulk-count">0 món đã chọn</span>
                             </div>
                             <div class="bulk-action-right">
-                                <button class="btn btn-outline bulk-btn" id="btn-bulk-soft-delete">
-                                    <i class="fa-solid fa-ban"></i> Khóa tất cả
-                                </button>
                                 <button class="btn btn-outline bulk-btn bulk-btn-danger" id="btn-bulk-hard-delete">
                                     <i class="fa-solid fa-trash"></i> Xóa vĩnh viễn tất cả
                                 </button>
@@ -376,6 +373,22 @@
                         onclick="document.getElementById('user-detail-overlay').classList.add('hidden')"><i
                             class="fa-solid fa-times"></i></button>
                     <div id="user-detail-content">
+                        <div class="history-loading">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Đang tải chi tiết...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FOOD DETAIL MODAL -->
+            <div id="food-detail-overlay" class="modal-overlay hidden">
+                <div id="food-detail-modal" class="glass-card modal-box"
+                    style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
+                    <button class="modal-close"
+                        onclick="document.getElementById('food-detail-overlay').classList.add('hidden')"><i
+                            class="fa-solid fa-times"></i></button>
+                    <div id="food-detail-content">
                         <div class="history-loading">
                             <i class="fa-solid fa-spinner fa-spin"></i>
                             <span>Đang tải chi tiết...</span>

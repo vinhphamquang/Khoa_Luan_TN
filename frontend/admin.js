@@ -224,10 +224,79 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Removed Food Modal Logic
+    // Food Detail Modal Logic
+    window.viewFoodDetail = async (id) => {
+        const overlay = document.getElementById('food-detail-overlay');
+        const content = document.getElementById('food-detail-content');
+        if (!overlay || !content) return;
+        
+        overlay.classList.remove('hidden');
+        content.innerHTML = '<div class="history-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải...</span></div>';
 
+        try {
+            const res = await fetch(`/api/admin/foods/${id}`);
+            const data = await res.json();
+            if (!data.success) {
+                content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-circle-exclamation"></i><p>Không tìm thấy món ăn</p></div>';
+                return;
+            }
 
+            const f = data.food;
+            const dinhDuong = f.DinhDuong || {};
+            const congThuc = f.CongThuc || {};
+            const nguyenLieu = congThuc.NguyenLieu || [];
+            
+            let ingHTML = '';
+            if (nguyenLieu.length > 0) {
+                ingHTML = `<div class="ud-section"><div class="ud-section-title"><i class="fa-solid fa-carrot"></i> Nguyên liệu</div><ul class="ingredients-list">` + 
+                          nguyenLieu.map(i => `<li>${i.TenNguyenLieu} - ${i.SoLuong}</li>`).join('') + 
+                          `</ul></div>`;
+            }
 
+            let instHTML = '';
+            if (congThuc.HuongDan) {
+                instHTML = `<div class="ud-section"><div class="ud-section-title"><i class="fa-solid fa-book-open"></i> Hướng dẫn nấu</div><div class="recipe-text">${congThuc.HuongDan}</div></div>`;
+            }
+
+            content.innerHTML = `
+                <div class="ud-header" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent);">
+                    <div class="ud-header-info">
+                        <h2 class="ud-name">${f.TenMonAn} <span class="badge badge-info" style="font-size:12px;">${f.PhanLoai || 'Chưa phân loại'}</span></h2>
+                        <p style="color: var(--text-secondary); margin-top: 8px;">${f.MoTa || 'Không có mô tả'}</p>
+                    </div>
+                </div>
+                
+                <div class="ud-stats-row">
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-fire" style="color: #ef4444;"></i>
+                        <span class="ud-stat-val">${dinhDuong.Calo || '--'}</span>
+                        <span class="ud-stat-label">Calo (kcal)</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-drumstick-bite" style="color: #3b82f6;"></i>
+                        <span class="ud-stat-val">${dinhDuong.Protein || '--'}</span>
+                        <span class="ud-stat-label">Protein (g)</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-wheat-awn" style="color: #f59e0b;"></i>
+                        <span class="ud-stat-val">${dinhDuong.Carbohydrate || '--'}</span>
+                        <span class="ud-stat-label">Carbs (g)</span>
+                    </div>
+                    <div class="ud-stat-card">
+                        <i class="fa-solid fa-droplet" style="color: #eab308;"></i>
+                        <span class="ud-stat-val">${dinhDuong.ChatBeo || '--'}</span>
+                        <span class="ud-stat-label">Chất béo (g)</span>
+                    </div>
+                </div>
+                
+                ${ingHTML}
+                ${instHTML}
+            `;
+        } catch (e) {
+            console.error(e);
+            content.innerHTML = '<div class="history-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi khi tải chi tiết</p></div>';
+        }
+    };
     // Global Edit/Delete Handlers
 
     window.deleteAdminFood = async (id) => {
@@ -394,14 +463,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const status = f.is_deleted ? '<span class="badge badge-danger">Đã khóa</span>' : '<span class="badge badge-success">Hiển thị</span>';
                     const tr = document.createElement('tr');
                     tr.dataset.foodId = f.id;
+                    tr.style.cursor = 'pointer';
+                    tr.onclick = () => viewFoodDetail(f.id);
                     tr.innerHTML = `
                             <td>#${f.id}</td>
                             <td>${f.name}</td>
                             <td>${f.category}</td>
                             <td>${status}</td>
                             <td>
-                                <div class="action-btns">
-                                    ${!f.is_deleted ? `<button class="btn-icon delete" title="Khóa (Soft Delete)" onclick="deleteAdminFood(${f.id})"><i class="fa-solid fa-ban"></i></button>` : `<button class="btn-icon" title="Hoàn tác" style="color: var(--c-carb);" onclick="restoreAdminFood(${f.id})"><i class="fa-solid fa-rotate-left"></i></button>`}
+                                <div class="action-btns" onclick="event.stopPropagation()">
+                                    <button class="btn-icon" title="Xem chi tiết" onclick="viewFoodDetail(${f.id})"><i class="fa-solid fa-eye"></i></button>
                                     <button class="btn-icon delete" title="Xóa vĩnh viễn" onclick="hardDeleteAdminFood(${f.id})" style="color: #ef4444;"><i class="fa-solid fa-trash"></i></button>
                                     <label class="bulk-select-label" title="Chọn để xóa nhiều">
                                         <input type="checkbox" class="food-row-checkbox" data-food-id="${f.id}">
