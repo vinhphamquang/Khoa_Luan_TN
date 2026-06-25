@@ -16,6 +16,98 @@ print(f"[CONFIG] Spoonacular API: {'OK' if SPOONACULAR_API_KEY else 'Missing'}")
 print(f"[CONFIG] Google Vision API: {'OK' if GOOGLE_VISION_API_KEY else 'Missing'}")
 print(f"[CONFIG] Gemini API: {'OK' if GEMINI_API_KEY else 'Missing'}")
 
+# ============================================
+# NOT_FOOD DETECTION — VISION GATE
+# ============================================
+# Các label mà Google Vision thường trả về cho ảnh có đồ ăn.
+# Dùng để gate: nếu KHÔNG label nào trong top-5 chứa các từ này,
+# nhiều khả năng ảnh không phải món ăn → trả NOT_FOOD ngay.
+FOOD_LABEL_HINTS = {
+    "food", "dish", "meal", "cuisine", "ingredient",
+    "noodle", "noodles", "rice", "bread", "meat", "vegetable",
+    "fruit", "dessert", "snack", "drink", "beverage",
+    "soup", "salad", "sandwich", "pizza", "pasta",
+    "seafood", "produce", "stew", "curry", "breakfast",
+    "lunch", "dinner", "recipe", "cooking", "kitchen",
+    "plate", "bowl", "crockery", "serveware", "fast food",
+    "junk food", "comfort food", "staple food", "banh",
+    "pho", "sushi", "burger", "hamburger", "taco", "burrito",
+    "steak", "nachos", "fries", "fried", "baked", "grilled",
+    "roasted", "steamed", "spicy", "sweet", "savory",
+}
+
+
+def is_food_image(vision_labels):
+    """
+    Kiểm tra top labels từ Google Vision có chứa label liên quan đến đồ ăn không.
+
+    Args:
+        vision_labels: list of {"description": str, "score": float} từ Vision API.
+                       Có thể là None hoặc [] nếu Vision fail.
+
+    Returns:
+        bool: True nếu có label food-related trong top-5, False nếu không.
+              Khi Vision fail (None/empty) → trả True (không block — cho các API
+              khác cơ hội nhận diện).
+    """
+    if not vision_labels:
+        # Vision fail/timeout → không block, để Gemini quyết định
+        return True
+
+    top = vision_labels[:5]
+    for lbl in top:
+        desc = (lbl.get("description") or "").lower().strip()
+        if not desc:
+            continue
+        # Match chính xác hoặc là substring của label
+        if desc in FOOD_LABEL_HINTS:
+            return True
+        if any(hint in desc for hint in FOOD_LABEL_HINTS if len(hint) >= 4):
+            return True
+    return False
+
+
+def get_vision_top_labels(image_bytes: bytes, max_results: int = 5):
+    """
+    Gọi Google Vision LABEL_DETECTION và trả về danh sách labels.
+
+    Returns:
+        list[dict] gồm {"description", "score"} nếu thành công,
+        hoặc None nếu lỗi / không có key / không có labels.
+    """
+    if not GOOGLE_VISION_API_KEY:
+        return None
+
+    url = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_VISION_API_KEY}"
+    encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    payload = {
+        "requests": [{
+            "image": {"content": encoded_image},
+            "features": [{"type": "LABEL_DETECTION", "maxResults": max_results}],
+        }]
+    }
+
+    try:
+        print("[DEBUG] Trying Google Vision API (label gate)...")
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code != 200:
+            print(f"[DEBUG] Vision gate HTTP {response.status_code}")
+            return None
+        data = response.json()
+        responses = data.get("responses") or []
+        if not responses:
+            return None
+        labels = responses[0].get("labelAnnotations") or []
+        if not labels:
+            return None
+        # Chỉ giữ top-N có score >= 0.5 để gate chính xác hơn
+        filtered = [l for l in labels if l.get("score", 0) >= 0.5][:max_results]
+        return filtered or labels[:max_results]
+    except Exception as e:
+        print(f"[DEBUG] Vision gate exception: {e}")
+        return None
+
 
 def recognize_food_openfoodfacts(image_bytes: bytes):
     """
@@ -236,12 +328,18 @@ def recognize_food_gemini(image_bytes: bytes):
 Đây là bước QUAN TRỌNG NHẤT. Hãy xác định chủ thể chính (subject) trong ảnh:
 - Nếu chủ thể chính là NGƯỜI (selfie, chân dung, ảnh nhóm, ảnh chụp người dù có đồ ăn ở góc nhỏ) → is_food = false
 - Nếu chủ thể chính là ĐỘNG VẬT (chó, mèo, chim...) → is_food = false
-- Nếu chủ thể chính là ĐỒ VẬT (điện thoại, máy tính, xe, quần áo, sách, tài liệu, logo, giày dép...) → is_food = false
+- Nếu chủ thể chính là ĐỒ VẬT (điện thoại, máy tính, xe, quần áo, sách, tài liệu, giày dép...) → is_food = false
+- Nếu chủ thể chính là LOGO thương hiệu (vd. logo KFC, McDonald's, Highlands) → is_food = false
+- Nếu chủ thể chính là BIỂN HIỆU / BẢNG MENU / ẢNH CHỤP MÀN HÌNH có chữ 'food'/'nhà hàng' nhưng KHÔNG có món ăn thực tế → is_food = false
 - Nếu chủ thể chính là PHONG CẢNH, KIẾN TRÚC, CÂY CỐI (không phải rau/quả/thực phẩm) → is_food = false
-- Nếu chủ thể chính là VĂN BẢN, ẢNH CHỤP MÀN HÌNH, BIỂU ĐỒ → is_food = false
-- CHỈ đặt is_food = true khi CHỦ THỂ CHÍNH của ảnh là MÓN ĂN ĐÃ CHẾ BIẾN, THỰC PHẨM, hoặc ĐỒ UỐNG chiếm phần lớn diện tích ảnh.
+- Nếu chủ thể chính là VĂN BẢN, BIỂU ĐỒ, NỘI DUNG SỐ → is_food = false
+- CHỈ đặt is_food = true khi CHỦ THỂ CHÍNH của ảnh là MÓN ĂN ĐÃ CHẾ BIẾN, NGUYÊN LIỆU THÔ (thịt sống, rau củ tươi, gạo, trứng), hoặc ĐỒ UỐNG chiếm phần lớn diện tích ảnh.
 
-Lưu ý: Ảnh có người cầm đồ ăn nhưng người chiếm phần lớn ảnh → is_food = false. Ảnh phải FOCUS vào đồ ăn thì mới đặt is_food = true.
+**NGUYÊN TẮC VÀNG — NGHIÊNG VỀ PHÍA NOT_FOOD KHI KHÔNG CHẮC:**
+- Nếu KHÔNG CHẮC CHẮN >= 70% rằng đây là món ăn → is_food = false.
+- Sai lầm "trả tên món ăn cho ảnh người/đồ vật" còn tệ hơn nhiều so với "trả NOT_FOOD cho ảnh món ăn lạ". Người dùng sẽ upload lại khi bị từ chối, nhưng sẽ bực bội khi nhận tên sai.
+- Ảnh mờ, tối, chụp xa, góc nghiêng → ưu tiên is_food = false.
+- Ảnh có người cầm đồ ăn nhưng người chiếm phần lớn ảnh → is_food = false. Ảnh phải FOCUS vào đồ ăn thì mới đặt is_food = true.
 
 **BƯỚC 2 — NẾU LÀ MÓN ĂN (is_food = true), NHẬN DIỆN CỤ THỂ:**
    - Tên tiếng Việt phải CÓ DẤU đầy đủ (ví dụ: "Phở Bò", "Bánh Mì", "Bún Bò Huế")
@@ -334,12 +432,21 @@ Nếu is_food = false, các trường food_name_vi, food_name_en để chuỗi r
 def analyze_image(image_bytes: bytes):
     """
     Phân tích hình ảnh và nhận diện món ăn.
-    
-    Thứ tự ưu tiên:
-    1. Gemini (AI mạnh nhất, trả về tên tiếng Việt trực tiếp)
-    2. Spoonacular (chuyên về food, trả tên tiếng Anh)
-    3. Google Vision (general purpose, trả tên tiếng Anh)
-    
+
+    Cascade (đã cập nhật 2026-06-25 để chặn non-food chắc chắn hơn):
+    0. GATE:  Google Vision LABEL_DETECTION — nếu top-5 labels KHÔNG có label
+              food-related → return NOT_FOOD ngay, KHÔNG gọi thêm API.
+              (Vision fail / timeout → skip gate, để các bước sau quyết định.)
+    1. Gemini (AI mạnh nhất, trả về tên tiếng Việt trực tiếp).
+       - Nếu Gemini xác nhận NOT_FOOD → return ngay, không fallback.
+       - Nếu Gemini confidence >= 0.6 → return ngay.
+    2. Spoonacular (food-specific, trả tên tiếng Anh).
+       - Nếu confidence > 0.3 → return.
+    3. Google Vision best_label (đã pass gate nên có thể tin).
+       - Nếu confidence > 0.5 → return.
+    4. best_result fallback — chọn kết quả có confidence cao nhất
+       trong các API đã chạy.
+
     Returns:
         tuple: (food_name_vi, food_name_en, confidence, error_msg)
         - food_name_vi: Tên tiếng Việt (có dấu) hoặc "NOT_FOOD"
@@ -348,33 +455,45 @@ def analyze_image(image_bytes: bytes):
         - error_msg: Thông báo lỗi hoặc None
     """
     errors = []
-    
+
     # Khởi tạo biến để dùng trong best-result fallback
     gemini_result = (None, None, 0.0)
     spoonacular_result = (None, None, 0.0)
     vision_result = (None, None, 0.0)
-    
-    # 1. Thử Gemini trước (AI mạnh nhất, trả về tên tiếng Việt trực tiếp)
+
+    # 0. VISION GATE — chặn non-food ngay từ đầu
+    if GOOGLE_VISION_API_KEY:
+        top_labels = get_vision_top_labels(image_bytes, max_results=5)
+        if top_labels is not None:
+            gate_pass = is_food_image(top_labels)
+            top_descs = [l.get("description", "?") for l in top_labels[:5]]
+            print(f"[DEBUG] Vision gate labels={top_descs} → {'PASS' if gate_pass else 'BLOCKED'}")
+            if not gate_pass:
+                # Không có label food-related nào trong top-5 → NOT_FOOD
+                return "NOT_FOOD", None, 0.95, None
+
+    # 1. Gemini (primary recognizer)
     if GEMINI_API_KEY:
         food_name_vi, food_name_en, confidence_gemini, err = recognize_food_gemini(image_bytes)
         print(f"[DEBUG] Gemini => vi='{food_name_vi}', en='{food_name_en}', confidence={confidence_gemini}")
-        
-        # QUAN TRỌNG: Nếu Gemini xác nhận KHÔNG PHẢI MÓN ĂN → trả về ngay, KHÔNG fallback
+
+        # QUAN TRỌNG: Nếu Gemini xác nhận KHÔNG PHẢI MÓN ĂN → trả về ngay
         if food_name_vi == "NOT_FOOD":
-            print(f"[DEBUG] Gemini confirmed NOT_FOOD → returning immediately, no fallback")
+            print(f"[DEBUG] Gemini confirmed NOT_FOOD → returning immediately")
             return "NOT_FOOD", None, 0.99, None
-        
-        if food_name_vi and confidence_gemini > 0.5:
+
+        # Threshold nâng lên 0.6 để tránh false positive (food_name_vi sai)
+        if food_name_vi and confidence_gemini >= 0.6:
             return food_name_vi, food_name_en, confidence_gemini, None
-        
+
         if food_name_vi:
             gemini_result = (food_name_vi, food_name_en, confidence_gemini)
-        
+
         if err:
             print(f"[DEBUG] Gemini error: {err}")
             errors.append(f"Gemini: {err}")
-    
-    # 2. Thử Spoonacular (chuyên về đồ ăn, trả tên tiếng Anh)
+
+    # 2. Spoonacular (food-specific)
     if SPOONACULAR_API_KEY:
         food_name, confidence, err = recognize_food_spoonacular(image_bytes)
         print(f"[DEBUG] Spoonacular => name='{food_name}', confidence={confidence}")
@@ -383,11 +502,11 @@ def analyze_image(image_bytes: bytes):
             return food_name, food_name, confidence, None
         if food_name:
             spoonacular_result = (food_name, food_name, confidence)
-        if err: 
+        if err:
             print(f"[DEBUG] Spoonacular error: {err}")
             errors.append(f"Spoonacular: {err}")
-    
-    # 3. Thử Google Vision (reliable, general purpose)
+
+    # 3. Google Vision best_label (đã pass gate ở bước 0 nên có thể tin)
     if GOOGLE_VISION_API_KEY:
         food_name_v, confidence_v, err = recognize_food_vision(image_bytes)
         print(f"[DEBUG] Vision => name='{food_name_v}', confidence={confidence_v}")
@@ -395,23 +514,23 @@ def analyze_image(image_bytes: bytes):
             return food_name_v, food_name_v, confidence_v, None
         if food_name_v:
             vision_result = (food_name_v, food_name_v, confidence_v)
-        if err: 
+        if err:
             print(f"[DEBUG] Vision error: {err}")
             errors.append(f"Vision: {err}")
-    
-    # Nếu tất cả API có kết quả nhưng confidence thấp, chọn kết quả tốt nhất
+
+    # 4. best_result fallback — chọn kết quả có confidence cao nhất
     best_result = None
     best_confidence = 0
-    
+
     for name_vi, name_en, conf in [gemini_result, spoonacular_result, vision_result]:
         if name_vi and conf > best_confidence:
             best_result = (name_vi, name_en, conf)
             best_confidence = conf
-    
+
     if best_result:
         print(f"[DEBUG] Using best result despite low confidence: {best_result[0]} ({best_result[2]})")
         return best_result[0], best_result[1], best_result[2], None
-    
+
     return None, None, 0.0, " | ".join(errors) if errors else "Không thể nhận diện món ăn"
 
 
