@@ -408,6 +408,10 @@
                     <!-- Camera Section -->
                     <div id="camera-section" class="hidden"
                         style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                        <div class="camera-tips" style="background: rgba(255, 193, 7, 0.1); border-left: 4px solid #ffc107; padding: 10px 15px; border-radius: 8px; font-size: 14px; text-align: left; width: 100%; max-width: 400px; color: var(--text-main);">
+                            <i class="fa-solid fa-lightbulb" style="color: #ffc107; margin-right: 8px;"></i>
+                            <strong>Mẹo chụp:</strong> Để AI nhận diện chính xác nhất, hãy chụp đủ sáng, cận cảnh món ăn và đảm bảo không bị che khuất.
+                        </div>
                         <div
                             style="position: relative; width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                             <video id="camera-video" autoplay playsinline muted
@@ -419,7 +423,7 @@
                                 <i class="fa-solid fa-camera"></i> Chụp Ảnh
                             </button>
                         </div>
-                        <span class="upload-hint">Hãy đưa món ăn vào khung hình và bấm Chụp</span>
+                        <span class="upload-hint">Hãy đưa món ăn vào trung tâm khung hình và bấm Chụp</span>
                     </div>
 
                     <!-- Image Preview -->
@@ -966,7 +970,7 @@
                         style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: normal; cursor: pointer;">
                         <input type="checkbox" id="reg-terms" required style="margin-top: 3px;">
                         <span>Tôi đã đọc và đồng ý với <a href="#"
-                                onclick="alert('Điều khoản sử dụng: Hệ thống cung cấp thông tin tham khảo về dinh dưỡng. Chúng tôi không chịu trách nhiệm y tế. Mọi dữ liệu bạn cung cấp đều được bảo mật.')"
+                                onclick="document.getElementById('terms-modal').classList.remove('hidden'); return false;"
                                 style="color: var(--primary);">điều khoản sử dụng</a> và chính sách bảo mật của ứng
                             dụng.</span>
                     </label>
@@ -998,6 +1002,20 @@
         </div>
     </div>
 
+    <!-- ========== TERMS OF USE MODAL ========== -->
+    <div id="terms-modal" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+        <div class="glass-card modal-box" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <button class="modal-close" onclick="document.getElementById('terms-modal').classList.add('hidden')"><i class="fa-solid fa-times"></i></button>
+            <h2 class="section-title" style="font-size: 24px; text-align: center;">Điều Khoản Sử Dụng</h2>
+            <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin-top: 15px; text-align: left;">
+                <p><strong>1. Mục đích sử dụng</strong><br>Hệ thống cung cấp thông tin tham khảo về dinh dưỡng dựa trên nhận diện hình ảnh món ăn. Các thông tin này không nhằm mục đích thay thế cho lời khuyên y tế chuyên nghiệp hoặc chẩn đoán từ bác sĩ.</p>
+                <p style="margin-top: 10px;"><strong>2. Miễn trừ trách nhiệm</strong><br>Chúng tôi không chịu trách nhiệm cho bất kỳ vấn đề y tế hoặc sức khỏe nào phát sinh từ việc sử dụng thông tin trên ứng dụng. Luôn tham khảo ý kiến chuyên gia y tế trước khi thực hiện các thay đổi lớn về chế độ ăn uống.</p>
+                <p style="margin-top: 10px;"><strong>3. Quyền riêng tư và Bảo mật</strong><br>Mọi hình ảnh và dữ liệu cá nhân bạn cung cấp (địa chỉ email, tuổi, cân nặng, chiều cao...) đều được bảo mật tuyệt đối. Chúng tôi cam kết không chia sẻ dữ liệu cho bên thứ ba vì mục đích thương mại.</p>
+                <p style="margin-top: 10px;"><strong>4. Thay đổi điều khoản</strong><br>Chúng tôi có quyền cập nhật điều khoản sử dụng bất kỳ lúc nào để phù hợp với sự phát triển của hệ thống. Việc bạn tiếp tục sử dụng ứng dụng đồng nghĩa với việc chấp nhận các điều khoản mới.</p>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 20px;" onclick="document.getElementById('terms-modal').classList.add('hidden')">Tôi Đã Hiểu & Đồng Ý</button>
+        </div>
+    </div>
 
     <!-- ========== HISTORY COMMENT MODAL ========== -->
     <div id="history-comment-overlay" class="modal-overlay hidden"
